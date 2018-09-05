@@ -61,7 +61,7 @@ get_target_property(al_libs al LINK_LIBRARIES)
 target_link_libraries(${app_name} al  ${al_libs})
 
 target_include_directories(${app_name} PRIVATE ${app_include_dirs})
-target_link_libraries(${app_name} ${app_link_libs} ${FREEIMAGE_LIBRARY})
+target_link_libraries(${app_name} ${app_link_libs})
 target_compile_definitions(${app_name} PRIVATE ${app_definitions})
 target_compile_options(${app_name} PRIVATE ${app_compile_flags})
 # Item names starting with -, but not -l or -framework, are treated as linker flags.

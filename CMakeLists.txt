@@ -57,7 +57,7 @@ else ()
 endif ()
 
 get_target_property(al_libs al LINK_LIBRARIES)
-message("  >>>>> ${al_libs}")
+#message("  >>>>> ${al_libs}")
 target_link_libraries(${app_name} al  ${al_libs})
 
 target_include_directories(${app_name} PRIVATE ${app_include_dirs})
@@ -68,6 +68,7 @@ target_compile_options(${app_name} PRIVATE ${app_compile_flags})
 target_link_libraries(${app_name} ${app_linker_flags})
 
 if (${CMAKE_SYSTEM_NAME} MATCHES "Windows")
+message("Building for windows: ${CMAKE_GENERATOR_PLATFORM}")
   # when run from Visual Studio, working directory is where the solution is by default
   # set it to app output directory
   set_target_properties(${app_name} PROPERTIES VS_DEBUGGER_WORKING_DIRECTORY ${app_path}/bin)

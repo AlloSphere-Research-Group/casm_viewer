@@ -3,7 +3,7 @@ set(allolib_directory allolib)
 
 # list your app files here
 set(app_files_list
-	vdv_group/al_DataScript.hpp
+  vdv_group/al_DataScript.hpp
   vdv_group/common.hpp
   vdv_group/instanced_mesh.hpp
   vdv_group/simulator.cpp

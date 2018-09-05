@@ -10,18 +10,6 @@ include(app_config.cmake)
 
 set(allolib_dir ${CMAKE_CURRENT_LIST_DIR}/${allolib_directory})
 
-if (AL_VERBOSE_OUTPUT)
-	message("binary dir: ${CMAKE_CURRENT_BINARY_DIR}")
-	message("app path: ${app_path}")
-	message("app name: ${app_name}")
-	message("allolib path: ${allolib_dir}")
-	message("include dirs: ${app_include_dirs}")
-	message("link libs: ${app_link_libs}")
-  message("definitions: ${app_definitions}")
-  message("compile flags: ${app_compile_flags}")
-  message("linker flags: ${app_linker_flags}")
-endif()
-
 # inlcude allolib target
 
 if (NOT DEFINED CMAKE_CONFIGURATION_TYPES)
@@ -68,10 +56,26 @@ target_compile_options(${app_name} PRIVATE ${app_compile_flags})
 target_link_libraries(${app_name} ${app_linker_flags})
 
 if (${CMAKE_SYSTEM_NAME} MATCHES "Windows")
-message("Building for windows: ${CMAKE_GENERATOR_PLATFORM}")
+message("Building for windows: ${CMAKE_GENERATOR_PLATFORM} ${CMAKE_BUILD_TYPE}")
   # when run from Visual Studio, working directory is where the solution is by default
   # set it to app output directory
-  set_target_properties(${app_name} PROPERTIES VS_DEBUGGER_WORKING_DIRECTORY ${app_path}/bin)
+  
+	if (${CMAKE_BUILD_TYPE} MATCHES Debug)
+		set_target_properties(${app_name} PROPERTIES VS_DEBUGGER_WORKING_DIRECTORY ${app_path}/bin)
+    endif()
   # startup project is `ALL_BUILD` by default so we change it to app project
   set_directory_properties(PROPERTIES VS_STARTUP_PROJECT bin)
 endif ()
+
+
+if (AL_VERBOSE_OUTPUT)
+	message("binary dir: ${CMAKE_CURRENT_BINARY_DIR}")
+	message("app path: ${app_path}")
+	message("app name: ${app_name}")
+	message("allolib path: ${allolib_dir}")
+	message("include dirs: ${app_include_dirs}")
+	message("link libs: ${app_link_libs}")
+  message("definitions: ${app_definitions}")
+  message("compile flags: ${app_compile_flags}")
+  message("linker flags: ${app_linker_flags}")
+endif()

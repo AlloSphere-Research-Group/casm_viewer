@@ -28,6 +28,8 @@ add_subdirectory(${allolib_dir} ${FULL_AL_BUILD_PATH})
 
 add_executable(${app_name} ${app_files_list})
 
+target_include_directories(${app_name} PUBLIC ${allolib_dir}/modules)
+
 set_target_properties(${app_name} PROPERTIES
   DEBUG_POSTFIX _debug
   RUNTIME_OUTPUT_DIRECTORY ${app_path}/bin

@@ -4,10 +4,12 @@
 
 mkdir -p build
 cd build
-cmake ..
-cmake --build .
+mkdir -p Release
+cd Release
+cmake -DCMAKE_BUILD_TYPE="Release" ../.. 
+cmake --build . --config Release --target casm_viewer_run
 
-if [ $? == 0 ]; then
-    cd ../bin
-    ./casm_viewer
-fi
+# if [ $? == 0 ]; then
+#     cd ../bin
+#     ./casm_viewer
+# fi

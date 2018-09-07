@@ -12,7 +12,7 @@ set(allolib_dir ${CMAKE_CURRENT_LIST_DIR}/${allolib_directory})
 
 # inlcude allolib target
 
-if (NOT DEFINED CMAKE_CONFIGURATION_TYPES)
+if (DEFINED CMAKE_CONFIGURATION_TYPES)
   set(CMAKE_CONFIGURATION_TYPES "Debug;Release")
   set(FULL_AL_BUILD_PATH  ${allolib_dir}/build)
 else()
@@ -31,7 +31,7 @@ add_executable(${app_name} ${app_files_list})
 target_include_directories(${app_name} PUBLIC ${allolib_dir}/modules)
 
 set_target_properties(${app_name} PROPERTIES
-  DEBUG_POSTFIX _debug
+  DEBUG_POSTFIX d
   RUNTIME_OUTPUT_DIRECTORY ${app_path}/bin
   RUNTIME_OUTPUT_DIRECTORY_DEBUG ${app_path}/bin
   RUNTIME_OUTPUT_DIRECTORY_RELEASE ${app_path}/bin
@@ -69,6 +69,13 @@ message("Building for windows: ${CMAKE_GENERATOR_PLATFORM} ${CMAKE_BUILD_TYPE}")
   set_directory_properties(PROPERTIES VS_STARTUP_PROJECT bin)
 endif ()
 
+add_custom_target(${app_name}_run 
+                    ${app_name}
+                  DEPENDS ${app_name}
+                  WORKING_DIRECTORY ${app_path}/bin
+                  USES_TERMINAL
+                  )
+message("Running target after build")
 
 if (AL_VERBOSE_OUTPUT)
 	message("binary dir: ${CMAKE_CURRENT_BINARY_DIR}")

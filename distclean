@@ -2,6 +2,7 @@ rm -rf build
 rm -rf bin
 rm -rf allolib/build
 rm -rf allolib/bin
+rm -rf vdv_group/build
 rm -rf vdv_group/bin
 
 

@@ -1,8 +1,5 @@
-﻿################################################################################
-# This .gitignore file was automatically created by Microsoft(R) Visual Studio.
-################################################################################
-
 /.vs
+build/*
 /bin/vdv.toml
 /bin/imgui.ini
 /bin/freetype.dll
@@ -13,3 +10,6 @@
 /bin/casm_viewer.ilk
 /bin/casm_viewer.exe
 /bin/bin_debug.pdb
+bin/cached_output
+bin/casm_viewer
+bin/casm_viewerd

@@ -39,25 +39,10 @@ set_target_properties(${app_name} PROPERTIES
   CXX_STANDARD_REQUIRED ON
 )
 
-set(OPENVR_ROOT "C:/Users/Mengyu/source/repos/openvr")
-set(OPENVR_INCLUDE_DIR "${OPENVR_ROOT}/headers")
-set(OPENVR_LIB "${OPENVR_ROOT}/lib/win32/openvr_api.lib")
-
-
-if(EXISTS "${OPENVR_LIB}")
-  add_definitions(-DBUILD_VR)
-  message("Building with OpenVR support")
-endif()
-
 list(APPEND app_include_dirs 
 ${OPENVR_INCLUDE_DIR}
 
   ${allolib_directory}/external/Gamma
-)
-
-# other libraries to link
-list(APPEND app_link_libs
-${OPENVR_LIB}
 )
 
 # flags

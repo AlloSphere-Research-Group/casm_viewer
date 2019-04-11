@@ -30,31 +30,12 @@ set(app_definitions
 )
 
 # compile flags
+if(${CMAKE_SYSTEM_NAME} MATCHES "Windows")
 set(app_compile_flags
+    /bigobj /F2000000
 )
+endif()
 
 # linker flags, with `-` in the beginning
 set(app_linker_flags
 )
-
-# ---- OpenVR
-set(OPENVR_ROOT "C:/Users/Mengyu/source/repos/openvr")
-set(OPENVR_INCLUDE_DIR "${OPENVR_ROOT}/headers")
-set(OPENVR_LIB "${OPENVR_ROOT}/lib/win64/openvr_api.lib")
-
-if(EXISTS "${OPENVR_LIB}")
-  add_definitions(-DBUILD_VR)
-  message("Building with OpenVR support")
-  list(APPEND app_include_dirs
-  ${OPENVR_INCLUDE_DIR}
-  )
-
-  # other libraries to link
-  list(APPEND app_link_libs
-  ${OPENVR_LIB}
-  )
-
-  list(APPEND app_compile_flags
-      /bigobj /F2000000
-  )
-endif()

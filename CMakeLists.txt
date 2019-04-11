@@ -6,7 +6,7 @@ project(${app_name})
 option(AL_VERBOSE_OUTPUT "" ON)
 
 # app config user specified
-include(app_config.cmake) 
+include("vdv_group/app_config.cmake")
 
 set(allolib_dir ${CMAKE_CURRENT_LIST_DIR}/${allolib_directory})
 
@@ -77,6 +77,25 @@ add_custom_target(${app_name}_run
                   WORKING_DIRECTORY ${app_path}/bin
                   USES_TERMINAL
                   )
+
+if(${CMAKE_SYSTEM_NAME} MATCHES "Linux")
+  set (DEBUGGER "gdb" "-ex" "run")
+  add_custom_target(${app_name}_run_debug
+    ${DEBUGGER} ./${app_name}d
+    DEPENDS ${app_name}d
+    WORKING_DIRECTORY ${app_path}/bin
+    USES_TERMINAL
+    )
+elseif (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
+  set (DEBUGGER "lldb" "-o run" "-ex ")
+  add_custom_target(${app_name}_run_debug
+    ${DEBUGGER} ./${app_name}d
+    DEPENDS ${app_name}d
+    WORKING_DIRECTORY ${app_path}/bin
+    USES_TERMINAL
+    )
+endif()
+
 message("Running target after build")
 
 if (AL_VERBOSE_OUTPUT)

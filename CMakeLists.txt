@@ -23,7 +23,7 @@ else()
 	endif()
 endif ()
 
-set(BUILD_EXAMPLES OFF CACHE BOOL "Build Examples (should affect allolib" FORCE)
+set(BUILD_EXAMPLES ON CACHE BOOL "Build Examples (should affect allolib" FORCE)
 add_subdirectory(${allolib_dir} ${FULL_AL_BUILD_PATH})
 
 add_executable(${app_name} ${app_files_list})
@@ -39,11 +39,11 @@ set_target_properties(${app_name} PROPERTIES
   CXX_STANDARD_REQUIRED ON
 )
 
-list(APPEND app_include_dirs 
-${OPENVR_INCLUDE_DIR}
+#list(APPEND app_include_dirs
+#${OPENVR_INCLUDE_DIR}
 
-  ${allolib_directory}/external/Gamma
-)
+#  ${allolib_directory}/external/Gamma
+#)
 
 # flags
 if (${CMAKE_SYSTEM_NAME} MATCHES "Windows")
@@ -72,22 +72,25 @@ if (${CMAKE_SYSTEM_NAME} MATCHES "Windows")
 endif ()
 
 add_custom_target(${app_name}_run 
-                    ${app_name}
-                  DEPENDS ${app_name}
-                  WORKING_DIRECTORY ${app_path}/bin
-                  USES_TERMINAL
-                  )
+  ${app_name}
+  DEPENDS ${app_name}
+  WORKING_DIRECTORY ${app_path}/bin
+  USES_TERMINAL
+  )
+get_target_property(DLLS_TO_COPY al AL_DLL_LIBRARIES)
+Copy_dlls("${app_path}" "${app_name}" "${DLLS_TO_COPY}")
 
 if(${CMAKE_SYSTEM_NAME} MATCHES "Linux")
+  message(" ------ Debugger target")
   set (DEBUGGER "gdb" "-ex" "run")
   add_custom_target(${app_name}_run_debug
-    ${DEBUGGER} ./${app_name}d
+    "${DEBUGGER}" ./${app_name}d
     DEPENDS ${app_name}d
     WORKING_DIRECTORY ${app_path}/bin
     USES_TERMINAL
     )
 elseif (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
-  set (DEBUGGER "lldb" "-o run" "-ex ")
+  set (DEBUGGER "lldb" "-o run")
   add_custom_target(${app_name}_run_debug
     ${DEBUGGER} ./${app_name}d
     DEPENDS ${app_name}d
@@ -96,7 +99,7 @@ elseif (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
     )
 endif()
 
-message("Running target after build")
+#message("Running target after build")
 
 if (AL_VERBOSE_OUTPUT)
 	message("binary dir: ${CMAKE_CURRENT_BINARY_DIR}")

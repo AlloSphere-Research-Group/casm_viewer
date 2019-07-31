@@ -1,114 +1,177 @@
 cmake_minimum_required(VERSION 3.0)
-set(app_path ${CMAKE_CURRENT_LIST_DIR})
-#get_filename_component(app_name ${app_path} NAME)
-set(app_name casm_viewer)
-project(${app_name})
-option(AL_VERBOSE_OUTPUT "" ON)
 
-# app config user specified
-include("vdv_group/app_config.cmake")
+# name of application. replace 'app' with desired app name
+set(APP_NAME casm_viewer)
 
-set(allolib_dir ${CMAKE_CURRENT_LIST_DIR}/${allolib_directory})
+project(${APP_NAME})
 
-# inlcude allolib target
+# path to main source file
+add_executable(${APP_NAME}
+  src/main.cpp
+  src/parameterspace.cpp
+  src/datadisplay.cpp
+  src/datasetmanager.cpp
+  src/slice.cpp
+  src/al_DataScript.cpp
+  src/al_VASPReader.cpp
 
-if (DEFINED CMAKE_CONFIGURATION_TYPES)
-  set(CMAKE_CONFIGURATION_TYPES "Debug;Release")
-  set(FULL_AL_BUILD_PATH  ${allolib_dir}/build)
-else()
-	if (${CMAKE_BUILD_TYPE} MATCHES Debug)
-		set(FULL_AL_BUILD_PATH  ${allolib_dir}/build/Debug)
-	else()
-		set(FULL_AL_BUILD_PATH  ${allolib_dir}/build/Release)
-	endif()
-endif ()
+  src/al_DataScript.hpp
+  src/al_VASPReader.hpp
+  src/datadisplay.hpp
+  src/datasetmanager.hpp
+  src/processors.hpp
+  src/parameterspace.hpp
+  src/instanced_mesh.hpp
+  src/json.hpp
+  src/slice.hpp)
 
-set(BUILD_EXAMPLES ON CACHE BOOL "Build Examples (should affect allolib" FORCE)
-add_subdirectory(${allolib_dir} ${FULL_AL_BUILD_PATH})
+# add allolib as a subdirectory to the project
+add_subdirectory(allolib)
 
-add_executable(${app_name} ${app_files_list})
+# link allolib to project
+target_link_libraries(${APP_NAME} PRIVATE al)
 
-target_include_directories(${app_name} PUBLIC ${allolib_dir}/modules)
+# compile flags
+if(${CMAKE_SYSTEM_NAME} MATCHES "Windows")
+set(app_compile_flags
+    /bigobj /F2000000
+)
+endif()
 
-set_target_properties(${app_name} PROPERTIES
-  DEBUG_POSTFIX d
-  RUNTIME_OUTPUT_DIRECTORY ${app_path}/bin
-  RUNTIME_OUTPUT_DIRECTORY_DEBUG ${app_path}/bin
-  RUNTIME_OUTPUT_DIRECTORY_RELEASE ${app_path}/bin
+# example line for find_package usage
+# find_package(Qt5Core REQUIRED CONFIG PATHS "C:/Qt/5.12.0/msvc2017_64/lib" NO_DEFAULT_PATH)
+
+# replace ${PATH_TO_INCLUDE_DIR} before including other libraries
+# target_include_directories(${APP_NAME} PRIVATE ${PATH_TO_INCLUDE_DIR})
+
+# replace ${PATH_TO_LIB_FILE} before linking other libraries
+# target_link_libraries(${APP_NAME} PRIVATE ${PATH_TO_LIB_FILE})
+
+# binaries are put into the ./bin directory by default
+set_target_properties(${APP_NAME} PROPERTIES
   CXX_STANDARD 14
   CXX_STANDARD_REQUIRED ON
+  RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_LIST_DIR}/bin
+  RUNTIME_OUTPUT_DIRECTORY_DEBUG ${CMAKE_CURRENT_LIST_DIR}/bin
+  RUNTIME_OUTPUT_DIRECTORY_RELEASE ${CMAKE_CURRENT_LIST_DIR}/bin
 )
 
-#list(APPEND app_include_dirs
-#${OPENVR_INCLUDE_DIR}
 
-#  ${allolib_directory}/external/Gamma
+
+
+
+
+#cmake_minimum_required(VERSION 3.0)
+#set(app_path ${CMAKE_CURRENT_LIST_DIR})
+##get_filename_component(app_name ${app_path} NAME)
+#set(app_name casm_viewer)
+#project(${app_name})
+#option(AL_VERBOSE_OUTPUT "" ON)
+
+## app config user specified
+#include("vdv_group/app_config.cmake")
+
+#set(allolib_dir ${CMAKE_CURRENT_LIST_DIR}/${allolib_directory})
+
+## inlcude allolib target
+
+#if (DEFINED CMAKE_CONFIGURATION_TYPES)
+#  set(CMAKE_CONFIGURATION_TYPES "Debug;Release")
+#  set(FULL_AL_BUILD_PATH  ${allolib_dir}/build)
+#else()
+#	if (${CMAKE_BUILD_TYPE} MATCHES Debug)
+#		set(FULL_AL_BUILD_PATH  ${allolib_dir}/build/Debug)
+#	else()
+#		set(FULL_AL_BUILD_PATH  ${allolib_dir}/build/Release)
+#	endif()
+#endif ()
+
+#set(BUILD_EXAMPLES ON CACHE BOOL "Build Examples (should affect allolib" FORCE)
+#add_subdirectory(${allolib_dir} ${FULL_AL_BUILD_PATH})
+
+#add_executable(${app_name} ${app_files_list})
+
+#target_include_directories(${app_name} PUBLIC ${allolib_dir}/modules)
+
+#set_target_properties(${app_name} PROPERTIES
+#  DEBUG_POSTFIX d
+#  RUNTIME_OUTPUT_DIRECTORY ${app_path}/bin
+#  RUNTIME_OUTPUT_DIRECTORY_DEBUG ${app_path}/bin
+#  RUNTIME_OUTPUT_DIRECTORY_RELEASE ${app_path}/bin
+#  CXX_STANDARD 14
+#  CXX_STANDARD_REQUIRED ON
 #)
 
-# flags
-if (${CMAKE_SYSTEM_NAME} MATCHES "Windows")
-  target_compile_options(${app_name} PRIVATE "")
-else ()
-  target_compile_options(${app_name} PRIVATE "-Wall")
-endif ()
+##list(APPEND app_include_dirs
+##${OPENVR_INCLUDE_DIR}
 
-get_target_property(al_libs al LINK_LIBRARIES)
-target_link_libraries(${app_name} al  ${al_libs})
+##  ${allolib_directory}/external/Gamma
+##)
 
-target_include_directories(${app_name} PRIVATE ${app_include_dirs})
-target_link_libraries(${app_name} ${app_link_libs})
-target_compile_definitions(${app_name} PRIVATE ${app_definitions})
-target_compile_options(${app_name} PRIVATE ${app_compile_flags})
-# Item names starting with -, but not -l or -framework, are treated as linker flags.
-target_link_libraries(${app_name} ${app_linker_flags})
+## flags
+#if (${CMAKE_SYSTEM_NAME} MATCHES "Windows")
+#  target_compile_options(${app_name} PRIVATE "")
+#else ()
+#  target_compile_options(${app_name} PRIVATE "-Wall")
+#endif ()
 
-if (${CMAKE_SYSTEM_NAME} MATCHES "Windows")
-  message("Building for windows: ${CMAKE_GENERATOR_PLATFORM} ${CMAKE_BUILD_TYPE}")
-  # when run from Visual Studio, working directory is where the solution is by default
-  # set it to app output directory
-  set_target_properties(${app_name} PROPERTIES VS_DEBUGGER_WORKING_DIRECTORY ${app_path}/bin)
-  # startup project is `ALL_BUILD` by default so we change it to app project
-  set_directory_properties(PROPERTIES VS_STARTUP_PROJECT bin)
-endif ()
+#get_target_property(al_libs al LINK_LIBRARIES)
+#target_link_libraries(${app_name} al  ${al_libs})
 
-add_custom_target(${app_name}_run 
-  ${app_name}
-  DEPENDS ${app_name}
-  WORKING_DIRECTORY ${app_path}/bin
-  USES_TERMINAL
-  )
-get_target_property(DLLS_TO_COPY al AL_DLL_LIBRARIES)
-Copy_dlls("${app_path}" "${app_name}" "${DLLS_TO_COPY}")
+#target_include_directories(${app_name} PRIVATE ${app_include_dirs})
+#target_link_libraries(${app_name} ${app_link_libs})
+#target_compile_definitions(${app_name} PRIVATE ${app_definitions})
+#target_compile_options(${app_name} PRIVATE ${app_compile_flags})
+## Item names starting with -, but not -l or -framework, are treated as linker flags.
+#target_link_libraries(${app_name} ${app_linker_flags})
 
-if(${CMAKE_SYSTEM_NAME} MATCHES "Linux")
-  message(" ------ Debugger target")
-  set (DEBUGGER "gdb" "-ex" "run")
-  add_custom_target(${app_name}_run_debug
-    "${DEBUGGER}" ./${app_name}d
-    DEPENDS ${app_name}d
-    WORKING_DIRECTORY ${app_path}/bin
-    USES_TERMINAL
-    )
-elseif (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
-  set (DEBUGGER "lldb" "-o run")
-  add_custom_target(${app_name}_run_debug
-    ${DEBUGGER} ./${app_name}d
-    DEPENDS ${app_name}d
-    WORKING_DIRECTORY ${app_path}/bin
-    USES_TERMINAL
-    )
-endif()
+#if (${CMAKE_SYSTEM_NAME} MATCHES "Windows")
+#  message("Building for windows: ${CMAKE_GENERATOR_PLATFORM} ${CMAKE_BUILD_TYPE}")
+#  # when run from Visual Studio, working directory is where the solution is by default
+#  # set it to app output directory
+#  set_target_properties(${app_name} PROPERTIES VS_DEBUGGER_WORKING_DIRECTORY ${app_path}/bin)
+#  # startup project is `ALL_BUILD` by default so we change it to app project
+#  set_directory_properties(PROPERTIES VS_STARTUP_PROJECT bin)
+#endif ()
 
-#message("Running target after build")
+#add_custom_target(${app_name}_run
+#  ${app_name}
+#  DEPENDS ${app_name}
+#  WORKING_DIRECTORY ${app_path}/bin
+#  USES_TERMINAL
+#  )
+#get_target_property(DLLS_TO_COPY al AL_DLL_LIBRARIES)
+#Copy_dlls("${app_path}" "${app_name}" "${DLLS_TO_COPY}")
 
-if (AL_VERBOSE_OUTPUT)
-	message("binary dir: ${CMAKE_CURRENT_BINARY_DIR}")
-	message("app path: ${app_path}")
-	message("app name: ${app_name}")
-	message("allolib path: ${allolib_dir}")
-	message("include dirs: ${app_include_dirs}")
-	message("link libs: ${app_link_libs}")
-  message("definitions: ${app_definitions}")
-  message("compile flags: ${app_compile_flags}")
-  message("linker flags: ${app_linker_flags}")
-endif()
+#if(${CMAKE_SYSTEM_NAME} MATCHES "Linux")
+#  message(" ------ Debugger target")
+#  set (DEBUGGER "gdb" "-ex" "run")
+#  add_custom_target(${app_name}_run_debug
+#    "${DEBUGGER}" ./${app_name}d
+#    DEPENDS ${app_name}d
+#    WORKING_DIRECTORY ${app_path}/bin
+#    USES_TERMINAL
+#    )
+#elseif (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
+#  set (DEBUGGER "lldb" "-o run")
+#  add_custom_target(${app_name}_run_debug
+#    ${DEBUGGER} ./${app_name}d
+#    DEPENDS ${app_name}d
+#    WORKING_DIRECTORY ${app_path}/bin
+#    USES_TERMINAL
+#    )
+#endif()
+
+##message("Running target after build")
+
+#if (AL_VERBOSE_OUTPUT)
+#	message("binary dir: ${CMAKE_CURRENT_BINARY_DIR}")
+#	message("app path: ${app_path}")
+#	message("app name: ${app_name}")
+#	message("allolib path: ${allolib_dir}")
+#	message("include dirs: ${app_include_dirs}")
+#	message("link libs: ${app_link_libs}")
+#  message("definitions: ${app_definitions}")
+#  message("compile flags: ${app_compile_flags}")
+#  message("linker flags: ${app_linker_flags}")
+#endif()

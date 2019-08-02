@@ -343,8 +343,8 @@ std::string DatasetManager::getSubDir() {
 
 void DatasetManager::processTemplatePositions() {
 
-  std::unique_lock<std::mutex> lk(mDataLock);
-  auto templatePoscarName = File::conformDirectory(mLoadedDataset) + labelProcessor.outputFile();
+//  std::unique_lock<std::mutex> lk(mDataLock);
+  auto templatePoscarName = labelProcessor.outputFile();
 
   // Load POSCAR data
   if (reader.loadFile(templatePoscarName)) {
@@ -355,7 +355,7 @@ void DatasetManager::processTemplatePositions() {
   mHistory.clear();
   // Load empty template
   VASPReader emptyTemplateReader;
-  if (emptyTemplateReader.loadFile(File::conformPathToOS(buildRootPath() + mCurrentDataset.get() + "/template_POSCAR"))) {
+  if (emptyTemplateReader.loadFile(File::conformPathToOS(buildRootPath() + mCurrentDataset.get() + "/cached_output/template_POSCAR"))) {
     mEmptyTemplate = emptyTemplateReader.getElementPositions("X");
   }
 
@@ -512,11 +512,10 @@ void DatasetManager::getAtomPositions() {
       //          std::string timeIndexId = mParameterSpaces["time"]->idAt(0);
       labelProcessor.setRunningDirectory(mLoadedDataset);
       labelProcessor.setParams(id, condition, mCurrentDataset, "0");
-      labelProcessor.processAsync(labelProcessor.configuration(),false,[&] (bool ok) {
-        if (ok) {
-           processTemplatePositions();
-        }
-      });
+      bool ok = labelProcessor.process(labelProcessor.configuration(),false);
+      if (ok) {
+        processTemplatePositions();
+      }
     } else {
       timeIndex = mCurrentLoadedIndeces["time"];
     }

@@ -287,11 +287,6 @@ void DataDisplay::initRootDirectory() {
 
   mPlotXAxis.setElements(parameterSpaceNames);
   mPlotYAxis.set(0);
-  //        if (mConfig.preProcess) {
-  ////            std::cout << "Starting preprocess " << std::endl;
-  //            preProcessDataset();
-  //        }
-//  requestDataLoad();
 }
 
 void DataDisplay::prepare(Graphics &g, Matrix4f &transformMatrix) {
@@ -305,7 +300,6 @@ void DataDisplay::prepare(Graphics &g, Matrix4f &transformMatrix) {
       mRequestLoad = false;
     }*/
     mProcessing = false;
-    updateParameterText();
   }
   updateDisplayBuffers();
 

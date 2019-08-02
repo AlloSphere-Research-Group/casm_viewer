@@ -146,6 +146,12 @@ void DatasetManager::initRoot() {
         mConditionsParameter = key;
       }
     }
+    if (mConditionsParameter == "" && mParameterSpaces["temperature"]->size() > 0) {
+      // This is a fallback to support datasets with only a single condition.
+      // In this case no conditions parameter is found, and therefore this would be considered an
+      // invalid dataset...
+      mConditionsParameter = "temperature";
+    }
 
 
     for (json::iterator it = j["internal_states"].begin(); it != j["internal_states"].end(); ++it) {

@@ -516,13 +516,17 @@ void DatasetManager::getAtomPositions() {
     }
 
     bool diffLoaded = loadDiff(timeIndex);
-    if (diffLoaded) { /*allPositions = mTemplatePositions;*/}
+    if (diffLoaded) {
+
+      auto positions = positionBuffers.getWritable();
+      *positions = mTemplatePositions;
+
+      positionBuffers.doneWriting(positions);}
     else {
       loadFromPOSCAR();
 
     }
   } else { // Generate POSCAR file from template if no time space and no cached diffs
-
     loadFromPOSCAR();
 
   }

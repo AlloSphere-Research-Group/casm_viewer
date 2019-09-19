@@ -11,6 +11,8 @@
 
 #include "imgui.h"
 
+#include <thread>
+
 void DataDisplay::init() {
 
 #ifdef AL_BUILD_MPI
@@ -19,15 +21,16 @@ void DataDisplay::init() {
 
   mPickableManager << graphPickable << parallelPickable << perspectivePickable;
 
-  graphPickable.bb.set(Vec3f(-1.2f,-0.9f,-0.05f), Vec3f(1.2f,0.9f,0.0f));
+  graphPickable.bb.set(Vec3f(-1.2f, -0.9f, -0.05f), Vec3f(1.2f, 0.9f, 0.0f));
   graphPickable.pose = Pose(Vec3d(-2.0, 0.8, -.75), Quatf());
   graphPickable.scale = 0.2f;
 
-  parallelPickable.bb.setCenterDim(Vec3f(), Vec3f(4,4,0.1f));
+  parallelPickable.bb.setCenterDim(Vec3f(), Vec3f(4, 4, 0.1f));
   parallelPickable.pose = Pose(Vec3d(-0.68, 1.1, -1.5), Quatf());
   parallelPickable.scale = 0.4f;
 
-  perspectivePickable.pose = Pose(Vec3d(0.55, 0.35, -0.7), Quatf().fromEuler(75.0*M_DEG2RAD,0,0));
+  perspectivePickable.pose =
+      Pose(Vec3d(0.55, 0.35, -0.7), Quatf().fromEuler(75.0 * M_DEG2RAD, 0, 0));
   perspectivePickable.scale = 0.02f;
   //    perspectivePickable.scaleVec = mPerspectiveScale.get();
   // perspectivePickable.addChild(rh);
@@ -38,9 +41,11 @@ void DataDisplay::init() {
   perspectivePickable.testChildren = false;
   perspectivePickable.containChildren = true;
 
-  //        mPerspectiveScale.registerChangeCallback([this](float s){ perspectivePickable.scaleVec.set(s); });
-  mPerspectiveRotY.registerChangeCallback([this](float d){
-    perspectivePickable.pose = Pose(perspectivePickable.pose.get().pos(), Quatf().fromEuler(-d*M_DEG2RAD,0,0));
+  //        mPerspectiveScale.registerChangeCallback([this](float s){
+  //        perspectivePickable.scaleVec.set(s); });
+  mPerspectiveRotY.registerChangeCallback([this](float d) {
+    perspectivePickable.pose = Pose(perspectivePickable.pose.get().pos(),
+                                    Quatf().fromEuler(-d * M_DEG2RAD, 0, 0));
   });
 
   mMarkerScale = 0.01f;
@@ -51,8 +56,8 @@ void DataDisplay::init() {
     addSphere(instancing_mesh0.mesh, 1, 12, 6);
     instancing_mesh0.mesh.update();
     instancing_mesh0.init(instancing_vert, instancing_frag,
-                          1, // location
-                          4, // num elements
+                          1,         // location
+                          4,         // num elements
                           GL_FLOAT); // type
 
     instancing_shader.compile(instancing_vert, instancing_frag);
@@ -82,7 +87,7 @@ void DataDisplay::init() {
   transform *= Matrix4f::translation(0, 0, 0.3);
   transform *= Matrix4f::scaling(0.02, 0.02, 1);
   axis.transform(transform, axis.vertices().size() - num_verts_added);
-  for (int i = 0 ; i < num_verts_added; i += 1) {
+  for (int i = 0; i < num_verts_added; i += 1) {
     axis.color(1, 0, 0);
   }
 
@@ -93,7 +98,7 @@ void DataDisplay::init() {
   transform *= Matrix4f::translation(0, 0, 0.3);
   transform *= Matrix4f::scaling(0.02, 0.02, 1);
   axis.transform(transform, axis.vertices().size() - num_verts_added);
-  for (int i = 0 ; i < num_verts_added; i += 1) {
+  for (int i = 0; i < num_verts_added; i += 1) {
     axis.color(0, 1, 0);
   }
 
@@ -103,53 +108,64 @@ void DataDisplay::init() {
   transform *= Matrix4f::translation(0, 0, 0.3);
   transform *= Matrix4f::scaling(0.02, 0.02, 1);
   axis.transform(transform, axis.vertices().size() - num_verts_added);
-  for (int i = 0 ; i < num_verts_added; i += 1) {
+  for (int i = 0; i < num_verts_added; i += 1) {
     axis.color(0, 0, 1);
   }
   axis.update();
 
   // Parameters setup
 
-  for (auto &parameterSpace: mDatasetManager.mParameterSpaces) {
-    parameterSpace.second->parameter().registerChangeCallback([&](float value){
+  for (auto &parameterSpace : mDatasetManager.mParameterSpaces) {
+    parameterSpace.second->parameter().registerChangeCallback([&](float value) {
+      if (parameterSpace.second->getCurrentId() !=
+          parameterSpace.second->idAt(parameterSpace.second->getIndexForValue(
+              value))) { // Only reload if id has changed
 
-      if (parameterSpace.second->getCurrentId()
-          != parameterSpace.second->idAt(parameterSpace.second->getIndexForValue(value))) { // Only reload if id has changed
-
-        parameterSpace.second->parameter().setNoCalls(value); // To have the internal value already changed for the following functions.
-        std::cout << value << " : " << parameterSpace.second->getCurrentId() << "..."
-                  << parameterSpace.second->idAt(parameterSpace.second->getIndexForValue(value));
+        parameterSpace.second->parameter().setNoCalls(
+            value); // To have the internal value already changed for the
+                    // following functions.
+        std::cout << value << " : " << parameterSpace.second->getCurrentId()
+                  << "..."
+                  << parameterSpace.second->idAt(
+                         parameterSpace.second->getIndexForValue(value));
         mDatasetManager.getAtomPositions();
-//        this->requestDataLoad();
+        //        this->requestDataLoad();
       }
     });
   }
 
-  mDatasetManager.mCurrentDataset.registerChangeCallback([&](std::string value){
-    if (value != mDatasetManager.mCurrentDataset.get()) {
-      this->requestInitDataset();
-//      this->requestDataLoad();
-    }
-  });
+  mDatasetManager.mCurrentDataset.registerChangeCallback(
+      [&](std::string value) {
+        if (value != mDatasetManager.mCurrentDataset.get()) {
+          this->requestInitDataset();
+          //      this->requestDataLoad();
+        }
+      });
 
   mShowAtoms.registerChangeCallback([this](uint16_t value) {
     if (mShowAtoms.get() != value) {
-//      this->requestDataLoad();
+      //      this->requestDataLoad();
     }
   });
 
   mSliceRotationPitch.registerChangeCallback([this](float value) {
-    mSlicingPlaneNormal.setNoCalls(Vec3f(sin(mSliceRotationRoll), cos(mSliceRotationRoll) *sin(value), cos(value)).normalize());
+    mSlicingPlaneNormal.setNoCalls(Vec3f(sin(mSliceRotationRoll),
+                                         cos(mSliceRotationRoll) * sin(value),
+                                         cos(value))
+                                       .normalize());
   });
 
   mSliceRotationRoll.registerChangeCallback([this](float value) {
-    mSlicingPlaneNormal.setNoCalls(Vec3f(sin(value), cos(value) * sin(mSliceRotationPitch), cos(mSliceRotationPitch)).normalize());
+    mSlicingPlaneNormal.setNoCalls(Vec3f(sin(value),
+                                         cos(value) * sin(mSliceRotationPitch),
+                                         cos(mSliceRotationPitch))
+                                       .normalize());
   });
 
   mSlicingPlaneNormal.registerChangeCallback([this](Vec3f value) {
     value = value.normalized();
-    float pitch = std::atan(value.y/value.z);
-    float roll = std::atan(value.x/value.z);
+    float pitch = std::atan(value.y / value.z);
+    float roll = std::atan(value.x / value.z);
     mSliceRotationPitch.setNoCalls(pitch);
     mSliceRotationRoll.setNoCalls(roll);
   });
@@ -159,7 +175,7 @@ void DataDisplay::init() {
     // mSlicingPlaneNormal.setNoCalls();
   });
 
-  mSlicingPlaneDistance.registerChangeCallback([this](float v){
+  mSlicingPlaneDistance.registerChangeCallback([this](float v) {
     auto m = slicePickable.bb.max;
     m.z = v;
     slicePickable.bb.set(slicePickable.bb.min, m);
@@ -168,7 +184,7 @@ void DataDisplay::init() {
   backgroundColor.setHint("showAlpha", 1.0);
 
   mGridType.setElements({"square", "triangle"});
-  mShowGrid.registerChangeCallback([this](float value){
+  mShowGrid.registerChangeCallback([this](float value) {
     if (value == 0.0f) {
       mGridType.setHint("hide", 1.0);
       mGridSpacing.setHint("hide", 1.0);
@@ -184,25 +200,28 @@ void DataDisplay::init() {
   mShowGrid = false;
 
   // TODO we don't need to do a full data load here, just recompute the graph
-  mPlotYAxis.registerChangeCallback([this](float value){
+  mPlotYAxis.registerChangeCallback([this](float value) {
     if (mPlotYAxis.get() != value) {
-//      this->requestDataLoad();
+      //      this->requestDataLoad();
     }
   });
   // TODO we don't need to do a full data load here, just recompute the graph
-  mPlotXAxis.registerChangeCallback([this](float value){
+  mPlotXAxis.registerChangeCallback([this](float value) {
     if (mPlotXAxis.get() != value) {
-//      this->requestDataLoad();
+      //      this->requestDataLoad();
     }
   });
 
-  mDatasetManager.currentGraphName.registerChangeCallback([this](std::string value) {
-    std::string fullDatasetPath = File::conformPathToOS(mDatasetManager.buildRootPath()
-                                                        + File::conformPathToOS(mDatasetManager.mCurrentDataset.get()));
+  mDatasetManager.currentGraphName.registerChangeCallback(
+      [this](std::string value) {
+        std::string fullDatasetPath = File::conformPathToOS(
+            mDatasetManager.buildRootPath() +
+            File::conformPathToOS(mDatasetManager.mCurrentDataset.get()));
 
-    std::cout << "loading graph " << value << " at " << fullDatasetPath <<std::endl;
-    loadGraphTexture(value);
-  });
+        std::cout << "loading graph " << value << " at " << fullDatasetPath
+                  << std::endl;
+        loadGraphTexture(value);
+      });
 
   mLabelFont.align(TEXT_ALIGN::LEFT);
 
@@ -210,28 +229,30 @@ void DataDisplay::init() {
   bundle << mDatasetManager.mCurrentDataset;
   bundle << mVisible;
   bundle << mDatasetManager.mParameterSpaces["temperature"]->parameter();
-  bundle << mDatasetManager.mParameterSpaces["chempotA"]->parameter() << mDatasetManager.mParameterSpaces["chempotB"]->parameter();
+  bundle << mDatasetManager.mParameterSpaces["chempotA"]->parameter()
+         << mDatasetManager.mParameterSpaces["chempotB"]->parameter();
   bundle << mDatasetManager.mParameterSpaces["time"]->parameter();
   bundle << mAtomMarkerSize;
   //        bundle << mAtomOfInterest;
   bundle << mShowAtoms;
   bundle << mPlotXAxis;
   bundle << mPlotYAxis;
-  bundle << mShowGraph << mShowParallel /*<< mShowSurface */ << mShowPerspective /*<< mSingleProjection*/;
+  bundle << mShowGraph << mShowParallel /*<< mShowSurface */
+         << mShowPerspective /*<< mSingleProjection*/;
 
   bundle << mLayerSeparation;
   bundle << mPerspectiveRotY;
   bundle << mSlicingPlaneNormal;
   bundle << mSliceRotationPitch << mSliceRotationRoll;
   bundle << mSlicingPlanePoint << mSlicingPlaneDistance << mLayerScaling;
-  bundle << mShowGrid << mGridType << mGridSpacing << mGridXOffset << mGridYOffset;
+  bundle << mShowGrid << mGridType << mGridSpacing << mGridXOffset
+         << mGridYOffset;
 
   bundle << mShowRadius;
   bundle << mCumulativeTrajectory << mIndividualTrajectory;
   bundle << mBillboarding;
   bundle << mSmallLabel;
   bundle << mDrawLabels;
-
 }
 
 void DataDisplay::initRootDirectory() {
@@ -239,15 +260,18 @@ void DataDisplay::initRootDirectory() {
 
   mDatasetManager.initRoot();
 
-  DatasetManager::SpeciesLabelMap labelMap = mDatasetManager.getAvailableSpecies();
+  DatasetManager::SpeciesLabelMap labelMap =
+      mDatasetManager.getAvailableSpecies();
 
   std::vector<std::string> availableAtoms;
   std::vector<std::string> atomLabels;
-  for(auto species: labelMap) {
+  for (auto species : labelMap) {
     availableAtoms.push_back(species.first);
     if (species.first != "Va") {
-      // Vacancy atom names will be there already so wee need to skip to avoid duplication
-      atomLabels.insert(atomLabels.end(), species.second.begin(), species.second.end());
+      // Vacancy atom names will be there already so wee need to skip to avoid
+      // duplication
+      atomLabels.insert(atomLabels.end(), species.second.begin(),
+                        species.second.end());
     }
   }
   // Only update menu and selection if it has changed
@@ -262,13 +286,15 @@ void DataDisplay::initRootDirectory() {
     // Match atom of interest to atom that can fill vacancies
     std::smatch match;
     std::regex atomNameRegex("[A-Z][a-z]*");
-    for(auto atomName: labelMap["Va"]) {
+    for (auto atomName : labelMap["Va"]) {
       // Use only first result
       if (std::regex_search(atomName, match, atomNameRegex)) {
         string result = match.str();
-        ptrdiff_t pos = std::distance(availableAtoms.begin(), find(availableAtoms.begin(), availableAtoms.end(), result));
-        if (pos < (int) availableAtoms.size()) {
-          mAtomOfInterest.set((int) pos);
+        ptrdiff_t pos = std::distance(
+            availableAtoms.begin(),
+            find(availableAtoms.begin(), availableAtoms.end(), result));
+        if (pos < (int)availableAtoms.size()) {
+          mAtomOfInterest.set((int)pos);
         }
         mShowAtoms.setElementSelected(atomName);
       }
@@ -276,10 +302,11 @@ void DataDisplay::initRootDirectory() {
   }
   auto dataNames = mDatasetManager.getDataNames();
   mPlotYAxis.setElements(dataNames);
-  string defaultYAxis= "<comp_n(" + mAtomOfInterest.getCurrent() + ")>";
-  ptrdiff_t pos = std::find(dataNames.begin(), dataNames.end(), defaultYAxis) - dataNames.begin();
-  if (pos < (int) dataNames.size()) {
-    mPlotYAxis.set((int) pos);
+  string defaultYAxis = "<comp_n(" + mAtomOfInterest.getCurrent() + ")>";
+  ptrdiff_t pos = std::find(dataNames.begin(), dataNames.end(), defaultYAxis) -
+                  dataNames.begin();
+  if (pos < (int)dataNames.size()) {
+    mPlotYAxis.set((int)pos);
   }
 
   std::vector<std::string> parameterSpaceNames;
@@ -303,7 +330,7 @@ void DataDisplay::prepare(Graphics &g, Matrix4f &transformMatrix) {
   }
   updateDisplayBuffers();
 
-  if (/*mRequestLoad ||*/ mRequestInit)  {
+  if (/*mRequestLoad ||*/ mRequestInit) {
     mProcessing = true;
   } // Schedule processing for the start of next frame
 
@@ -314,29 +341,38 @@ void DataDisplay::prepare(Graphics &g, Matrix4f &transformMatrix) {
 
     float historyWidth = 0.65f;
     size_t counter = mDatasetManager.mHistory.size() - 1;
-    for (auto historyPoint = mDatasetManager.mHistory.begin(); historyPoint != mDatasetManager.mHistory.end(); historyPoint++) {
+    for (auto historyPoint = mDatasetManager.mHistory.begin();
+         historyPoint != mDatasetManager.mHistory.end(); historyPoint++) {
 
-      HSV hsvColor(0.5f * float(counter)/mDatasetManager.mHistory.size(), 1.0, 1.0);
+      HSV hsvColor(0.5f * float(counter) / mDatasetManager.mHistory.size(), 1.0,
+                   1.0);
       Color c;
 
       // Assumes the plane's normal is the z-axis
-      Vec3f orthogonalVec = (historyPoint->second - historyPoint->first).cross({0, 0, 1}).normalize(historyWidth);
-      Vec3f orthogonalVec2 = (historyPoint->second - historyPoint->first).cross({1, 0, 0}).normalize(historyWidth);
+      Vec3f orthogonalVec = (historyPoint->second - historyPoint->first)
+                                .cross({0, 0, 1})
+                                .normalize(historyWidth);
+      Vec3f orthogonalVec2 = (historyPoint->second - historyPoint->first)
+                                 .cross({1, 0, 0})
+                                 .normalize(historyWidth);
       if (orthogonalVec2.mag() < 0.0001f) {
-        orthogonalVec2 = (historyPoint->second - historyPoint->first).cross({0, 1, 0}).normalize(historyWidth);
+        orthogonalVec2 = (historyPoint->second - historyPoint->first)
+                             .cross({0, 1, 0})
+                             .normalize(historyWidth);
       }
       assert(orthogonalVec2.mag() > 0.0001f);
-      ImGui::ColorConvertHSVtoRGB(hsvColor.h, hsvColor.s, hsvColor.v, c.r, c.g, c.b);
+      ImGui::ColorConvertHSVtoRGB(hsvColor.h, hsvColor.s, hsvColor.v, c.r, c.g,
+                                  c.b);
       c.a = 0.35f;
       unsigned int previousSize = mHistoryMesh.vertices().size();
       mHistoryMesh.color(c);
       mHistoryMesh.vertex(historyPoint->first - orthogonalVec);
       mHistoryMesh.color(c);
-      mHistoryMesh.vertex(historyPoint->second - orthogonalVec* 0.1f);
+      mHistoryMesh.vertex(historyPoint->second - orthogonalVec * 0.1f);
       mHistoryMesh.color(c);
       mHistoryMesh.vertex(historyPoint->first + orthogonalVec);
       mHistoryMesh.color(c);
-      mHistoryMesh.vertex(historyPoint->second + orthogonalVec* 0.1f);
+      mHistoryMesh.vertex(historyPoint->second + orthogonalVec * 0.1f);
 
       mHistoryMesh.index(previousSize);
       mHistoryMesh.index(previousSize + 1);
@@ -348,27 +384,32 @@ void DataDisplay::prepare(Graphics &g, Matrix4f &transformMatrix) {
       counter--;
     }
 
-
     // Trajectory mesh displays the cumulative trajectory
     mTrajectoryMesh.primitive(Mesh::TRIANGLES);
     mTrajectoryMesh.reset();
-    Vec3f previousPoint(0,0,0);
+    Vec3f previousPoint(0, 0, 0);
     float previousMag = 0.0;
 
     float trajectoryWidth = 0.35f;
     counter = mDatasetManager.mHistory.size() - 1;
-    for (auto historyPoint = mDatasetManager.mHistory.begin(); historyPoint != mDatasetManager.mHistory.end(); historyPoint++) {
+    for (auto historyPoint = mDatasetManager.mHistory.begin();
+         historyPoint != mDatasetManager.mHistory.end(); historyPoint++) {
 
-      HSV hsvColor(0.5f * float(counter)/mDatasetManager.mHistory.size(), 1.0, 1.0);
+      HSV hsvColor(0.5f * float(counter) / mDatasetManager.mHistory.size(), 1.0,
+                   1.0);
       Color c;
 
       // Assumes the plane's normal is the z-axis
       Vec3f thisMovement = historyPoint->second - historyPoint->first;
-      Vec3f orthogonalVec = thisMovement.cross({0, 0, 1}).normalize(trajectoryWidth);
-      ImGui::ColorConvertHSVtoRGB(hsvColor.h, hsvColor.s, hsvColor.v, c.r, c.g, c.b);
+      Vec3f orthogonalVec =
+          thisMovement.cross({0, 0, 1}).normalize(trajectoryWidth);
+      ImGui::ColorConvertHSVtoRGB(hsvColor.h, hsvColor.s, hsvColor.v, c.r, c.g,
+                                  c.b);
       c.a = 0.8f;
       unsigned int previousSize = mTrajectoryMesh.vertices().size();
-      if (thisMovement.mag() > fabs(mDataBoundaries.maxx - mDataBoundaries.minx)/2.0f) { // Atom is wrapping around
+      if (thisMovement.mag() >
+          fabs(mDataBoundaries.maxx - mDataBoundaries.minx) /
+              2.0f) { // Atom is wrapping around
         //              c = Color(0.8f, 0.8f, 0.8f, 1.0f);
         thisMovement = -thisMovement;
         thisMovement.normalize(previousMag);
@@ -378,11 +419,13 @@ void DataDisplay::prepare(Graphics &g, Matrix4f &transformMatrix) {
       mTrajectoryMesh.color(c);
       mTrajectoryMesh.vertex(previousPoint - orthogonalVec);
       mTrajectoryMesh.color(c);
-      mTrajectoryMesh.vertex(previousPoint + thisMovement - orthogonalVec * 0.2f);
+      mTrajectoryMesh.vertex(previousPoint + thisMovement -
+                             orthogonalVec * 0.2f);
       mTrajectoryMesh.color(c);
       mTrajectoryMesh.vertex(previousPoint + orthogonalVec);
       mTrajectoryMesh.color(c);
-      mTrajectoryMesh.vertex(previousPoint + thisMovement + orthogonalVec * 0.2f);
+      mTrajectoryMesh.vertex(previousPoint + thisMovement +
+                             orthogonalVec * 0.2f);
 
       mTrajectoryMesh.index(previousSize);
       mTrajectoryMesh.index(previousSize + 1);
@@ -395,13 +438,13 @@ void DataDisplay::prepare(Graphics &g, Matrix4f &transformMatrix) {
       counter--;
     }
 
-
     prepareParallelProjection(g, transformMatrix);
     //        g.scale(1.0/(mDataBoundaries.maxy - mDataBoundaries.miny));
   }
 }
 
-void DataDisplay::draw(Graphics &g) {        // Load data after drawing frame to allow showing "in process" state
+void DataDisplay::draw(Graphics &g) { // Load data after drawing frame to allow
+                                      // showing "in process" state
   if (mVisible == 0.0f) {
     return;
   }
@@ -441,7 +484,8 @@ void DataDisplay::setFont(string name, float size) {
       if (!mLabelFont.load("C:\\Windows\\Fonts\\arial.ttf")) {
       }
 
-      if (!mLabelFont.load("/usr/share/fonts/truetype/ttf-bitstream-vera/Vera.ttf")) {
+      if (!mLabelFont.load(
+              "/usr/share/fonts/truetype/ttf-bitstream-vera/Vera.ttf")) {
         throw;
       }
     } else {
@@ -454,30 +498,39 @@ void DataDisplay::setFont(string name, float size) {
 
 void DataDisplay::dumpImages(string dumpPrefix) {
   std::unique_lock<std::mutex> lk(mDrawLock);
-  std::string dumpDirectory = File::conformPathToOS(mDatasetManager.buildRootPath() + mDatasetManager.mCurrentDataset.get() + "/graphics");
+  std::string dumpDirectory = File::conformPathToOS(
+      mDatasetManager.buildRootPath() + mDatasetManager.mCurrentDataset.get() +
+      "/graphics");
   if (!File::exists(dumpDirectory)) {
     if (!Dir::make(dumpDirectory)) {
-      std::cerr << "Failed to create directory: " << dumpDirectory <<std::endl;
+      std::cerr << "Failed to create directory: " << dumpDirectory << std::endl;
       return;
     }
   }
 
-  std::string fullDatasetPath = File::conformPathToOS(mDatasetManager.buildRootPath()
-                                                      + File::conformPathToOS(mDatasetManager.mCurrentDataset.get()));
-  std::string graphFilename = File::conformPathToOS(dumpDirectory + "/" + dumpPrefix + "_graph.png");
-  std::cout << "dumping " << fullDatasetPath + mDatasetManager.currentGraphName.get() << " -> " << graphFilename << std::endl;
-  if (!File::copy( File::conformPathToOS(fullDatasetPath + mDatasetManager.currentGraphName.get()) ,
-                   graphFilename)) {
-    std::cerr << "ERROR copying png file." <<std::endl;
+  std::string fullDatasetPath = File::conformPathToOS(
+      mDatasetManager.buildRootPath() +
+      File::conformPathToOS(mDatasetManager.mCurrentDataset.get()));
+  std::string graphFilename =
+      File::conformPathToOS(dumpDirectory + "/" + dumpPrefix + "_graph.png");
+  std::cout << "dumping "
+            << fullDatasetPath + mDatasetManager.currentGraphName.get()
+            << " -> " << graphFilename << std::endl;
+  if (!File::copy(File::conformPathToOS(fullDatasetPath +
+                                        mDatasetManager.currentGraphName.get()),
+                  graphFilename)) {
+    std::cerr << "ERROR copying png file." << std::endl;
   }
 
   auto allPositions = mDatasetManager.positionBuffers.get(false);
-  File allPositionsFile(File::conformPathToOS(dumpDirectory + "/" + dumpPrefix + "_positions.csv"), "w", true);
+  File allPositionsFile(File::conformPathToOS(dumpDirectory + "/" + dumpPrefix +
+                                              "_positions.csv"),
+                        "w", true);
   std::string header = "element,x,y,z\n";
   allPositionsFile.write(header);
-  for (auto elemPositions: *allPositions) {
+  for (auto elemPositions : *allPositions) {
     auto positionIt = elemPositions.second.begin();
-    while(positionIt != elemPositions.second.end()) {
+    while (positionIt != elemPositions.second.end()) {
       std::string line = elemPositions.first + ",";
       line += std::to_string(*positionIt++) + ",";
       line += std::to_string(*positionIt++) + ",";
@@ -487,7 +540,6 @@ void DataDisplay::dumpImages(string dumpPrefix) {
     }
   }
   allPositionsFile.close();
-
 }
 
 void DataDisplay::updateDisplayBuffers() {
@@ -498,32 +550,34 @@ void DataDisplay::updateDisplayBuffers() {
     auto allPositions = mDatasetManager.positionBuffers.get();
 
     mDatasetManager.mCurrentLoadedIndeces.clear();
-    for (auto &paramSpace: mDatasetManager.mParameterSpaces) {
-      mDatasetManager.mCurrentLoadedIndeces[paramSpace.first] = paramSpace.second->getCurrentIndex();
+    for (auto &paramSpace : mDatasetManager.mParameterSpaces) {
+      mDatasetManager.mCurrentLoadedIndeces[paramSpace.first] =
+          paramSpace.second->getCurrentIndex();
     }
 
     vector<vector<float> *> elemPositions;
 
-    // Now that the layer direction has been computed from the atom of interest, we need to
-    // generate aligned data from the visible atoms.
+    // Now that the layer direction has been computed from the atom of interest,
+    // we need to generate aligned data from the visible atoms.
     elemPositions.clear();
     auto visibleAtoms = mShowAtoms.getSelectedElements();
-    for (auto &elementData: *allPositions) {
-      if (std::find(visibleAtoms.begin(), visibleAtoms.end(), elementData.first) != visibleAtoms.end()) {
+    for (auto &elementData : *allPositions) {
+      if (std::find(visibleAtoms.begin(), visibleAtoms.end(),
+                    elementData.first) != visibleAtoms.end()) {
         elemPositions.push_back(&(elementData.second));
       }
     }
     // also prepare layer normal direction aligned data
     size_t totalSize = 0;
-    for(auto *elems:elemPositions) {
+    for (auto *elems : elemPositions) {
       totalSize += elems->size();
     }
 
     mDataBoundaries.reset();
-    mAligned4fData.resize(totalSize*4);
+    mAligned4fData.resize(totalSize * 4);
     auto outit = mAligned4fData.begin();
     // now fill the
-    for(auto *elems:elemPositions) {
+    for (auto *elems : elemPositions) {
       auto it = elems->begin();
       while (it != elems->end()) {
         assert(outit != mAligned4fData.end());
@@ -540,17 +594,19 @@ void DataDisplay::updateDisplayBuffers() {
       }
     }
 
-    if (mAligned4fData.size() > 0 ) {
+    if (mAligned4fData.size() > 0) {
       auto &b = mDataBoundaries;
-      perspectivePickable.bb.set(Vec3f(b.minx,b.miny,b.minz),Vec3f(b.maxx,b.maxy,b.maxz));
-      slicePickable.bb.set(Vec3f(b.minx,b.miny,b.minz),Vec3f(b.maxx,b.maxy,(b.maxz-b.minz)*0.5f));
+      perspectivePickable.bb.set(Vec3f(b.minx, b.miny, b.minz),
+                                 Vec3f(b.maxx, b.maxy, b.maxz));
+      slicePickable.bb.set(Vec3f(b.minx, b.miny, b.minz),
+                           Vec3f(b.maxx, b.maxy, (b.maxz - b.minz) * 0.5f));
       // rh.pose.pos().set(perspectivePickable.bb.cen);
       mSlicingPlanePoint.setHint("maxx", b.maxx);
-      mSlicingPlanePoint.setHint("minx", b.minx- (b.maxx));
+      mSlicingPlanePoint.setHint("minx", b.minx - (b.maxx));
       mSlicingPlanePoint.setHint("maxy", b.maxy);
-      mSlicingPlanePoint.setHint("miny", b.miny- (b.maxy));
+      mSlicingPlanePoint.setHint("miny", b.miny - (b.maxy));
       mSlicingPlanePoint.setHint("maxz", b.maxz);
-      mSlicingPlanePoint.setHint("minz", b.minz- (b.maxz));
+      mSlicingPlanePoint.setHint("minz", b.minz - (b.maxz));
       mSlicingPlaneDistance.min(mDataBoundaries.minz);
       mSlicingPlaneDistance.max(mDataBoundaries.maxz);
     }
@@ -561,38 +617,50 @@ void DataDisplay::updateDisplayBuffers() {
 
     // TODO these colors should be exposed as a preference
     vector<Color> colorList = {
-      Color(0.0, 1.0, 1.0, 1.0), Color(1.0, 1.0, 0.0, 1.0), Color(1.0, 0.0, 1.0, 1.0),
-      Color(0.0, 1.0, 1.0, 1.0), Color(1.0, 1.0, 0.0, 1.0), Color(1.0, 0.0, 1.0, 1.0)
-    };
+        Color(0.0, 1.0, 1.0, 1.0), Color(1.0, 1.0, 0.0, 1.0),
+        Color(1.0, 0.0, 1.0, 1.0), Color(0.0, 1.0, 1.0, 1.0),
+        Color(1.0, 1.0, 0.0, 1.0), Color(1.0, 0.0, 1.0, 1.0)};
 
     vector<Color> colorList2 = {
-      Color(0.7f, 0.0f, 0.7f, 0.4f), Color(0.7f, 0.0f, 0.7f, 1.0f),
-      Color(0.0f, 0.7f, 0.0f, 0.4f), Color(0.0f, 0.7f, 0.0f, 1.0f),
-      Color(0.0f, 0.0f, 0.7f, 0.4f), Color(0.0f, 0.0f, 0.7f, 1.0f),
-      Color(0.7f, 0.0f, 0.7f, 0.4f), Color(0.7f, 0.0f, 0.7f, 1.0f),
-      Color(0.0f, 0.7f, 0.0f, 0.4f), Color(0.0f, 0.7f, 0.0f, 1.0f),
-      Color(0.0f, 0.0f, 0.7f, 0.4f), Color(0.0f, 0.0f, 0.7f, 1.0f),
+        Color(0.7f, 0.0f, 0.7f, 0.4f), Color(0.7f, 0.0f, 0.7f, 1.0f),
+        Color(0.0f, 0.7f, 0.0f, 0.4f), Color(0.0f, 0.7f, 0.0f, 1.0f),
+        Color(0.0f, 0.0f, 0.7f, 0.4f), Color(0.0f, 0.0f, 0.7f, 1.0f),
+        Color(0.7f, 0.0f, 0.7f, 0.4f), Color(0.7f, 0.0f, 0.7f, 1.0f),
+        Color(0.0f, 0.7f, 0.0f, 0.4f), Color(0.0f, 0.7f, 0.0f, 1.0f),
+        Color(0.0f, 0.0f, 0.7f, 0.4f), Color(0.0f, 0.0f, 0.7f, 1.0f),
     };
     auto colorListIt = colorList.begin();
     auto colorList2It = colorList2.begin();
 
     auto selectedElements = mShowAtoms.getSelectedElements();
-    for (auto atom: mShowAtoms.getElements()) {
-      if (std::find(selectedElements.begin(), selectedElements.end(), atom) != selectedElements.end()) {
+    for (auto atom : mShowAtoms.getElements()) {
+      if (std::find(selectedElements.begin(), selectedElements.end(), atom) !=
+          selectedElements.end()) {
 
         if (elementData.find(atom) != elementData.end()) {
-          //                    std::cout << "Color for: " << atom << ":" << elementData[atom].color.r << " " << elementData[atom].color.g << " "<< elementData[atom].color.b << " "  <<std::endl ;
+          //                    std::cout << "Color for: " << atom << ":" <<
+          //                    elementData[atom].color.r << " " <<
+          //                    elementData[atom].color.g << " "<<
+          //                    elementData[atom].color.b << " "  <<std::endl ;
           // Atom was matched in elements.ini file, so use those colors
 
-          atomPropertiesProj.push_back(AtomProperties{ atom, elementData[atom].radius, elementData[atom].color});
+          atomPropertiesProj.push_back(AtomProperties{
+              atom, elementData[atom].radius, elementData[atom].color});
 
-          atomPropertiesPersp.push_back(AtomProperties{ atom, elementData[atom].radius, elementData[atom].color, Graphics::FILL });
-          atomPropertiesPersp.push_back(AtomProperties{ atom, elementData[atom].radius, elementData[atom].color, Graphics::LINE });
+          atomPropertiesPersp.push_back(
+              AtomProperties{atom, elementData[atom].radius,
+                             elementData[atom].color, Graphics::FILL});
+          atomPropertiesPersp.push_back(
+              AtomProperties{atom, elementData[atom].radius,
+                             elementData[atom].color, Graphics::LINE});
         } else { // Use defaults
-          atomPropertiesProj.push_back(AtomProperties{ atom, 1.0f , *colorListIt});
+          atomPropertiesProj.push_back(
+              AtomProperties{atom, 1.0f, *colorListIt});
 
-          atomPropertiesPersp.push_back(AtomProperties{ atom, 1.0f, *colorList2It, Graphics::FILL });
-          atomPropertiesPersp.push_back(AtomProperties{ atom, 1.0f, *colorList2It, Graphics::LINE });
+          atomPropertiesPersp.push_back(
+              AtomProperties{atom, 1.0f, *colorList2It, Graphics::FILL});
+          atomPropertiesPersp.push_back(
+              AtomProperties{atom, 1.0f, *colorList2It, Graphics::LINE});
         }
       }
       colorListIt++;
@@ -603,10 +671,10 @@ void DataDisplay::updateDisplayBuffers() {
     // Apply colors to aligned data -----------
     list<Color> colors;
     mAtomData.clear();
-    for (auto elem: *allPositions) {
-      elementCounts[elem.first] = elem.second.size()/4;
+    for (auto elem : *allPositions) {
+      elementCounts[elem.first] = elem.second.size() / 4;
     }
-    for (auto atomProps: atomPropertiesProj) {
+    for (auto atomProps : atomPropertiesProj) {
       colors.push_back(atomProps.color);
       mAtomData.push_back({elementCounts[atomProps.name], atomProps.drawScale});
     }
@@ -618,7 +686,7 @@ void DataDisplay::updateDisplayBuffers() {
     if (mAtomData.size() > 0) {
       auto atomDataIt = mAtomData.begin();
       int atomCounter = 0;
-      for (size_t i = 0; i < mAligned4fData.size() /4 ; i++) {
+      for (size_t i = 0; i < mAligned4fData.size() / 4; i++) {
         //            assert(atomCountsIt != mAtomCounts.end());
         if (atomDataIt != mAtomData.end() && --atomCounter <= 0) {
           atomCounter = atomDataIt->counts;
@@ -635,14 +703,16 @@ void DataDisplay::updateDisplayBuffers() {
     if (mRunComputation) {
       std::string xData = mPlotXAxis.getCurrent();
       std::string yData = mPlotYAxis.getCurrent();
-      mDatasetManager.generateGraph(xData, yData,  mDatasetManager.mCurrentDataset.get(), false);
+      mDatasetManager.generateGraph(
+          xData, yData, mDatasetManager.mCurrentDataset.get(), false);
     }
   }
 
   updateParameterText();
 }
 
-void DataDisplay::prepareParallelProjection(Graphics &g, Matrix4f &transformMatrix) {
+void DataDisplay::prepareParallelProjection(Graphics &g,
+                                            Matrix4f &transformMatrix) {
   //        std::unique_lock<std::mutex> lk(mDataLock);
   g.pushFramebuffer(fbo_iso);
   g.pushViewport(fbo_iso.width(), fbo_iso.height());
@@ -659,25 +729,26 @@ void DataDisplay::prepareParallelProjection(Graphics &g, Matrix4f &transformMatr
 
   float ar = float(fbo_iso.width()) / fbo_iso.height();
   //        float rangeSizeZ = mDataBoundaries.maxz - mDataBoundaries.minz;
-  float centerX = (mDataBoundaries.maxx + mDataBoundaries.minx)/ 2.0f;
-  float centerY = (mDataBoundaries.maxy + mDataBoundaries.miny)/ 2.0f;
+  float centerX = (mDataBoundaries.maxx + mDataBoundaries.minx) / 2.0f;
+  float centerY = (mDataBoundaries.maxy + mDataBoundaries.miny) / 2.0f;
   float rangeSizeX = mDataBoundaries.maxx - mDataBoundaries.minx;
   float rangeSizeY = mDataBoundaries.maxy - mDataBoundaries.miny;
   float maxrange = std::max(rangeSizeX, rangeSizeY);
-  float padding = maxrange*0.05f;
-  float left = centerX- 0.5f*maxrange* mLayerScaling - padding;
-  float right = centerX+ 0.5f*maxrange* mLayerScaling + padding;
-  float top = centerY+ 0.5f*maxrange* mLayerScaling + padding;
-  float bottom = centerY- 0.5f*maxrange* mLayerScaling - padding;
+  float padding = maxrange * 0.05f;
+  float left = centerX - 0.5f * maxrange * mLayerScaling - padding;
+  float right = centerX + 0.5f * maxrange * mLayerScaling + padding;
+  float top = centerY + 0.5f * maxrange * mLayerScaling + padding;
+  float bottom = centerY - 0.5f * maxrange * mLayerScaling - padding;
   //        const float near = mDataBoundaries.minz + (mNearClip * rangeSizeZ);
-  //        const float farClip = mDataBoundaries.minz + (mFarClip * rangeSizeZ);
-  //        float minxy = std::min(mDataBoundaries.minx, mDataBoundaries.miny);
-  g.projMatrix(Matrix4f::ortho(ar *left, ar* right,
-                               bottom, top,
-                               mDataBoundaries.minz - 100 , mDataBoundaries.maxz + 100));
+  //        const float farClip = mDataBoundaries.minz + (mFarClip *
+  //        rangeSizeZ); float minxy = std::min(mDataBoundaries.minx,
+  //        mDataBoundaries.miny);
+  g.projMatrix(Matrix4f::ortho(ar * left, ar * right, bottom, top,
+                               mDataBoundaries.minz - 100,
+                               mDataBoundaries.maxz + 100));
 
   bool mAlignData = true;
-  double scalingFactor = 1.0/(mDataBoundaries.maxy - mDataBoundaries.miny);
+  double scalingFactor = 1.0 / (mDataBoundaries.maxy - mDataBoundaries.miny);
 
   // std::cout << near << "..." << farClip <<std::endl;
 
@@ -689,8 +760,6 @@ void DataDisplay::prepareParallelProjection(Graphics &g, Matrix4f &transformMatr
   g.polygonMode(Graphics::FILL);
   g.depthMask(true); // for axis rendering
 
-
-
   if (mSingleProjection.get() == 1.0f) {
     g.pushViewport(0, 0, 2 * w, 2 * h);
     g.scissor(0, 0, 2 * w, 2 * h);
@@ -701,18 +770,18 @@ void DataDisplay::prepareParallelProjection(Graphics &g, Matrix4f &transformMatr
     //            { 0.0f, 0.0f, 0.0f },
     //            { 0.0f, 1.0f, 0.0f }));
     g.viewMatrix(getLookAt(mSlicingPlanePoint,
-                           mSlicingPlanePoint.get() - mSlicingPlaneNormal.get().normalized(),
-    { 0.0f, 1.0f, 0.0f }));
+                           mSlicingPlanePoint.get() -
+                               mSlicingPlaneNormal.get().normalized(),
+                           {0.0f, 1.0f, 0.0f}));
 
     g.blending(false);
     g.depthTesting(true);
     g.meshColor();
     g.draw(axis);
 
-
     if (mShowGrid == 1.0f) {
       mGridMesh.reset();
-      addRect(mGridMesh,0,-2.0, 0.1f/(maxrange* mLayerScaling), 4.0f);
+      addRect(mGridMesh, 0, -2.0, 0.1f / (maxrange * mLayerScaling), 4.0f);
       mGridMesh.update();
       if (backgroundColor.get().luminance() > 0.5f) {
         g.color(0.2f);
@@ -723,35 +792,35 @@ void DataDisplay::prepareParallelProjection(Graphics &g, Matrix4f &transformMatr
         if (mGridType.getCurrent() == "square") {
           g.pushMatrix();
           g.translate(mGridXOffset, mGridYOffset + mGridSpacing * i, 0);
-          g.scale(maxrange* mLayerScaling);
-          g.rotate(90, 0,0,1);
+          g.scale(maxrange * mLayerScaling);
+          g.rotate(90, 0, 0, 1);
           g.draw(mGridMesh);
           g.popMatrix();
           g.pushMatrix();
           g.translate(mGridXOffset + mGridSpacing * i, mGridYOffset, 0);
-          g.scale(maxrange* mLayerScaling);
+          g.scale(maxrange * mLayerScaling);
           g.draw(mGridMesh);
           g.popMatrix();
         } else if (mGridType.getCurrent() == "triangle") {
           float spacing = 0.86602540378f * mGridSpacing; // sin(60)
           g.pushMatrix();
           g.translate(mGridXOffset, mGridYOffset + spacing * i, 0);
-          g.scale(maxrange* mLayerScaling);
-          g.rotate(90, 0,0,1);
+          g.scale(maxrange * mLayerScaling);
+          g.rotate(90, 0, 0, 1);
           g.draw(mGridMesh);
           g.popMatrix();
           g.pushMatrix();
           g.translate(mGridXOffset, mGridYOffset, 0);
-          g.rotate(30, 0,0,1);
+          g.rotate(30, 0, 0, 1);
           g.translate(spacing * i, 0, 0);
-          g.scale(maxrange* mLayerScaling);
+          g.scale(maxrange * mLayerScaling);
           g.draw(mGridMesh);
           g.popMatrix();
           g.pushMatrix();
           g.translate(mGridXOffset, mGridYOffset, 0);
-          g.rotate(-30, 0,0,1);
+          g.rotate(-30, 0, 0, 1);
           g.translate(spacing * i, 0, 0);
-          g.scale(maxrange* mLayerScaling);
+          g.scale(maxrange * mLayerScaling);
           g.draw(mGridMesh);
           g.popMatrix();
         }
@@ -766,7 +835,7 @@ void DataDisplay::prepareParallelProjection(Graphics &g, Matrix4f &transformMatr
     if (atomPropertiesProj.size() > 0) {
       // ----------------------------------------
       int cumulativeCount = 0;
-      for(auto &data: mAtomData) {
+      for (auto &data : mAtomData) {
 
         if (mAlignData) {
           //            instancing_mesh0.attrib_data(
@@ -775,14 +844,13 @@ void DataDisplay::prepareParallelProjection(Graphics &g, Matrix4f &transformMatr
           //              mAligned4fData.size()/4
           //            );
           int count = data.counts;
-          assert((int) mAligned4fData.size() >= (cumulativeCount + count) * 4 );
+          assert((int)mAligned4fData.size() >= (cumulativeCount + count) * 4);
           instancing_mesh0.attrib_data(
-                count * 4 * sizeof(float),
-                mAligned4fData.data() + (cumulativeCount * 4),
-                count
-                );
+              count * 4 * sizeof(float),
+              mAligned4fData.data() + (cumulativeCount * 4), count);
           cumulativeCount += count;
-          //                        std::cout << "Drawing " << counts << " of " << cumulativeCount << std::endl;
+          //                        std::cout << "Drawing " << counts << " of "
+          //                        << cumulativeCount << std::endl;
         } else {
           //            auto& elemPositions = r0->getElementPositions(p0.name);
           //            instancing_mesh0.attrib_data(
@@ -798,7 +866,8 @@ void DataDisplay::prepareParallelProjection(Graphics &g, Matrix4f &transformMatr
         g.shader().uniform("layerSeparation", 1.0);
         // A scaling value of 4.0 found empirically...
         if (mShowRadius == 1.0f) {
-          g.shader().uniform("markerScale", data.radius * mAtomMarkerSize * mMarkerScale);
+          g.shader().uniform("markerScale",
+                             data.radius * mAtomMarkerSize * mMarkerScale);
         } else {
           g.shader().uniform("markerScale", mAtomMarkerSize * mMarkerScale);
         }
@@ -806,7 +875,8 @@ void DataDisplay::prepareParallelProjection(Graphics &g, Matrix4f &transformMatr
         g.shader().uniform("is_omni", 0.0f);
 
         g.shader().uniform("plane_point", mSlicingPlanePoint.get());
-        g.shader().uniform("plane_normal", mSlicingPlaneNormal.get().normalized());
+        g.shader().uniform("plane_normal",
+                           mSlicingPlaneNormal.get().normalized());
         g.shader().uniform("second_plane_distance", mSlicingPlaneDistance);
 
         //                    g.shader().uniform("far_clip", farClip);
@@ -822,8 +892,7 @@ void DataDisplay::prepareParallelProjection(Graphics &g, Matrix4f &transformMatr
     g.popMatrix();
     g.popViewMatrix();
     g.popViewport();
-  }
-  else {
+  } else {
     // (from x, y up), (right bottom)
     {
       g.pushViewport(w, 0, w, h);
@@ -831,7 +900,7 @@ void DataDisplay::prepareParallelProjection(Graphics &g, Matrix4f &transformMatr
       g.clear(backgroundColor);
 
       g.pushViewMatrix();
-      g.viewMatrix(getLookAt({ 4, 0, 0 }, { 0, 0, 0 }, { 0, 1, 0 }));
+      g.viewMatrix(getLookAt({4, 0, 0}, {0, 0, 0}, {0, 1, 0}));
 
       g.blending(false);
       g.depthTesting(true);
@@ -858,7 +927,8 @@ void DataDisplay::prepareParallelProjection(Graphics &g, Matrix4f &transformMatr
         g.shader().uniform("is_omni", 0.0f);
 
         g.shader().uniform("plane_point", mSlicingPlanePoint.get());
-        g.shader().uniform("plane_normal", mSlicingPlaneNormal.get().normalized());
+        g.shader().uniform("plane_normal",
+                           mSlicingPlaneNormal.get().normalized());
         g.shader().uniform("second_plane_distance", mSlicingPlaneDistance);
         //                    g.shader().uniform("far_clip", farClip);
         //                    g.shader().uniform("near_clip", near);
@@ -877,7 +947,7 @@ void DataDisplay::prepareParallelProjection(Graphics &g, Matrix4f &transformMatr
       g.clear(0, 0.2f, 0);
 
       g.pushViewMatrix();
-      g.viewMatrix(getLookAt({ 0, 4, 0 }, { 0, 0, 0 }, { 0, 0, -1 }));
+      g.viewMatrix(getLookAt({0, 4, 0}, {0, 0, 0}, {0, 0, -1}));
 
       g.blending(false);
       g.depthTesting(true);
@@ -902,7 +972,8 @@ void DataDisplay::prepareParallelProjection(Graphics &g, Matrix4f &transformMatr
         g.shader().uniform("is_omni", 0.0f);
 
         g.shader().uniform("plane_point", mSlicingPlanePoint.get());
-        g.shader().uniform("plane_normal", mSlicingPlaneNormal.get().normalized());
+        g.shader().uniform("plane_normal",
+                           mSlicingPlaneNormal.get().normalized());
         g.shader().uniform("second_plane_distance", mSlicingPlaneDistance);
         //                    g.shader().uniform("far_clip", farClip);
         //                    g.shader().uniform("near_clip", near);
@@ -921,7 +992,7 @@ void DataDisplay::prepareParallelProjection(Graphics &g, Matrix4f &transformMatr
       g.clear(0, 0, 0.2f);
 
       g.pushViewMatrix();
-      g.viewMatrix(getLookAt({ 0, 0, 4 }, { 0, 0, 0 }, { 0, 1, 0 }));
+      g.viewMatrix(getLookAt({0, 0, 4}, {0, 0, 0}, {0, 1, 0}));
 
       g.blending(false);
       g.depthTesting(true);
@@ -945,7 +1016,8 @@ void DataDisplay::prepareParallelProjection(Graphics &g, Matrix4f &transformMatr
         g.shader().uniform("is_line", 0.0f);
         g.shader().uniform("is_omni", 0.0f);
         g.shader().uniform("plane_point", mSlicingPlanePoint.get());
-        g.shader().uniform("plane_normal", mSlicingPlaneNormal.get().normalized());
+        g.shader().uniform("plane_normal",
+                           mSlicingPlaneNormal.get().normalized());
         g.shader().uniform("second_plane_distance", mSlicingPlaneDistance);
         //                    g.shader().uniform("far_clip", farClip);
         //                    g.shader().uniform("near_clip", near);
@@ -964,7 +1036,7 @@ void DataDisplay::prepareParallelProjection(Graphics &g, Matrix4f &transformMatr
       g.clear(0.2f, 0.2f, 0.2f);
 
       g.pushViewMatrix();
-      g.viewMatrix(getLookAt({ 3, 3, 3 }, { 0, 0, 0 }, { 0, 1, 0 }));
+      g.viewMatrix(getLookAt({3, 3, 3}, {0, 0, 0}, {0, 1, 0}));
 
       g.blending(false);
       g.depthTesting(true);
@@ -988,7 +1060,8 @@ void DataDisplay::prepareParallelProjection(Graphics &g, Matrix4f &transformMatr
         g.shader().uniform("is_line", 0.0f);
         g.shader().uniform("is_omni", 0.0f);
         g.shader().uniform("plane_point", mSlicingPlanePoint.get());
-        g.shader().uniform("plane_normal", mSlicingPlaneNormal.get().normalized());
+        g.shader().uniform("plane_normal",
+                           mSlicingPlaneNormal.get().normalized());
         g.shader().uniform("second_plane_distance", mSlicingPlaneDistance);
         //                    g.shader().uniform("far_clip", farClip);
         //                    g.shader().uniform("near_clip", near);
@@ -999,7 +1072,6 @@ void DataDisplay::prepareParallelProjection(Graphics &g, Matrix4f &transformMatr
       g.popViewMatrix();
       g.popViewport();
     }
-
   }
 
   // put back scissoring
@@ -1022,7 +1094,9 @@ void DataDisplay::drawPerspective(Graphics &g) {
   perspectivePickable.pushMatrix(g);
 
   // move to center
-  // g.translate(-(mDataBoundaries.maxx - mDataBoundaries.minx)/2,-(mDataBoundaries.maxy - mDataBoundaries.miny)/2,-(mDataBoundaries.maxz - mDataBoundaries.minz)/2);
+  // g.translate(-(mDataBoundaries.maxx -
+  // mDataBoundaries.minx)/2,-(mDataBoundaries.maxy -
+  // mDataBoundaries.miny)/2,-(mDataBoundaries.maxz - mDataBoundaries.minz)/2);
   // g.translate(0,0,-7 -(mDataBoundaries.minz+mDataBoundaries.maxz)/2);
   // g.scale(1/(mDataBoundaries.maxy - mDataBoundaries.miny));
   // g.rotate(mPerspectiveRotY.get(), 0, 1.0, 0);
@@ -1033,23 +1107,27 @@ void DataDisplay::drawPerspective(Graphics &g) {
 
   g.meshColor();
 
-
   g.pushMatrix();
   g.scale(20);
   g.draw(axis);
   g.popMatrix();
   // g.scale(mPerspectiveScale);
 
-  //        float near = mDataBoundaries.minz + (mNearClip * (mDataBoundaries.maxz- mDataBoundaries.minz));
-  //        float farClip = mDataBoundaries.minz + (mFarClip * (mDataBoundaries.maxz- mDataBoundaries.minz));
+  //        float near = mDataBoundaries.minz + (mNearClip *
+  //        (mDataBoundaries.maxz- mDataBoundaries.minz)); float farClip =
+  //        mDataBoundaries.minz + (mFarClip * (mDataBoundaries.maxz-
+  //        mDataBoundaries.minz));
 
   int cumulativeCount = 0;
   // now draw data with custom shaderg.shader(instancing_mesh0.shader);
   g.shader(instancing_mesh0.shader);
-  g.shader().uniform("dataScale", 1.0f/((mDataBoundaries.maxy - mDataBoundaries.miny)* perspectivePickable.scale));
+  g.shader().uniform("dataScale",
+                     1.0f / ((mDataBoundaries.maxy - mDataBoundaries.miny) *
+                             perspectivePickable.scale));
   g.shader().uniform("layerSeparation", mLayerSeparation);
   g.shader().uniform("is_omni", 1.0f);
-  g.shader().uniform("eye_sep", perspectivePickable.scale * g.lens().eyeSep() * g.eye() / 2.0f);
+  g.shader().uniform("eye_sep", perspectivePickable.scale * g.lens().eyeSep() *
+                                    g.eye() / 2.0f);
   // g.shader().uniform("eye_sep", g.lens().eyeSep() * g.eye() / 2.0f);
   g.shader().uniform("foc_len", g.lens().focalLength());
 
@@ -1061,20 +1139,21 @@ void DataDisplay::drawPerspective(Graphics &g) {
   g.shader().uniform("clipped_mult", 0.45);
   g.update();
 
-  for(auto data: mAtomData) {
+  for (auto data : mAtomData) {
     if (mShowRadius == 1.0f) {
-      g.shader().uniform("markerScale", data.radius * mAtomMarkerSize * mMarkerScale / perspectivePickable.scale);
+      g.shader().uniform("markerScale", data.radius * mAtomMarkerSize *
+                                            mMarkerScale /
+                                            perspectivePickable.scale);
       //                std::cout << data.radius << std::endl;
     } else {
-      g.shader().uniform("markerScale", mAtomMarkerSize * mMarkerScale / perspectivePickable.scale);
+      g.shader().uniform("markerScale", mAtomMarkerSize * mMarkerScale /
+                                            perspectivePickable.scale);
     }
     int count = data.counts;
-    assert((int) mAligned4fData.size() >= (cumulativeCount + count) * 4 );
-    instancing_mesh0.attrib_data(
-          count * 4 * sizeof(float),
-          mAligned4fData.data() + (cumulativeCount * 4),
-          count
-          );
+    assert((int)mAligned4fData.size() >= (cumulativeCount + count) * 4);
+    instancing_mesh0.attrib_data(count * 4 * sizeof(float),
+                                 mAligned4fData.data() + (cumulativeCount * 4),
+                                 count);
     cumulativeCount += count;
 
     g.polygonMode(Graphics::FILL);
@@ -1098,45 +1177,44 @@ void DataDisplay::drawPerspective(Graphics &g) {
   //   3. modelview matrix for perspective view should have been applied
   boxMesh.reset();
   boxMesh.primitive(Mesh::LINES);
-  //const float z[2] = {mNearClip.get(), mFarClip.get()};
+  // const float z[2] = {mNearClip.get(), mFarClip.get()};
   // double scalingFactor = 1.0/(mDataBoundaries.maxz - mDataBoundaries.minz);
 
   // Plane equation Ax + By + Cz - D = 0
   //        float D =  -mSlicingPlanePoint.get().dot(mSlicingPlaneNormal);
   // Line Equation
 
-  const float x[2] = { mDataBoundaries.maxx, mDataBoundaries.minx };
-  const float y[2] = { mDataBoundaries.maxy, mDataBoundaries.miny };
+  const float x[2] = {mDataBoundaries.maxx, mDataBoundaries.minx};
+  const float y[2] = {mDataBoundaries.maxy, mDataBoundaries.miny};
 
-  const float z[2] = {
-    0.0,
-    (mSlicingPlaneDistance)
-  };
+  const float z[2] = {0.0, (mSlicingPlaneDistance)};
 
-  for(int k=0; k<=1; k++){
-    for(int j=0; j<=1; j++){
-      for(int i=0; i<=1; i++){
-        boxMesh.vertex(x[i], y[j], z[k]) ;
-      }}}
+  for (int k = 0; k <= 1; k++) {
+    for (int j = 0; j <= 1; j++) {
+      for (int i = 0; i <= 1; i++) {
+        boxMesh.vertex(x[i], y[j], z[k]);
+      }
+    }
+  }
 
-  static const int I[] = {
-    0,1, 2,3, 4,5, 6,7,
-    0,2, 1,3, 4,6, 5,7,
-    0,4, 1,5, 2,6, 3,7
-  };
-  boxMesh.index(I, sizeof(I)/sizeof(*I), 0);
+  static const int I[] = {0, 1, 2, 3, 4, 5, 6, 7, 0, 2, 1, 3,
+                          4, 6, 5, 7, 0, 4, 1, 5, 2, 6, 3, 7};
+  boxMesh.index(I, sizeof(I) / sizeof(*I), 0);
   boxMesh.update();
-  g.shader().uniform("eye_sep", perspectivePickable.scale * g.lens().eyeSep() * g.eye() / 2.0f);
+  g.shader().uniform("eye_sep", perspectivePickable.scale * g.lens().eyeSep() *
+                                    g.eye() / 2.0f);
 
-  g.shader().uniform("eye_sep", /*perspectivePickable.scale * */g.lens().eyeSep() * g.eye() / 2.0f);
+  g.shader().uniform("eye_sep",
+                     /*perspectivePickable.scale * */ g.lens().eyeSep() *
+                         g.eye() / 2.0f);
 
   glLineWidth(5);
   g.polygonMode(Graphics::LINE);
   g.color(0.8f, 0.8f, 1.0f, 0.9f);
   g.scale(1.0, 1.0, 1.0f + mLayerSeparation);
   g.translate(mSlicingPlanePoint.get());
-  g.rotate(mSliceRotationPitch * 360.0f/(M_2PI), 1.0, 0.0, 0.0);
-  g.rotate(mSliceRotationRoll * 360.0f/(M_2PI), 0.0, -1.0, 0.0);
+  g.rotate(mSliceRotationPitch * 360.0f / (M_2PI), 1.0, 0.0, 0.0);
+  g.rotate(mSliceRotationRoll * 360.0f / (M_2PI), 0.0, -1.0, 0.0);
   g.draw(boxMesh);
   g.polygonMode(Graphics::FILL);
   glLineWidth(1);
@@ -1147,8 +1225,7 @@ void DataDisplay::drawPerspective(Graphics &g) {
 
   drawHistory(g);
 
-  g.popMatrix(); //pickable
-
+  g.popMatrix(); // pickable
 
   g.depthTesting(false);
   g.blending(true);
@@ -1176,12 +1253,12 @@ void DataDisplay::drawPerspective(Graphics &g) {
 
   perspectivePickable.drawBB(g);
   //        perspectivePickable.drawChildren(g);
-  // if(perspectivePickable.hover || rh.hover[0] || rh.hover[1] || rh.hover[2] ){
+  // if(perspectivePickable.hover || rh.hover[0] || rh.hover[1] || rh.hover[2]
+  // ){
   //     g.depthTesting(false);
   //     perspectivePickable.drawChildren(g);
   //     g.depthTesting(true);
   // }
-
 }
 
 void DataDisplay::drawParallelProjection(Graphics &g) {
@@ -1192,7 +1269,7 @@ void DataDisplay::drawParallelProjection(Graphics &g) {
   Mesh m;
   addTexQuad(m, w, h);
   iso_scene().filter(Texture::LINEAR_MIPMAP_LINEAR);
-  iso_scene().generateMipmap(); //XXX this works.. confusing api needs help..
+  iso_scene().generateMipmap(); // XXX this works.. confusing api needs help..
   iso_scene().bind();
   parallelPickable.pushMatrix(g);
   // g.pushMatrix();
@@ -1257,9 +1334,10 @@ void DataDisplay::drawGraph(Graphics &g) {
         }
         mGraphTexture.resize(4, 4);
         // Will try again on next frame...
-      }
-      else {
-        //                         cout << "loaded image size: " << imageData.width << ", " << imageData.height << endl;
+      } else {
+        //                         cout << "loaded image size: " <<
+        //                         imageData.width << ", " << imageData.height
+        //                         << endl;
 
         mGraphTexture.resize(imageData.width, imageData.height);
         mGraphTexture.submit(imageData.data.data(), GL_RGBA, GL_UNSIGNED_BYTE);

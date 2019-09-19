@@ -8,14 +8,13 @@
 
 #include "al/core.hpp"
 #include "al/core/app/al_DistributedApp.hpp"
-#include "al/util/ui/al_Parameter.hpp"
-#include "al/util/ui/al_Preset.hpp"
-#include "al/util/ui/al_SequenceRecorder.hpp"
+#include "al/sphere/al_SphereUtils.hpp"
 #include "al/util/ui/al_FileSelector.hpp"
 #include "al/util/ui/al_HtmlInterfaceServer.hpp"
+#include "al/util/ui/al_Parameter.hpp"
 #include "al/util/ui/al_ParameterGUI.hpp"
-#include "al/sphere/al_SphereUtils.hpp"
-
+#include "al/util/ui/al_Preset.hpp"
+#include "al/util/ui/al_SequenceRecorder.hpp"
 
 #include "al_DeferredComputation.hpp"
 #include "al_PeriodicTask.hpp"
@@ -51,15 +50,14 @@ struct State {
 
 // ---------------------------------------------------
 
-struct ObjectTransformHandler : WindowEventHandler
-{
+struct ObjectTransformHandler : WindowEventHandler {
   float scale = 1;
   float mSpeed = 0.1f;
-  Quatf quat {Quatf::identity()};
+  Quatf quat{Quatf::identity()};
   Vec3f spin;
-  Vec3f home {0.0f, 0.0f, 4.0f};
-  Vec3f pos {0.0f, 0.0f, 0.0f};
-  Vec3f vel {0.0f, 0.0f, 0.0f};
+  Vec3f home{0.0f, 0.0f, 4.0f};
+  Vec3f pos{0.0f, 0.0f, 0.0f};
+  Vec3f vel{0.0f, 0.0f, 0.0f};
 
   void setHome(Vec3f newHome) {
     // TODO home should include camera pose too
@@ -80,62 +78,60 @@ struct ObjectTransformHandler : WindowEventHandler
   Matrix4f mat() {
     Matrix4f rot_mat;
     quat.toMatrix(rot_mat.elems());
-    return Matrix4f::translation(pos)
-        * rot_mat;
+    return Matrix4f::translation(pos) * rot_mat;
   }
-
 };
-
 
 class MyApp : public DistributedApp<State> {
 public:
-
   // Parameters and triggers for interaction commands
-  Trigger resetView {"resetView"};
-  Trigger stepXpos {"stepXpos"};
-  Trigger stepXneg {"stepXneg"};
-  Trigger stepYpos {"stepYpos"};
-  Trigger stepYneg {"stepYneg"};
-  Trigger stepZpos {"stepZpos"};
-  Trigger stepZneg {"stepZneg"};
+  Trigger resetView{"resetView"};
+  Trigger stepXpos{"stepXpos"};
+  Trigger stepXneg{"stepXneg"};
+  Trigger stepYpos{"stepYpos"};
+  Trigger stepYneg{"stepYneg"};
+  Trigger stepZpos{"stepZpos"};
+  Trigger stepZneg{"stepZneg"};
   Trigger mJumpLayerPos{"jumpLayerPos"};
   Trigger mJumpLayerNeg{"jumpLayerNeg"};
-  Trigger stepTempPos {"stepTempPos"};
-  Trigger stepTempNeg {"stepTempNeg"};
-  Trigger stepChempotPos {"stepChempotPos"};
-  Trigger stepChempotNeg {"stepChempotNeg"};
-  Trigger stepChempot2Pos {"stepChempot2Pos"};
-  Trigger stepChempot2Neg {"stepChempot2Neg"};
-  Trigger stepTimePos {"stepTimePos"};
-  Trigger stepTimeNeg {"stepTimeNeg"};
+  Trigger stepTempPos{"stepTempPos"};
+  Trigger stepTempNeg{"stepTempNeg"};
+  Trigger stepChempotPos{"stepChempotPos"};
+  Trigger stepChempotNeg{"stepChempotNeg"};
+  Trigger stepChempot2Pos{"stepChempot2Pos"};
+  Trigger stepChempot2Neg{"stepChempot2Neg"};
+  Trigger stepTimePos{"stepTimePos"};
+  Trigger stepTimeNeg{"stepTimeNeg"};
   Parameter pitchAngleStep{"PitchAngleStep", "AngleControl", 15, "", 0.0, 60.0};
-  Trigger stepPitchAnglePos {"stepPitchAnglePos", "AngleControl"};
-  Trigger stepPitchAngleNeg {"stepPitchAngleNeg", "AngleControl"};
+  Trigger stepPitchAnglePos{"stepPitchAnglePos", "AngleControl"};
+  Trigger stepPitchAngleNeg{"stepPitchAngleNeg", "AngleControl"};
   Parameter rollAngleStep{"RollAngleStep", "AngleControl", 15, "", 0.0, 60.0};
-  Trigger stepRollAnglePos {"stepRollAnglePos", "AngleControl"};
-  Trigger stepRollAngleNeg {"stepRollAngleNeg", "AngleControl"};
-  Trigger CalculateSlicing {"CalculateSlicing"};
-  Trigger ResetSlicing {"ResetSlicing"};
-  Trigger mSaveGraphics {"SaveSnapshot"};
+  Trigger stepRollAnglePos{"stepRollAnglePos", "AngleControl"};
+  Trigger stepRollAngleNeg{"stepRollAngleNeg", "AngleControl"};
+  Trigger CalculateSlicing{"CalculateSlicing"};
+  Trigger ResetSlicing{"ResetSlicing"};
+  Trigger mSaveGraphics{"SaveSnapshot"};
   Trigger mAlignTemperatures{"AlignTemperatures"};
   Trigger mAlignChempots{"AlignChempots"};
   Trigger mRecomputeSpace{"RecomputeSpace"};
 
-  ParameterBool mAutoAdvance {"autoAdvance"};
-  Parameter mAutoAdvanceFreq {"autoAdvanceFreq", "", 2, "", 0.25, 3.0};
+  ParameterBool mAutoAdvance{"autoAdvance"};
+  Parameter mAutoAdvanceFreq{"autoAdvanceFreq", "", 2, "", 0.25, 3.0};
 
   // File selection
-  ParameterMenu mDataRootPath {"datarootPath"};
-  ParameterMenu mAvailableDatasets {"availableDatasets"};
+  ParameterMenu mDataRootPath{"datarootPath"};
+  ParameterMenu mAvailableDatasets{"availableDatasets"};
 
   // 3D nav parameters
-  Parameter Z {"Z", "", 2.8f, "",  -15,15};
-  Parameter X {"X", "", 0.0, "",  -2,2};
+  Parameter Z{"Z", "", 2.8f, "", -15, 15};
+  Parameter X{"X", "", 0.0, "", -2, 2};
 
   // Settings
-  ParameterColor backgroundColor{"background", "", Color(0.0f, 0.0f, 0.0f, 1.0f) };
-  ParameterColor sliceBackground{"sliceBackground", "", Color(0.0f, 0.0f, 0.0f, 1.0f) };
-  ParameterString font {"font"};
+  ParameterColor backgroundColor{"background", "",
+                                 Color(0.0f, 0.0f, 0.0f, 1.0f)};
+  ParameterColor sliceBackground{"sliceBackground", "",
+                                 Color(0.0f, 0.0f, 0.0f, 1.0f)};
+  ParameterString font{"font"};
   Parameter fontSize{"fontSize", "", 32, "", 2, 128};
   ParameterString pythonScriptPath{"pythonScriptPath"};
   ParameterString pythonBinary{"pythonBinary"};
@@ -157,8 +153,8 @@ public:
   std::vector<DataDisplay *> dataDisplays;
 
   ObjectTransformHandler object_transform;
-  bool showGui {true};
-  bool mMarkUpdateTitle {true};
+  bool showGui{true};
+  bool mMarkUpdateTitle{true};
 
 #ifdef AL_EXT_OPENVR
   OpenVRWrapper mOpenVR;
@@ -182,7 +178,8 @@ public:
     navControl().useMouse(false);
 
     // Create and configure displays
-    int numDisplays = 2; // 2 is a good number. Usually need one, but some times need to compare 2
+    int numDisplays = 2; // 2 is a good number. Usually need one, but some times
+                         // need to compare 2
 
     for (int i = 0; i < numDisplays; i++) {
       dataDisplays.push_back(new DataDisplay);
@@ -207,7 +204,7 @@ public:
     dataDisplays[0]->mBillboarding = false;
     dataDisplays[0]->mSmallLabel = true;
     dataDisplays[0]->mVisible = true;
-    for (size_t i = 1; i < dataDisplays.size(); i ++) {
+    for (size_t i = 1; i < dataDisplays.size(); i++) {
       dataDisplays[i]->mVisible = false;
     }
 
@@ -218,33 +215,33 @@ public:
     readElementsIni();
 
     if (isPrimary()) {
-      for (auto *display: dataDisplays) {
+      for (auto *display : dataDisplays) {
         *presetHandler << display->bundle;
         vdvBundle << display->bundle;
       }
       // Add parameters that are not part of the bundle
       *presetHandler << Z << X; //
-      if (presetServer) {
-        *presetServer << *presetHandler;
-      }
+      presetHandler << if (presetServer) { *presetServer << *presetHandler; }
       *sequencer << *presetHandler;
       *recorder << *presetHandler;
       parameterServer().notifyAll();
-      backgroundColor.set(backgroundColor.get()); // Set current value to update on renderers
-      sliceBackground.set(sliceBackground.get()); // Set current value to update on renderers
+      backgroundColor.set(
+          backgroundColor.get()); // Set current value to update on renderers
+      sliceBackground.set(
+          sliceBackground.get()); // Set current value to update on renderers
     }
 
     // use object control for model matrix
     append(object_transform);
-    object_transform.setHome(Vec3f(0,0,0));
+    object_transform.setHome(Vec3f(0, 0, 0));
     object_transform.reset();
 
     if (hasRole(ROLE_SIMULATOR) || hasRole(ROLE_DESKTOP)) {
       nav().pos(0, 1.5, 5);
       nav().setHome();
       navControl().useMouse(false);
-    } else if(hasRole(ROLE_DESKTOP_REPLICA)){
-      nav().pos(0,1.5,5);
+    } else if (hasRole(ROLE_DESKTOP_REPLICA)) {
+      nav().pos(0, 1.5, 5);
     }
 
     // For distributed running in allo infrastructure
@@ -256,20 +253,23 @@ public:
     // Configure host dependent display options
     if (hasRole(ROLE_RENDERER)) {
 
-          if (group() == 1) {
-            std::cout << "Setting up display for group 1: SPHERE" << std::endl;
-            // this function loads config files if hostname suggests that the app
-            // is running in sphere renderer. If not it loads fake configuration to
-            // show cubemap view
-            load_perprojection_configuration();
-            cursorHide(true);
-          }
-        }
-    if (al_get_hostname() == "moxi") { // Fullscreen to two monitors on MOXI machine
-      std::cout << "On MOXI! --------------------------------------" <<std::endl;
+      if (group() == 1) {
+        std::cout << "Setting up display for group 1: SPHERE" << std::endl;
+        // this function loads config files if hostname suggests that the app
+        // is running in sphere renderer. If not it loads fake configuration to
+        // show cubemap view
+        load_perprojection_configuration();
+        cursorHide(true);
+      }
+    }
+    if (al_get_hostname() ==
+        "moxi") { // Fullscreen to two monitors on MOXI machine
+      std::cout << "On MOXI! --------------------------------------"
+                << std::endl;
       int width, height;
       sphere::get_fullscreen_dimension(&width, &height);
-      std::cout << "Setting fullscreen dimensions " << width << "," << height <<std::endl;
+      std::cout << "Setting fullscreen dimensions " << width << "," << height
+                << std::endl;
       if (width != 0 && height != 0) {
         decorated(false);
         dimensions(0, 0, width, height);
@@ -279,13 +279,13 @@ public:
     }
 
 #ifdef AL_EXT_OPENVR
-        if(!mOpenVR.init()) {
-          std::cerr << "ERROR: OpenVR init returned error" << std::endl;
-        }
-        addWireBox(mControllerMesh, 0.1f);
-        mControllerMesh.scale(0.1f, 0.1f, 1);
-        mControllerMesh.update();
-    #endif
+    if (!mOpenVR.init()) {
+      std::cerr << "ERROR: OpenVR init returned error" << std::endl;
+    }
+    addWireBox(mControllerMesh, 0.1f);
+    mControllerMesh.scale(0.1f, 0.1f, 1);
+    mControllerMesh.update();
+#endif
   }
 
   virtual void onAnimate(double /*dt*/) override {
@@ -297,7 +297,7 @@ public:
 
     // fbo operations should be done outside onDraw so it does not mess with
     // omni drawing
-    for (auto *display:dataDisplays) {
+    for (auto *display : dataDisplays) {
       display->prepare(graphics(), state().transformMatrix);
     }
 #ifdef AL_EXT_OPENVR
@@ -327,30 +327,40 @@ public:
 
     if (r.touchpadDown()) {
       if (fabs(r.touchPos.x) > 0.4f) {
-        dataDisplays[vdvBundle.currentBundle()]->mSlicingPlaneDistance = dataDisplays[vdvBundle.currentBundle()]->mSlicingPlaneDistance + r.touchPos.x*0.2;
+        dataDisplays[vdvBundle.currentBundle()]->mSlicingPlaneDistance =
+            dataDisplays[vdvBundle.currentBundle()]->mSlicingPlaneDistance +
+            r.touchPos.x * 0.2;
       }
       if (fabs(r.touchPos.y) > 0.4f) {
-        dataDisplays[vdvBundle.currentBundle()]->mPickableManager.event(PickEvent(Pick, ray));
-        dataDisplays[vdvBundle.currentBundle()]->mPickableManager.event(PickEvent(Scale, r.touchPos.y));
-        // dataDisplays[vdvBundle.currentBundle()]->perspectivePickable.scale = dataDisplays[vdvBundle.currentBundle()]->perspectivePickable.scale + r.touchPos.y*0.0001;
+        dataDisplays[vdvBundle.currentBundle()]->mPickableManager.event(
+            PickEvent(Pick, ray));
+        dataDisplays[vdvBundle.currentBundle()]->mPickableManager.event(
+            PickEvent(Scale, r.touchPos.y));
+        // dataDisplays[vdvBundle.currentBundle()]->perspectivePickable.scale =
+        // dataDisplays[vdvBundle.currentBundle()]->perspectivePickable.scale +
+        // r.touchPos.y*0.0001;
       }
     }
-    if(r.touchpadPress()) dataDisplays[vdvBundle.currentBundle()]->perspectivePickable.testChildren = true;
-    if(r.touchpadRelease()) dataDisplays[vdvBundle.currentBundle()]->perspectivePickable.testChildren = false;
+    if (r.touchpadPress())
+      dataDisplays[vdvBundle.currentBundle()]
+          ->perspectivePickable.testChildren = true;
+    if (r.touchpadRelease())
+      dataDisplays[vdvBundle.currentBundle()]
+          ->perspectivePickable.testChildren = false;
 
-    for(auto *display: dataDisplays) {
+    for (auto *display : dataDisplays) {
       if (display->mVisible != 0.0f) {
         Pose p = r.pose();
-        if(r.triggerPress()){
+        if (r.triggerPress()) {
           display->mPickableManager.event(PickEvent(Pick, ray));
-        } else if(r.gripPress()){
+        } else if (r.gripPress()) {
           display->mPickableManager.event(PickEvent(Pick, ray));
           display->mPickableManager.event(PickEvent(PickPose, p));
-        } else if(r.triggerDown()){
+        } else if (r.triggerDown()) {
           display->mPickableManager.event(PickEvent(Drag, ray, r.vel));
-        } else if(r.gripDown()){
+        } else if (r.gripDown()) {
           display->mPickableManager.event(PickEvent(RotatePose, p));
-        } else if(r.triggerRelease() || r.gripRelease()){
+        } else if (r.triggerRelease() || r.gripRelease()) {
           display->mPickableManager.event(PickEvent(Unpick, ray));
         } else {
           display->mPickableManager.event(PickEvent(Point, ray));
@@ -358,20 +368,21 @@ public:
       }
     }
 
-    //openVR draw.
+    // openVR draw.
     // Draw in onAnimate, to make sure drawing happens only once per frame
     // Pass a function that takes Graphics &g argument
-    mOpenVR.draw(std::bind(&MyApp::drawVR, this, std::placeholders::_1), mGraphics);
+    mOpenVR.draw(std::bind(&MyApp::drawVR, this, std::placeholders::_1),
+                 mGraphics);
 #endif
   }
 
-  virtual void onDraw(Graphics& g) override {
+  virtual void onDraw(Graphics &g) override {
     g.clear(backgroundColor);
     if (mMarkUpdateTitle) {
       std::string newTitle = "CASM Viewer ";
-      for (auto *display: dataDisplays) {
+      for (auto *display : dataDisplays) {
         if (display->mVisible == 1.0f) {
-          newTitle += display->mDatasetManager.mRootPath.get() +  " : ";
+          newTitle += display->mDatasetManager.mRootPath.get() + " : ";
           newTitle += display->mDatasetManager.mCurrentDataset;
           newTitle += " -- ";
         }
@@ -394,7 +405,7 @@ public:
     if (hasRole(ROLE_SIMULATOR) || hasRole(ROLE_DESKTOP)) {
       if (!ParameterGUI::usingKeyboard()) {
 
-        for (auto *display: dataDisplays) {
+        for (auto *display : dataDisplays) {
           display->mPickableManager.onKeyDown(k);
           display->perspectivePickable.testChildren = k.shift();
         }
@@ -405,16 +416,20 @@ public:
           showGui = !showGui;
           break;
         case 'b':
-          dataDisplays[vdvBundle.currentBundle()]->mPerspectiveRotY = dataDisplays[vdvBundle.currentBundle()]->mPerspectiveRotY + 5;
+          dataDisplays[vdvBundle.currentBundle()]->mPerspectiveRotY =
+              dataDisplays[vdvBundle.currentBundle()]->mPerspectiveRotY + 5;
           break;
         case 'v':
-          dataDisplays[vdvBundle.currentBundle()]->mPerspectiveRotY = dataDisplays[vdvBundle.currentBundle()]->mPerspectiveRotY - 5;
+          dataDisplays[vdvBundle.currentBundle()]->mPerspectiveRotY =
+              dataDisplays[vdvBundle.currentBundle()]->mPerspectiveRotY - 5;
           break;
         case '[':
-          dataDisplays[vdvBundle.currentBundle()]->mLayerScaling = dataDisplays[vdvBundle.currentBundle()]->mLayerScaling + 0.05f;
+          dataDisplays[vdvBundle.currentBundle()]->mLayerScaling =
+              dataDisplays[vdvBundle.currentBundle()]->mLayerScaling + 0.05f;
           break;
         case ']':
-          dataDisplays[vdvBundle.currentBundle()]->mLayerScaling = dataDisplays[vdvBundle.currentBundle()]->mLayerScaling - 0.05f;
+          dataDisplays[vdvBundle.currentBundle()]->mLayerScaling =
+              dataDisplays[vdvBundle.currentBundle()]->mLayerScaling - 0.05f;
           break;
         case '-':
           mJumpLayerNeg.trigger(); // This will trigger a change
@@ -453,7 +468,6 @@ public:
           presetHandler->recallPreset(index);
           break;
 
-
         case 'z':
           mAlignTemperatures.trigger();
           break;
@@ -464,9 +478,9 @@ public:
     }
   }
 
-  virtual void onKeyUp(Keyboard const& k) override {
+  virtual void onKeyUp(Keyboard const &k) override {
 
-    for (auto *display: dataDisplays) {
+    for (auto *display : dataDisplays) {
       display->mPickableManager.onKeyUp(k);
       display->perspectivePickable.testChildren = k.shift();
     }
@@ -475,85 +489,93 @@ public:
   virtual void onMessage(osc::Message &m) override {
     //      std::cout << name();
     //      m.print();
-    if("/point" == m.addressPattern()){
-      float ox,oy,oz,dx,dy,dz;
+    if ("/point" == m.addressPattern()) {
+      float ox, oy, oz, dx, dy, dz;
       int id;
       m >> id >> ox >> oy >> oz >> dx >> dy >> dz;
-      Rayd r = Rayd(Vec3f(ox,oy,oz),Vec3f(dx,dy,dz));
+      Rayd r = Rayd(Vec3f(ox, oy, oz), Vec3f(dx, dy, dz));
       // r = rayTransformAllosphere(r);
-      for(auto *display: dataDisplays) {
+      for (auto *display : dataDisplays) {
         if (display->mVisible != 0.0f) {
           display->mPickableManager.event(PickEvent(Point, r));
         }
       }
-    } else if("/pick" == m.addressPattern()){
-      float ox,oy,oz,dx,dy,dz;
-      int id; int button;
+    } else if ("/pick" == m.addressPattern()) {
+      float ox, oy, oz, dx, dy, dz;
+      int id;
+      int button;
       m >> id >> button >> ox >> oy >> oz >> dx >> dy >> dz;
-      Rayd r = Rayd(Vec3f(ox,oy,oz),Vec3f(dx,dy,dz));
+      Rayd r = Rayd(Vec3f(ox, oy, oz), Vec3f(dx, dy, dz));
       // r = rayTransformAllosphere(r);
-      for(auto *display: dataDisplays) {
+      for (auto *display : dataDisplays) {
         if (display->mVisible != 0.0f) {
           display->mPickableManager.event(PickEvent(Pick, r));
         }
       }
-    } else if("/drag" == m.addressPattern()){
-      float ox,oy,oz,dx,dy,dz,x,y,z;
-      int id; int button;
+    } else if ("/drag" == m.addressPattern()) {
+      float ox, oy, oz, dx, dy, dz, x, y, z;
+      int id;
+      int button;
       m >> id >> button >> ox >> oy >> oz >> dx >> dy >> dz >> x >> y >> z;
-      Rayd r = Rayd(Vec3f(ox,oy,oz),Vec3f(dx,dy,dz));
+      Rayd r = Rayd(Vec3f(ox, oy, oz), Vec3f(dx, dy, dz));
       // r = rayTransformAllosphere(r);
-      Vec3f v = Vec3f(x,y,z);
-      for(auto *display: dataDisplays) {
+      Vec3f v = Vec3f(x, y, z);
+      for (auto *display : dataDisplays) {
         if (display->mVisible != 0.0f) {
-          display->mPickableManager.event(PickEvent(Drag, r, v)); // id, button, v);
+          display->mPickableManager.event(
+              PickEvent(Drag, r, v)); // id, button, v);
         }
       }
-    } else if("/rotate" == m.addressPattern()){
-      float ox,oy,oz,dx,dy,dz,x,y,z;
-      int id; int button;
+    } else if ("/rotate" == m.addressPattern()) {
+      float ox, oy, oz, dx, dy, dz, x, y, z;
+      int id;
+      int button;
       m >> id >> button >> ox >> oy >> oz >> dx >> dy >> dz >> x >> y >> z;
-      Rayd r = Rayd(Vec3f(ox,oy,oz),Vec3f(dx,dy,dz));
+      Rayd r = Rayd(Vec3f(ox, oy, oz), Vec3f(dx, dy, dz));
       // r = rayTransformAllosphere(r);
       //      Vec3f v = Vec3f(x,y,z);
-      for(auto *display: dataDisplays) {
+      for (auto *display : dataDisplays) {
         if (display->mVisible != 0.0f) {
           display->mPickableManager.event(PickEvent(RotateRay, r));
         }
       }
-    } else if("/scale" == m.addressPattern()){
-      float ox,oy,oz,dx,dy,dz,x,y,z;
-      int id; int button;
+    } else if ("/scale" == m.addressPattern()) {
+      float ox, oy, oz, dx, dy, dz, x, y, z;
+      int id;
+      int button;
       m >> id >> button >> ox >> oy >> oz >> dx >> dy >> dz >> x >> y >> z;
-      Rayd r = Rayd(Vec3f(ox,oy,oz),Vec3f(dx,dy,dz));
+      Rayd r = Rayd(Vec3f(ox, oy, oz), Vec3f(dx, dy, dz));
       // r = rayTransformAllosphere(r);
       //      Vec3f v = Vec3f(x,y,z);
-      for(auto *display: dataDisplays) {
+      for (auto *display : dataDisplays) {
         if (display->mVisible != 0.0f) {
           display->mPickableManager.event(PickEvent(Scale, r, y));
         }
       }
-    } else if("/unpick" == m.addressPattern()){
-      float ox,oy,oz,dx,dy,dz;
-      int id; int button;
+    } else if ("/unpick" == m.addressPattern()) {
+      float ox, oy, oz, dx, dy, dz;
+      int id;
+      int button;
       m >> id >> button >> ox >> oy >> oz >> dx >> dy >> dz;
-      Rayd r = Rayd(Vec3f(ox,oy,oz),Vec3f(dx,dy,dz));
+      Rayd r = Rayd(Vec3f(ox, oy, oz), Vec3f(dx, dy, dz));
       // r = rayTransformAllosphere(r);
 
-      for(auto *display: dataDisplays) {
+      for (auto *display : dataDisplays) {
         if (display->mVisible != 0.0f) {
-          display->mPickableManager.event(PickEvent(Unpick, r)); //, id, button);
+          display->mPickableManager.event(
+              PickEvent(Unpick, r)); //, id, button);
         }
       }
     }
   }
 
-  virtual void onMouseMove(const Mouse& m){
+  virtual void onMouseMove(const Mouse &m) {
 
-    for(auto *display: dataDisplays) {
+    for (auto *display : dataDisplays) {
       if (display->mVisible != 0.0f) {
         if (!ParameterGUI::usingInput()) {
-          display->mPickableManager.onMouseMove(graphics(), m, width(), height());
+          display->mPickableManager.onMouseMove(graphics(), m, width(),
+                                                height());
         } else {
           display->mPickableManager.unhighlightAll();
         }
@@ -561,11 +583,12 @@ public:
     }
   }
 
-  virtual void onMouseDown(const Mouse& m){
-    for(auto *display: dataDisplays) {
+  virtual void onMouseDown(const Mouse &m) {
+    for (auto *display : dataDisplays) {
       if (display->mVisible != 0.0f) {
         if (!ParameterGUI::usingInput()) {
-          display->mPickableManager.onMouseDown(graphics(), m, width(), height());
+          display->mPickableManager.onMouseDown(graphics(), m, width(),
+                                                height());
         } else {
           display->mPickableManager.onMouseUp(graphics(), m, width(), height());
         }
@@ -573,19 +596,21 @@ public:
     }
   }
 
-  virtual void onMouseDrag(const Mouse& m){
+  virtual void onMouseDrag(const Mouse &m) {
     if (hasRole(ROLE_SIMULATOR) || hasRole(ROLE_DESKTOP)) {
-      if(showGui && ParameterGUI::usingInput()) return;
-      for(auto *display: dataDisplays) {
+      if (showGui && ParameterGUI::usingInput())
+        return;
+      for (auto *display : dataDisplays) {
         if (display->mVisible != 0.0f) {
-          display->mPickableManager.onMouseDrag(graphics(), m, width(), height());
+          display->mPickableManager.onMouseDrag(graphics(), m, width(),
+                                                height());
         }
       }
     }
   }
-  virtual void onMouseUp(const Mouse& m){
+  virtual void onMouseUp(const Mouse &m) {
     if (hasRole(ROLE_SIMULATOR) || hasRole(ROLE_DESKTOP)) {
-      for(auto *display: dataDisplays) {
+      for (auto *display : dataDisplays) {
         if (display->mVisible != 0.0f) {
           display->mPickableManager.onMouseUp(graphics(), m, width(), height());
         }
@@ -593,8 +618,7 @@ public:
     }
   }
 
-
-  void onSound(AudioIOData& io) override {
+  void onSound(AudioIOData &io) override {
     //    static double phase {0};
     //    double phaseIncrement = 440.0 / io.framesPerSecond();
 
@@ -619,10 +643,9 @@ public:
 
   // ---- Drawing functions
 
-
   void drawScene(Graphics &g) {
     g.pushMatrix();
-    for (auto *display:dataDisplays) {
+    for (auto *display : dataDisplays) {
       display->draw(g);
     }
     g.popMatrix();
@@ -638,19 +661,19 @@ public:
     g.pushMatrix();
     g.translate(mOpenVR.LeftController.pos);
     g.rotate(mOpenVR.LeftController.quat);
-    g.color(0,1,1);
+    g.color(0, 1, 1);
     g.draw(mControllerMesh);
     g.popMatrix();
 
-    //right hand
+    // right hand
     g.pushMatrix();
     g.translate(mOpenVR.RightController.pos);
     g.rotate(mOpenVR.RightController.quat);
-    g.color(1,0,1);
+    g.color(1, 0, 1);
     g.draw(mControllerMesh);
     g.popMatrix();
 
-    //draw controller rays
+    // draw controller rays
     g.blendOn();
     g.blendModeTrans();
     auto r1 = mOpenVR.RightController.ray();
@@ -658,12 +681,12 @@ public:
     Mesh rays;
     // TODO can we make the ray fade out in the distance?
     rays.primitive(Mesh::LINES);
-    rays.colors().push_back({1,0,1, 1});
+    rays.colors().push_back({1, 0, 1, 1});
     rays.vertices().push_back(r1.o);
-    rays.colors().push_back({1,0,1, 1});
-    rays.vertices().push_back(r1.o + r1.d*2.5);
-    rays.colors().push_back({1,0,1, 0.3f});
-    rays.vertices().push_back(r1.o + r1.d*5);
+    rays.colors().push_back({1, 0, 1, 1});
+    rays.vertices().push_back(r1.o + r1.d * 2.5);
+    rays.colors().push_back({1, 0, 1, 0.3f});
+    rays.vertices().push_back(r1.o + r1.d * 5);
     // rays.vertices().push_back(r2.o);
     // rays.vertices().push_back(r2.o + r2.d*5);
     g.meshColor();
@@ -709,16 +732,18 @@ public:
 
       if (ImGui::Button("Load")) {
 
-        std::string conformedPath = File::conformDirectory(mDataRootPath.getCurrent());
+        std::string conformedPath =
+            File::conformDirectory(mDataRootPath.getCurrent());
         std::replace(conformedPath.begin(), conformedPath.end(), '\\', '/');
         int currentBundle = vdvBundle.currentBundle();
         assert(currentBundle < dataDisplays.size());
         if (currentBundle >= 0) {
-          dataDisplays[currentBundle]->mDatasetManager.mRootPath.set(conformedPath);
-          dataDisplays[currentBundle]->mDatasetManager.mCurrentDataset.set(mAvailableDatasets.getCurrent());
+          dataDisplays[currentBundle]->mDatasetManager.mRootPath.set(
+              conformedPath);
+          dataDisplays[currentBundle]->mDatasetManager.mCurrentDataset.set(
+              mAvailableDatasets.getCurrent());
         }
         showLoadingWindow = false;
-
       }
       ImGui::SameLine();
       if (ImGui::Button("Cancel##Loading")) {
@@ -748,23 +773,32 @@ public:
       if (ImGui::Button("Load dataset")) {
         showLoadingWindow = !showLoadingWindow;
       }
-      for (auto &paramSpaces: this->dataDisplays[vdvBundle.currentBundle()]->mDatasetManager.mParameterSpaces) {
+      for (auto &paramSpaces : this->dataDisplays[vdvBundle.currentBundle()]
+                                   ->mDatasetManager.mParameterSpaces) {
         ParameterMeta *param = &paramSpaces.second->parameter();
         if (param->getHint("hide") != 1.0f) {
           ParameterGUI::drawParameterMeta(param);
         }
       }
-      ParameterGUI::drawParameterMeta(&this->dataDisplays[vdvBundle.currentBundle()]->mAtomMarkerSize);
-      if (this->dataDisplays[vdvBundle.currentBundle()]->mDatasetManager.mParameterSpaces["time"]->size() > 0) {
+      ParameterGUI::drawParameterMeta(
+          &this->dataDisplays[vdvBundle.currentBundle()]->mAtomMarkerSize);
+      if (this->dataDisplays[vdvBundle.currentBundle()]
+              ->mDatasetManager.mParameterSpaces["time"]
+              ->size() > 0) {
         ParameterGUI::drawParameterMeta(&mAutoAdvance);
         if (mAutoAdvance == 0.0) {
           ParameterGUI::drawParameterMeta(&mAutoAdvanceFreq);
         } else {
-          std::string text = "Incrementing time with freq: " + std::to_string(mAutoAdvanceFreq);
+          std::string text = "Incrementing time with freq: " +
+                             std::to_string(mAutoAdvanceFreq);
           ImGui::Text("%s", text.c_str());
         }
-        ParameterGUI::drawParameterMeta(&this->dataDisplays[vdvBundle.currentBundle()]->mCumulativeTrajectory);
-        ParameterGUI::drawParameterMeta(&this->dataDisplays[vdvBundle.currentBundle()]->mIndividualTrajectory);
+        ParameterGUI::drawParameterMeta(
+            &this->dataDisplays[vdvBundle.currentBundle()]
+                 ->mCumulativeTrajectory);
+        ParameterGUI::drawParameterMeta(
+            &this->dataDisplays[vdvBundle.currentBundle()]
+                 ->mIndividualTrajectory);
       }
       //          ImGui::Separator();
       //          ParameterGUI::drawParameterMeta(&mViewMenu);
@@ -774,8 +808,10 @@ public:
 
       if (ImGui::CollapsingHeader("Slicing")) {
         ImGui::Indent(20.0);
-        ParameterGUI::drawParameterMeta(&dataDisplays[vdvBundle.currentBundle()]->mSlicingPlaneNormal);
-        ParameterGUI::drawParameterMeta(&dataDisplays[vdvBundle.currentBundle()]->mSlicingPlaneDistance);
+        ParameterGUI::drawParameterMeta(
+            &dataDisplays[vdvBundle.currentBundle()]->mSlicingPlaneNormal);
+        ParameterGUI::drawParameterMeta(
+            &dataDisplays[vdvBundle.currentBundle()]->mSlicingPlaneDistance);
 
         ParameterGUI::drawParameterMeta(&mJumpLayerNeg);
         ImGui::SameLine();
@@ -806,10 +842,14 @@ public:
 
       if (ImGui::CollapsingHeader("Elements")) {
         ImGui::Indent(20.0);
-        ParameterGUI::drawBundle(&dataDisplays[vdvBundle.currentBundle()]->graphPickable.bundle);
-        ParameterGUI::drawBundle(&dataDisplays[vdvBundle.currentBundle()]->parallelPickable.bundle);
-        ParameterGUI::drawBundle(&dataDisplays[vdvBundle.currentBundle()]->perspectivePickable.bundle);
-        //          ParameterGUI::drawBundle(&dataDisplays[vdvBundle.currentBundle()]->slicePickable.bundle); // Slice pickable is already exposed enough above
+        ParameterGUI::drawBundle(
+            &dataDisplays[vdvBundle.currentBundle()]->graphPickable.bundle);
+        ParameterGUI::drawBundle(
+            &dataDisplays[vdvBundle.currentBundle()]->parallelPickable.bundle);
+        ParameterGUI::drawBundle(&dataDisplays[vdvBundle.currentBundle()]
+                                      ->perspectivePickable.bundle);
+        //          ParameterGUI::drawBundle(&dataDisplays[vdvBundle.currentBundle()]->slicePickable.bundle);
+        //          // Slice pickable is already exposed enough above
 
         ImGui::Unindent(20.0);
       }
@@ -862,13 +902,16 @@ public:
 
         if (ImGui::Button("Load")) {
 
-          std::string conformedPath = File::conformDirectory(mDataRootPath.getCurrent());
+          std::string conformedPath =
+              File::conformDirectory(mDataRootPath.getCurrent());
           std::replace(conformedPath.begin(), conformedPath.end(), '\\', '/');
           int currentBundle = vdvBundle.currentBundle();
           assert(currentBundle < dataDisplays.size());
           if (currentBundle >= 0) {
-            dataDisplays[currentBundle]->mDatasetManager.mRootPath.set(conformedPath);
-            dataDisplays[currentBundle]->mDatasetManager.mCurrentDataset.set(mAvailableDatasets.getCurrent());
+            dataDisplays[currentBundle]->mDatasetManager.mRootPath.set(
+                conformedPath);
+            dataDisplays[currentBundle]->mDatasetManager.mCurrentDataset.set(
+                mAvailableDatasets.getCurrent());
           }
           showLoadingWindow = false;
         }
@@ -900,7 +943,8 @@ public:
           helpText.assign((std::istreambuf_iterator<char>(t)),
                           std::istreambuf_iterator<char>());
         } else {
-          std::cerr << "WARNING: Help text file not found. No help text on GUI" << std::endl;
+          std::cerr << "WARNING: Help text file not found. No help text on GUI"
+                    << std::endl;
         }
       }
 
@@ -914,19 +958,22 @@ public:
 
   void setupParameterServer() {
     // Register parameters with parameter server
-    for (auto *display: dataDisplays) {
+    for (auto *display : dataDisplays) {
       parameterServer() << display->bundle;
       parameterServer() << display->graphPickable.bundle;
       parameterServer() << display->parallelPickable.bundle;
       parameterServer() << display->perspectivePickable.bundle;
       parameterServer() << display->slicePickable.bundle;
     }
-    parameterServer() << resetView << stepXpos << stepXneg << stepYpos << stepYneg << stepZpos << stepZneg;
+    parameterServer() << resetView << stepXpos << stepXneg << stepYpos
+                      << stepYneg << stepZpos << stepZneg;
     parameterServer() << CalculateSlicing << ResetSlicing;
     parameterServer() << backgroundColor << sliceBackground;
     parameterServer() << font << fontSize;
     // These parameters are command triggers
-    parameterServer() << stepTempPos << stepTempNeg << stepChempotPos << stepChempotNeg << stepChempot2Pos << stepChempot2Neg << mJumpLayerNeg << mJumpLayerPos;
+    parameterServer() << stepTempPos << stepTempNeg << stepChempotPos
+                      << stepChempotNeg << stepChempot2Pos << stepChempot2Neg
+                      << mJumpLayerNeg << mJumpLayerPos;
 
     parameterServer().verbose(true);
   }
@@ -937,18 +984,30 @@ public:
     configLoader2.setFile("casm_viewer.toml");
     // Set default values
 #ifdef AL_WINDOWS
-    configLoader2.setDefaultValue("font", string("C:\\Windows\\Fonts\\arial.ttf"));
-    configLoader2.setDefaultValueVector("dataRootPaths", std::vector<std::string>({string("e:\\NaxCoO2")}));
-    configLoader2.setDefaultValue("pythonScriptsPath", string("../vdv_group_python"));
+    configLoader2.setDefaultValue("font",
+                                  string("C:\\Windows\\Fonts\\arial.ttf"));
+    configLoader2.setDefaultValueVector(
+        "dataRootPaths", std::vector<std::string>({string("e:\\NaxCoO2")}));
+    configLoader2.setDefaultValue("pythonScriptsPath",
+                                  string("../vdv_group_python"));
 #elif defined(AL_OSX)
     configLoader2.setDefaultValue("font", string("/Library/Fonts/arial.ttf"));
-    configLoader2.setDefaultValueVector("dataRootPaths", std::vector<std::string>({string("/alloshare/vdv group/NaxCoO2")}));
-    configLoader2.setDefaultValue("pythonScriptsPath", string("../vdv_group_python"));
+    configLoader2.setDefaultValueVector(
+        "dataRootPaths",
+        std::vector<std::string>({string("/alloshare/vdv group/NaxCoO2")}));
+    configLoader2.setDefaultValue("pythonScriptsPath",
+                                  string("../vdv_group_python"));
 #else
-    configLoader2.setDefaultValue("font", string("/usr/share/fonts/truetype/freefont/FreeMono.ttf"));
-    //        ["/alloshare/vdv group", "/alloshare/vdv group/TiAlO", "/alloshare/vdv group/NaxCoO2", "/alloshare/vdv group/proj1"]
-    configLoader2.setDefaultValueVector<string>("dataRootPaths", std::vector<std::string>({string("/alloshare/vdv group/NaxCoO2"), string("/alloshare/vdv group")}));
-    configLoader2.setDefaultValue("pythonScriptsPath", string("../vdv_group_python"));
+    configLoader2.setDefaultValue(
+        "font", string("/usr/share/fonts/truetype/freefont/FreeMono.ttf"));
+    //        ["/alloshare/vdv group", "/alloshare/vdv group/TiAlO",
+    //        "/alloshare/vdv group/NaxCoO2", "/alloshare/vdv group/proj1"]
+    configLoader2.setDefaultValueVector<string>(
+        "dataRootPaths",
+        std::vector<std::string>({string("/alloshare/vdv group/NaxCoO2"),
+                                  string("/alloshare/vdv group")}));
+    configLoader2.setDefaultValue("pythonScriptsPath",
+                                  string("../vdv_group_python"));
 #endif
     configLoader2.setDefaultValue("fontSize", 32);
     configLoader2.setDefaultValue("pythonBinary", string("python3"));
@@ -960,7 +1019,8 @@ public:
       char cwd[256];
       getcwd(cwd, sizeof(cwd));
       std::string cwdString = cwd;
-      scriptPath = cwdString.substr(0,cwdString.rfind('/')) + scriptPath.substr(2);
+      scriptPath =
+          cwdString.substr(0, cwdString.rfind('/')) + scriptPath.substr(2);
     }
     vector<double> bgRGB = configLoader2.getVector<double>("background");
     if (bgRGB.size() == 4) {
@@ -981,15 +1041,14 @@ public:
     std::string joinedRootPaths;
     auto paths = configLoader2.getVector<string>("dataRootPaths");
     if (rank() == 0) {
-//      for (auto path: paths) {
-//        processParameterSpace(path);
-//      }
+      //      for (auto path: paths) {
+      //        processParameterSpace(path);
+      //      }
     }
     mDataRootPath.setElements(paths);
     mDataRootPath.registerChangeCallback([&](int index) {
       if (rank() == 0) {
         processParameterSpace(mDataRootPath.getElements()[index]);
-
       }
     });
 
@@ -998,13 +1057,12 @@ public:
     font.set(fontPath);
     fontSize = configLoader2.getd("fontSize");
     mDataRootPath.set(0);
-
   }
 
   void storeConfiguration() {
     char currentDir[512];
     getcwd(currentDir, 512);
-    std::cout << "Writing config in " << currentDir <<std::endl;
+    std::cout << "Writing config in " << currentDir << std::endl;
 
     TomlLoader configLoader2;
     configLoader2.setFile("casm_viewer.toml");
@@ -1027,7 +1085,8 @@ public:
     configLoader2.set<std::string>("font", font.get());
     configLoader2.set<float>("fontSize", fontSize.get());
 
-    configLoader2.setVector<std::string>("dataRootPaths", mDataRootPath.getElements());
+    configLoader2.setVector<std::string>("dataRootPaths",
+                                         mDataRootPath.getElements());
 
     configLoader2.writeFile();
   }
@@ -1077,10 +1136,11 @@ public:
           std::getline(ss, field, ' ');
         }
         float b = stof(field);
-        for (auto *display: dataDisplays) {
-          display->elementData[atomName] = {radius, Color(r,g,b)};
+        for (auto *display : dataDisplays) {
+          display->elementData[atomName] = {radius, Color(r, g, b)};
         }
-        //            std::cout << atomName << ":" << radius << " " << r << "  " << g << " " << b << std::endl;
+        //            std::cout << atomName << ":" << radius << " " << r << "  "
+        //            << g << " " << b << std::endl;
       }
     } else {
       std::cout << name() << "Could not open elements.ini" << std::endl;
@@ -1092,16 +1152,21 @@ public:
     std::unique_lock<std::mutex> lk(mScreenshotMutex);
     if (mScreenshotPrefix.size() > 0) { // Take screenshot
       std::vector<unsigned char> mPixels;
-      mPixels.resize(width()* height() * 3);
-      unsigned char * pixs = &mPixels[0];
+      mPixels.resize(width() * height() * 3);
+      unsigned char *pixs = &mPixels[0];
       // FIXME this can be done more efficiently
       glReadPixels(1, 1, width(), height(), GL_RGB, GL_UNSIGNED_BYTE, pixs);
-      std::string dumpDirectory = File::conformPathToOS(dataDisplays[vdvBundle.currentBundle()]->mDatasetManager.buildRootPath()
-          + dataDisplays[vdvBundle.currentBundle()]->mDatasetManager.mCurrentDataset.get() + "/graphics/");
+      std::string dumpDirectory =
+          File::conformPathToOS(dataDisplays[vdvBundle.currentBundle()]
+                                    ->mDatasetManager.buildRootPath() +
+                                dataDisplays[vdvBundle.currentBundle()]
+                                    ->mDatasetManager.mCurrentDataset.get() +
+                                "/graphics/");
       std::string imagePath = dumpDirectory + mScreenshotPrefix + "_screen.png";
 
       stbi_flip_vertically_on_write(1);
-      stbi_write_png(imagePath.c_str(), width(), height(), 3, pixs, width()*3);
+      stbi_write_png(imagePath.c_str(), width(), height(), 3, pixs,
+                     width() * 3);
 
       mScreenshotPrefix = "";
     }
@@ -1109,60 +1174,68 @@ public:
 
   void registerParameterCallbacks() {
 
-    for (auto *display: dataDisplays) {
-      display->mVisible.registerChangeCallback([this](float) {updateTitle();});
+    for (auto *display : dataDisplays) {
+      display->mVisible.registerChangeCallback(
+          [this](float) { updateTitle(); });
 
-      display->mDatasetManager.mCurrentDataset.registerChangeCallback([this, display](std::string value) {
-        std::string path = value;
-        path = path.substr(path.rfind('/') + 1);
-        if (display->mDatasetManager.buildRootPath().size() > 0) {
-          presetHandler->setRootPath(display->mDatasetManager.buildRootPath());
-          presetHandler->setSubDirectory(value + "/presets");
-          presetHandler->setCurrentPresetMap("default", true);
-          std::cout << "Preset Handler sub dir set to " << value << std::endl;
-        }
-        updateTitle();
-        mAutoAdvance = 0.0; // Turn off auto advance
-      });
+      display->mDatasetManager.mCurrentDataset.registerChangeCallback(
+          [this, display](std::string value) {
+            std::string path = value;
+            path = path.substr(path.rfind('/') + 1);
+            if (display->mDatasetManager.buildRootPath().size() > 0) {
+              presetHandler->setRootPath(
+                  display->mDatasetManager.buildRootPath());
+              presetHandler->setSubDirectory(value + "/presets");
+              presetHandler->setCurrentPresetMap("default", true);
+              std::cout << "Preset Handler sub dir set to " << value
+                        << std::endl;
+            }
+            updateTitle();
+            mAutoAdvance = 0.0; // Turn off auto advance
+          });
     }
 
     // Triggers and callbacks that should only be handled by rank 0
     if (rank() == 0) {
-      stepXpos.registerChangeCallback([this](float value){
+      stepXpos.registerChangeCallback([this](float value) {
         ObjectTransformHandler &oth = this->object_transform;
-        oth.quat = Quatf().fromEuler(Vec3f((1/24.0) * 2* M_PI, 0, 0)) * oth.quat;
-
+        oth.quat =
+            Quatf().fromEuler(Vec3f((1 / 24.0) * 2 * M_PI, 0, 0)) * oth.quat;
       });
 
-      stepXneg.registerChangeCallback([this](float value){
+      stepXneg.registerChangeCallback([this](float value) {
         ObjectTransformHandler &oth = this->object_transform;
-        oth.quat = Quatf().fromEuler(- Vec3f((1/24.0) * 2* M_PI, 0, 0)) * oth.quat;
+        oth.quat =
+            Quatf().fromEuler(-Vec3f((1 / 24.0) * 2 * M_PI, 0, 0)) * oth.quat;
       });
 
-
-      stepYpos.registerChangeCallback([this](float value){
+      stepYpos.registerChangeCallback([this](float value) {
         ObjectTransformHandler &oth = this->object_transform;
-        oth.quat = Quatf().fromEuler(Vec3f(0, (1/24.0) * 2* M_PI, 0)) * oth.quat;
+        oth.quat =
+            Quatf().fromEuler(Vec3f(0, (1 / 24.0) * 2 * M_PI, 0)) * oth.quat;
       });
 
-      stepYneg.registerChangeCallback([this](float value){
+      stepYneg.registerChangeCallback([this](float value) {
         ObjectTransformHandler &oth = this->object_transform;
-        oth.quat = Quatf().fromEuler(- Vec3f(0, (1/24.0) * 2* M_PI, 0)) * oth.quat;
+        oth.quat =
+            Quatf().fromEuler(-Vec3f(0, (1 / 24.0) * 2 * M_PI, 0)) * oth.quat;
       });
 
-      stepZpos.registerChangeCallback([this](float value){
+      stepZpos.registerChangeCallback([this](float value) {
         ObjectTransformHandler &oth = this->object_transform;
-        oth.quat = Quatf().fromEuler(Vec3f(0, 0, (1/24.0) * 2* M_PI)) * oth.quat;
+        oth.quat =
+            Quatf().fromEuler(Vec3f(0, 0, (1 / 24.0) * 2 * M_PI)) * oth.quat;
       });
 
-      stepZneg.registerChangeCallback([this](float value){
+      stepZneg.registerChangeCallback([this](float value) {
         ObjectTransformHandler &oth = this->object_transform;
-        oth.quat = Quatf().fromEuler(- Vec3f(0, 0, (1/24.0) * 2* M_PI)) * oth.quat;
+        oth.quat =
+            Quatf().fromEuler(-Vec3f(0, 0, (1 / 24.0) * 2 * M_PI)) * oth.quat;
       });
 
-      stepTempPos.registerChangeCallback([this](float value){
+      stepTempPos.registerChangeCallback([this](float value) {
         if (vdvBundle.bundleGlobal()) {
-          for (auto *display:this->dataDisplays) {
+          for (auto *display : this->dataDisplays) {
             display->nextTemp();
           }
         } else {
@@ -1170,9 +1243,9 @@ public:
         }
       });
 
-      stepTempNeg.registerChangeCallback([this](float value){
+      stepTempNeg.registerChangeCallback([this](float value) {
         if (vdvBundle.bundleGlobal()) {
-          for (auto *display:this->dataDisplays) {
+          for (auto *display : this->dataDisplays) {
             display->previousTemp();
           }
         } else {
@@ -1180,9 +1253,9 @@ public:
         }
       });
 
-      stepChempotPos.registerChangeCallback([this](float value){
+      stepChempotPos.registerChangeCallback([this](float value) {
         if (vdvBundle.bundleGlobal()) {
-          for (auto *display: this->dataDisplays) {
+          for (auto *display : this->dataDisplays) {
             display->nextChempot();
           }
         } else {
@@ -1190,9 +1263,9 @@ public:
         }
       });
 
-      stepChempotNeg.registerChangeCallback([this](float value){
+      stepChempotNeg.registerChangeCallback([this](float value) {
         if (vdvBundle.bundleGlobal()) {
-          for (auto *display: this->dataDisplays) {
+          for (auto *display : this->dataDisplays) {
             display->previousChempot();
           }
         } else {
@@ -1200,9 +1273,9 @@ public:
         }
       });
 
-      stepChempot2Pos.registerChangeCallback([this](float value){
+      stepChempot2Pos.registerChangeCallback([this](float value) {
         if (vdvBundle.bundleGlobal()) {
-          for (auto *display: this->dataDisplays) {
+          for (auto *display : this->dataDisplays) {
             display->nextChempot2();
           }
         } else {
@@ -1210,9 +1283,9 @@ public:
         }
       });
 
-      stepChempot2Neg.registerChangeCallback([this](float value){
+      stepChempot2Neg.registerChangeCallback([this](float value) {
         if (vdvBundle.bundleGlobal()) {
-          for (auto *display: this->dataDisplays) {
+          for (auto *display : this->dataDisplays) {
             display->previousChempot2();
           }
         } else {
@@ -1220,9 +1293,9 @@ public:
         }
       });
 
-      stepTimePos.registerChangeCallback([this](float value){
+      stepTimePos.registerChangeCallback([this](float value) {
         if (vdvBundle.bundleGlobal()) {
-          for (auto *display: this->dataDisplays) {
+          for (auto *display : this->dataDisplays) {
             display->nextTime();
           }
         } else {
@@ -1230,9 +1303,9 @@ public:
         }
       });
 
-      stepTimeNeg.registerChangeCallback([this](float value){
+      stepTimeNeg.registerChangeCallback([this](float value) {
         if (vdvBundle.bundleGlobal()) {
-          for (auto *display: this->dataDisplays) {
+          for (auto *display : this->dataDisplays) {
             display->previousTime();
           }
         } else {
@@ -1240,17 +1313,17 @@ public:
         }
       });
 
-      CalculateSlicing.registerChangeCallback([this](float value){
+      CalculateSlicing.registerChangeCallback([this](float value) {
         this->dataDisplays[vdvBundle.currentBundle()]->computeSlicing();
       });
 
-      ResetSlicing.registerChangeCallback([this](float value){
+      ResetSlicing.registerChangeCallback([this](float value) {
         this->dataDisplays[vdvBundle.currentBundle()]->resetSlicing();
       });
 
-      mJumpLayerPos.registerChangeCallback([this](float value){
+      mJumpLayerPos.registerChangeCallback([this](float value) {
         if (vdvBundle.bundleGlobal()) {
-          for (auto *display: this->dataDisplays) {
+          for (auto *display : this->dataDisplays) {
             display->nextLayer();
           }
         } else {
@@ -1258,9 +1331,9 @@ public:
         }
       });
 
-      mJumpLayerNeg.registerChangeCallback([this](float value){
+      mJumpLayerNeg.registerChangeCallback([this](float value) {
         if (vdvBundle.bundleGlobal()) {
-          for (auto *display: this->dataDisplays) {
+          for (auto *display : this->dataDisplays) {
             display->previousLayer();
           }
         } else {
@@ -1270,15 +1343,15 @@ public:
 
       mSaveGraphics.registerChangeCallback([this](float value) {
         time_t rawtime;
-        struct tm * timeinfo;
+        struct tm *timeinfo;
         char buffer[80];
-        time (&rawtime);
+        time(&rawtime);
         timeinfo = localtime(&rawtime);
-        strftime(buffer,sizeof(buffer),"%d-%m-%Y_%H%M%S",timeinfo);
+        strftime(buffer, sizeof(buffer), "%d-%m-%Y_%H%M%S", timeinfo);
         std::string str(buffer);
         int counter = 0;
-        for(DataDisplay *display: this->dataDisplays) {
-          if(display->mVisible == 1.0f) {
+        for (DataDisplay *display : this->dataDisplays) {
+          if (display->mVisible == 1.0f) {
             std::string prefix = str + "_" + std::to_string(counter++);
             display->dumpImages(prefix);
           }
@@ -1289,89 +1362,106 @@ public:
       });
 
       mAlignTemperatures.registerChangeCallback([this](float value) {
-        float baseTemp = dataDisplays[0]->mDatasetManager.mParameterSpaces["temperature"]->parameter();
-        for (size_t i = 1 ; i < dataDisplays.size(); i++) {
-          dataDisplays[i]->mDatasetManager.mParameterSpaces["temperature"]->parameter() = baseTemp;
-          for (size_t j= 0; j < i; j++) {
+        float baseTemp = dataDisplays[0]
+                             ->mDatasetManager.mParameterSpaces["temperature"]
+                             ->parameter();
+        for (size_t i = 1; i < dataDisplays.size(); i++) {
+          dataDisplays[i]
+              ->mDatasetManager.mParameterSpaces["temperature"]
+              ->parameter() = baseTemp;
+          for (size_t j = 0; j < i; j++) {
             dataDisplays[i]->nextTemp();
           }
         }
       });
 
       mAlignChempots.registerChangeCallback([this](float value) {
-        float baseChempot = dataDisplays[0]->mDatasetManager.mParameterSpaces["chempotA"]->parameter();
-        for (size_t i = 1 ; i < dataDisplays.size(); i++) {
-          dataDisplays[i]->mDatasetManager.mParameterSpaces["chempotA"]->parameter() = baseChempot;
-          for (size_t j= 0; j < i; j++) {
+        float baseChempot = dataDisplays[0]
+                                ->mDatasetManager.mParameterSpaces["chempotA"]
+                                ->parameter();
+        for (size_t i = 1; i < dataDisplays.size(); i++) {
+          dataDisplays[i]
+              ->mDatasetManager.mParameterSpaces["chempotA"]
+              ->parameter() = baseChempot;
+          for (size_t j = 0; j < i; j++) {
             dataDisplays[i]->nextChempot();
           }
         }
       });
       stepPitchAngleNeg.registerChangeCallback([this](float value) {
         if (vdvBundle.bundleGlobal()) {
-          float newAngle = dataDisplays[vdvBundle.currentBundle()]->mSliceRotationPitch;
-          newAngle -= pitchAngleStep * M_2PI /360.0;
-          for (auto *display: dataDisplays) {
+          float newAngle =
+              dataDisplays[vdvBundle.currentBundle()]->mSliceRotationPitch;
+          newAngle -= pitchAngleStep * M_2PI / 360.0;
+          for (auto *display : dataDisplays) {
             display->mSliceRotationPitch = newAngle;
           }
 
         } else {
-          float newAngle = dataDisplays[vdvBundle.currentBundle()]->mSliceRotationPitch;
-          newAngle -= pitchAngleStep * M_2PI /360.0;
-          dataDisplays[vdvBundle.currentBundle()]->mSliceRotationPitch = newAngle;
-
+          float newAngle =
+              dataDisplays[vdvBundle.currentBundle()]->mSliceRotationPitch;
+          newAngle -= pitchAngleStep * M_2PI / 360.0;
+          dataDisplays[vdvBundle.currentBundle()]->mSliceRotationPitch =
+              newAngle;
         }
       });
       stepPitchAnglePos.registerChangeCallback([this](float value) {
         if (vdvBundle.bundleGlobal()) {
-          float newAngle = dataDisplays[vdvBundle.currentBundle()]->mSliceRotationPitch;
-          newAngle += pitchAngleStep * M_2PI /360.0;
-          newAngle -= pitchAngleStep * M_2PI /360.0;
-          for (auto *display: dataDisplays) {
+          float newAngle =
+              dataDisplays[vdvBundle.currentBundle()]->mSliceRotationPitch;
+          newAngle += pitchAngleStep * M_2PI / 360.0;
+          newAngle -= pitchAngleStep * M_2PI / 360.0;
+          for (auto *display : dataDisplays) {
             display->mSliceRotationPitch = newAngle;
           }
 
         } else {
-          float newAngle = dataDisplays[vdvBundle.currentBundle()]->mSliceRotationPitch;
-          newAngle += pitchAngleStep * M_2PI /360.0;
-          dataDisplays[vdvBundle.currentBundle()]->mSliceRotationPitch = newAngle;
-
+          float newAngle =
+              dataDisplays[vdvBundle.currentBundle()]->mSliceRotationPitch;
+          newAngle += pitchAngleStep * M_2PI / 360.0;
+          dataDisplays[vdvBundle.currentBundle()]->mSliceRotationPitch =
+              newAngle;
         }
       });
       stepRollAngleNeg.registerChangeCallback([this](float value) {
         if (vdvBundle.bundleGlobal()) {
-          float newAngle = dataDisplays[vdvBundle.currentBundle()]->mSliceRotationRoll;
-          newAngle -= rollAngleStep * M_2PI /360.0;
-          for (auto *display: dataDisplays) {
+          float newAngle =
+              dataDisplays[vdvBundle.currentBundle()]->mSliceRotationRoll;
+          newAngle -= rollAngleStep * M_2PI / 360.0;
+          for (auto *display : dataDisplays) {
             display->mSliceRotationRoll = newAngle;
           }
         } else {
-          float newAngle = dataDisplays[vdvBundle.currentBundle()]->mSliceRotationRoll;
-          newAngle -= rollAngleStep * M_2PI /360.0;
-          dataDisplays[vdvBundle.currentBundle()]->mSliceRotationRoll = newAngle;
-
+          float newAngle =
+              dataDisplays[vdvBundle.currentBundle()]->mSliceRotationRoll;
+          newAngle -= rollAngleStep * M_2PI / 360.0;
+          dataDisplays[vdvBundle.currentBundle()]->mSliceRotationRoll =
+              newAngle;
         }
       });
       stepRollAnglePos.registerChangeCallback([this](float value) {
         if (vdvBundle.bundleGlobal()) {
-          float newAngle = dataDisplays[vdvBundle.currentBundle()]->mSliceRotationRoll;
-          newAngle += rollAngleStep * M_2PI /360.0;
-          for (auto *display: dataDisplays) {
+          float newAngle =
+              dataDisplays[vdvBundle.currentBundle()]->mSliceRotationRoll;
+          newAngle += rollAngleStep * M_2PI / 360.0;
+          for (auto *display : dataDisplays) {
             display->mSliceRotationRoll = newAngle;
           }
         } else {
-          float newAngle = dataDisplays[vdvBundle.currentBundle()]->mSliceRotationRoll;
-          newAngle += rollAngleStep * M_2PI /360.0;
-          dataDisplays[vdvBundle.currentBundle()]->mSliceRotationRoll = newAngle;
-
+          float newAngle =
+              dataDisplays[vdvBundle.currentBundle()]->mSliceRotationRoll;
+          newAngle += rollAngleStep * M_2PI / 360.0;
+          dataDisplays[vdvBundle.currentBundle()]->mSliceRotationRoll =
+              newAngle;
         }
       });
 
-      mAutoAdvance.registerChangeCallback([this](float value){
+      mAutoAdvance.registerChangeCallback([this](float value) {
         if (value == 0.0f) {
           mParameterPlayback.stop();
         } else {
-          std::chrono::nanoseconds wait = std::chrono::nanoseconds(uint64_t(1.0e9/ mAutoAdvanceFreq));
+          std::chrono::nanoseconds wait =
+              std::chrono::nanoseconds(uint64_t(1.0e9 / mAutoAdvanceFreq));
           mParameterPlayback.setWaitTime(wait);
           DataDisplay *d = dataDisplays[vdvBundle.currentBundle()];
           mParameterPlayback.start([d]() {
@@ -1384,44 +1474,46 @@ public:
       mRecomputeSpace.registerChangeCallback([&](float value) {
         if (value == 1.0f) {
           if (mAvailableDatasets.getCurrent() != "") {
-            cleanParameterSpace(File::conformPathToOS(mDataRootPath.getCurrent()));
-            processParameterSpace(File::conformPathToOS(mDataRootPath.getCurrent()));
+            cleanParameterSpace(
+                File::conformPathToOS(mDataRootPath.getCurrent()));
+            processParameterSpace(
+                File::conformPathToOS(mDataRootPath.getCurrent()));
           }
         }
       });
     }
 
-    resetView.registerChangeCallback([this](float value){
-      this->object_transform.reset();
-    });
+    resetView.registerChangeCallback(
+        [this](float value) { this->object_transform.reset(); });
 
-    Z.registerChangeCallback([this](float value){ this->nav().pos()[2] = value; });
-    X.registerChangeCallback([this](float value){ this->nav().pos()[0] = value; });
+    Z.registerChangeCallback(
+        [this](float value) { this->nav().pos()[2] = value; });
+    X.registerChangeCallback(
+        [this](float value) { this->nav().pos()[0] = value; });
 
     pythonScriptPath.registerChangeCallback([&](std::string value) {
-      for (auto *display: dataDisplays) {
+      for (auto *display : dataDisplays) {
         display->mDatasetManager.setPythonScriptPath(value);
       }
     });
     pythonBinary.registerChangeCallback([&](std::string value) {
-      for (auto *display: dataDisplays) {
+      for (auto *display : dataDisplays) {
         display->mDatasetManager.setPythonBinary(value);
       }
     });
     sliceBackground.registerChangeCallback([&](Color value) {
-
-      for (auto *display: dataDisplays) {
+      for (auto *display : dataDisplays) {
         display->backgroundColor.set(value);
       }
     });
 
     font.registerChangeCallback([&](std::string value) {
-      for (auto *display: dataDisplays) {
+      for (auto *display : dataDisplays) {
         display->setFont(value, fontSize);
       }
     });
     fontSize.registerChangeCallback([&](float value) {
-      for (auto *display: dataDisplays) {
+      for (auto *display : dataDisplays) {
         display->setFont(font.get(), value);
       }
     });
@@ -1430,24 +1522,30 @@ public:
   void cleanParameterSpace(string datasetPath) {
 
     if (File::isDirectory(dataRoot() + datasetPath)) {
-      FileList subDirs = filterInDir(dataRoot() + datasetPath, [&](FilePath const&fp) {
-          std::cout << fp.filepath() <<std::endl;
-          return File::isDirectory(fp.filepath());
-    });
+      FileList subDirs =
+          filterInDir(dataRoot() + datasetPath, [&](FilePath const &fp) {
+            std::cout << fp.filepath() << std::endl;
+            return File::isDirectory(fp.filepath());
+          });
       subDirs.add(FilePath(dataRoot() + datasetPath));
-      for (auto subDir: subDirs) {
+      for (auto subDir : subDirs) {
         std::string cachedOutputDir = subDir.filepath() + "/cached_output/";
-        if(File::exists(cachedOutputDir) && File::isDirectory(cachedOutputDir)) {
+        if (File::exists(cachedOutputDir) &&
+            File::isDirectory(cachedOutputDir)) {
           if (!Dir::removeRecursively(cachedOutputDir)) {
-            std::cerr << "ERROR cleaning cache at " << cachedOutputDir << std::endl;
+            std::cerr << "ERROR cleaning cache at " << cachedOutputDir
+                      << std::endl;
           }
         }
-        // FIXME This should be removed once no files are generated outside the cache directory
-        std::vector<std::string> additionalCacheFiles = {"transfmat" , "template_POSCAR"};
-        for (auto fileToRemove: additionalCacheFiles) {
+        // FIXME This should be removed once no files are generated outside the
+        // cache directory
+        std::vector<std::string> additionalCacheFiles = {"transfmat",
+                                                         "template_POSCAR"};
+        for (auto fileToRemove : additionalCacheFiles) {
           if (File::exists(subDir.filepath() + fileToRemove)) {
             if (!File::remove(subDir.filepath() + fileToRemove)) {
-              std::cerr << "ERROR deleting cache file: " << subDir.filepath() + fileToRemove << std::endl;
+              std::cerr << "ERROR deleting cache file: "
+                        << subDir.filepath() + fileToRemove << std::endl;
             }
           }
         }
@@ -1455,28 +1553,31 @@ public:
     }
   }
 
-  void processParameterSpace(string rootPath)
-  {
+  void processParameterSpace(string rootPath) {
     parameterSpaceProcessor.verbose(true);
 
     auto filelist = itemListInDir(dataRoot() + rootPath);
-    for (FilePath &element: filelist) {
+    for (FilePath &element : filelist) {
       if (File::isDirectory(element.filepath())) {
         // Attempt to generate data space for all directories in root dir.
         parameterSpaceProcessor.setCommand(pythonBinary);
-        parameterSpaceProcessor.setScriptName(pythonScriptPath.get() + "/analyze_parameter_space.py");
+        parameterSpaceProcessor.setScriptName(pythonScriptPath.get() +
+                                              "/analyze_parameter_space.py");
         parameterSpaceProcessor.setRunningDirectory(element.filepath());
-        parameterSpaceProcessor.setOutputDirectory(element.filepath() + "/cached_output");
+        parameterSpaceProcessor.setOutputDirectory(element.filepath() +
+                                                   "/cached_output");
         auto currentElement = element;
-        parameterSpaceProcessor.processAsync(false, [element, rootPath, this](bool ok) {
-          std::cout << "Process parameter space asyc for " << element.filepath() << std::endl;
-          if(ok && File::exists(File::conformPathToOS(element.filepath()) + "cached_output/_parameter_space.json")) {
-            updateAvailableDatasets(this->dataRoot() + rootPath);
-          } else {
-            Dir::removeRecursively(element.filepath() + "/cached_output");
-          }
-        }  );
-
+        parameterSpaceProcessor.processAsync(
+            false, [element, rootPath, this](bool ok) {
+              std::cout << "Process parameter space asyc for "
+                        << element.filepath() << std::endl;
+              if (ok && File::exists(File::conformPathToOS(element.filepath()) +
+                                     "cached_output/_parameter_space.json")) {
+                updateAvailableDatasets(this->dataRoot() + rootPath);
+              } else {
+                Dir::removeRecursively(element.filepath() + "/cached_output");
+              }
+            });
       }
     }
   }
@@ -1484,11 +1585,13 @@ public:
   void updateAvailableDatasets(std::string datasetRoot) {
     auto entries = filterInDir(datasetRoot, [&](const FilePath &fp) {
       //      std::cout << fp.filepath() <<std::endl;
-      return File::isDirectory(fp.filepath());} );
+      return File::isDirectory(fp.filepath());
+    });
 
     std::vector<std::string> directories;
-    for (auto entry: entries) {
-      auto spaceFileFullPath = File::conformPathToOS(entry.filepath()) + "/cached_output/_parameter_space.json";
+    for (auto entry : entries) {
+      auto spaceFileFullPath = File::conformPathToOS(entry.filepath()) +
+                               "/cached_output/_parameter_space.json";
       if (File::exists(spaceFileFullPath)) {
         directories.push_back(entry.file());
       }
@@ -1496,20 +1599,19 @@ public:
     mAvailableDatasets.setElements(directories);
   }
 
-
-  Rayd rayTransformAllosphere(Rayd r){
+  Rayd rayTransformAllosphere(Rayd r) {
     float t = r.intersectAllosphere(); // get t on surface of allosphere screen
-    Vec3f pos = nav().quat().rotate( r(t) ); // rotate point on allosphere to match current nav orientation (check this)
-    Rayd ray( nav().pos(), pos ); // ray from sphere center (camera location) to intersected location
+    Vec3f pos =
+        nav().quat().rotate(r(t)); // rotate point on allosphere to match
+                                   // current nav orientation (check this)
+    Rayd ray(nav().pos(), pos); // ray from sphere center (camera location) to
+                                // intersected location
     return ray;
   }
 
-  const char * flowAddress() override { return "interface";}
+  const char *flowAddress() override { return "interface"; }
 
-  void updateTitle() {
-    mMarkUpdateTitle = true;
-  }
-
+  void updateTitle() { mMarkUpdateTitle = true; }
 };
 
 int main() {
@@ -1523,4 +1625,3 @@ int main() {
   //  app.initAudio();
   app->start();
 }
-

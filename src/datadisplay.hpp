@@ -5,40 +5,41 @@
 #define NOMINMAX
 #endif
 
-#include <string>
-#include <vector>
-#include <map>
-#include <iostream>
-#include <regex>
 #include <algorithm>
+#include <iostream>
+#include <map>
 #include <memory>
 #include <mutex>
+#include <regex>
+#include <string>
+#include <thread>
+#include <vector>
 
 #include "al/core.hpp"
 #include "al/core/math/al_Matrix4.hpp"
 
-#include "al/util/ui/al_Parameter.hpp"
-#include "al/util/ui/al_ParameterBundle.hpp"
-#include "al/util/ui/al_Pickable.hpp"
-#include "al/util/ui/al_PickableRotateHandle.hpp"
-#include "al/util/ui/al_PickableManager.hpp"
+#include "al/core/graphics/al_Light.hpp"
 #include "al/core/io/al_CSVReader.hpp"
 #include "al/core/io/al_File.hpp"
 #include "al/core/types/al_Color.hpp"
-#include "al/core/graphics/al_Light.hpp"
-#include "al/util/al_Toml.hpp"
 #include "al/util/al_FontModule.hpp"
+#include "al/util/al_Toml.hpp"
+#include "al/util/ui/al_Parameter.hpp"
+#include "al/util/ui/al_ParameterBundle.hpp"
+#include "al/util/ui/al_Pickable.hpp"
+#include "al/util/ui/al_PickableManager.hpp"
+#include "al/util/ui/al_PickableRotateHandle.hpp"
 
 #include "module/img/loadImage.hpp"
 
-#include "al_VASPReader.hpp"
 #include "al_DataScript.hpp"
+#include "al_VASPReader.hpp"
 
-#include "processors.hpp"
 #include "instanced_mesh.hpp"
+#include "processors.hpp"
 
-#include "slice.hpp"
 #include "datasetmanager.hpp"
+#include "slice.hpp"
 
 //#include "imgui.h"
 
@@ -48,24 +49,21 @@
 using namespace al;
 using namespace std;
 
-inline Matrix4f getLookAt(const Vec3f& ux, const Vec3f& uy, const Vec3f& uz, const Vec3f& p) {
-  return Matrix4f(
-        ux[0], ux[1], ux[2], -(ux.dot(p)),
-      uy[0], uy[1], uy[2], -(uy.dot(p)),
-      uz[0], uz[1], uz[2], -(uz.dot(p)),
-      0,     0,     0,       1
-      );
+inline Matrix4f getLookAt(const Vec3f &ux, const Vec3f &uy, const Vec3f &uz,
+                          const Vec3f &p) {
+  return Matrix4f(ux[0], ux[1], ux[2], -(ux.dot(p)), uy[0], uy[1], uy[2],
+                  -(uy.dot(p)), uz[0], uz[1], uz[2], -(uz.dot(p)), 0, 0, 0, 1);
 }
 
-inline Matrix4f getLookAt(const Vec3f& eyePos, const Vec3f& at, const Vec3f& up) {
+inline Matrix4f getLookAt(const Vec3f &eyePos, const Vec3f &at,
+                          const Vec3f &up) {
   Vec3f z = (eyePos - at).normalize();
   Vec3f x = cross(up, z).normalize();
   Vec3f y = cross(z, x).normalize();
   return getLookAt(x, y, z, eyePos);
 }
 
-inline HSV rgb2hsv(RGB c)
-{
+inline HSV rgb2hsv(RGB c) {
   Vec4f K = Vec4f(0.0, -1.0 / 3.0, 2.0 / 3.0, -1.0);
   Vec4f p = c.g < c.b ? Vec4f(c.b, c.g, K.w, K.z) : Vec4f(c.g, c.b, K.x, K.y);
   Vec4f q = c.r < p.x ? Vec4f(p.x, p.y, p.w, c.r) : Vec4f(c.r, p.y, p.z, p.x);
@@ -201,78 +199,90 @@ public:
   string name;
   float drawScale;
   Color color;
-  Graphics::PolygonMode polygonMode {Graphics::FILL};
+  Graphics::PolygonMode polygonMode{Graphics::FILL};
 };
-
 
 struct ElementData {
   float radius;
   Color color;
 };
 
-
 class DataDisplayParameters {
 public:
+  ParameterVec3 layerDir{"LayerDir", ""}; // Direction of layers in data
 
-  ParameterVec3 layerDir {"LayerDir", ""}; // Direction of layers in data
+  ParameterMenu mAtomOfInterest{"AtomOfInterest", "", 0};
+  ParameterChoice mShowAtoms{"ShowAtoms"};
+  Parameter mAtomMarkerSize{"AtomMarkerSize", "", 0.4, "", 0.0, 5.0};
+  ParameterBool mShowRadius{"ShowAtomRadius", "", 1};
+  ParameterBool mCumulativeTrajectory{"ShowCumulativeTrajectory", "", 1.0};
+  ParameterBool mIndividualTrajectory{"ShowIndividualTrajectory", "", 1.0};
 
-  ParameterMenu mAtomOfInterest{ "AtomOfInterest", "", 0 };
-  ParameterChoice mShowAtoms{ "ShowAtoms" };
-  Parameter mAtomMarkerSize {"AtomMarkerSize", "", 0.4, "", 0.0, 5.0};
-  ParameterBool mShowRadius {"ShowAtomRadius", "", 1};
-  ParameterBool mCumulativeTrajectory {"ShowCumulativeTrajectory", "", 1.0};
-  ParameterBool mIndividualTrajectory {"ShowIndividualTrajectory", "", 1.0};
+  ParameterColor backgroundColor{"projectionBackground", "",
+                                 Color(0.1f, 0.1f, 0.1f, 0.8f)};
 
-  ParameterColor backgroundColor{"projectionBackground", "", Color(0.1f, 0.1f, 0.1f, 0.8f) };
+  ParameterBool mVisible{"Visible", "", 1};
+  ParameterBool mShowGraph{"ShowGraph", "", 1};
+  ParameterBool mShowParallel{"ShowParallel", "", 1};
+  ParameterBool mShowPerspective{"ShowPerspective", "", 1};
+  ParameterBool mSingleProjection{"SingleProjection", "", 1};
 
-  ParameterBool mVisible {"Visible", "", 1};
-  ParameterBool mShowGraph {"ShowGraph", "", 1};
-  ParameterBool mShowParallel {"ShowParallel", "", 1};
-  ParameterBool mShowPerspective {"ShowPerspective", "", 1};
-  ParameterBool mSingleProjection {"SingleProjection", "", 1};
-
-  ParameterBool mBillboarding {"Billboarding", "", 1};
-  ParameterBool mSmallLabel {"SmallLabel", "", 1};
-  ParameterBool mDrawLabels {"DrawLabels", "", 1};
+  ParameterBool mBillboarding{"Billboarding", "", 1};
+  ParameterBool mSmallLabel{"SmallLabel", "", 1};
+  ParameterBool mDrawLabels{"DrawLabels", "", 1};
 
   //    ParameterBool mMultiplot {"Multiplot", "", 0.0};
-  ParameterMenu mPlotYAxis{ "PlotYAxis" };
-  ParameterMenu mPlotXAxis{ "PlotXAxis" };
+  ParameterMenu mPlotYAxis{"PlotYAxis"};
+  ParameterMenu mPlotXAxis{"PlotXAxis"};
 
-  Parameter mLayerSeparation{"LayerSeparation", "", 0, "", 0, 3}; // Increase layer separation (Z- axis scaling) in perspectiveView
-  Parameter mLayerScaling{"LayerScaling", "", 1.0, "", 0, 3}; // Increase layer size in projection view
+  Parameter mLayerSeparation{
+      "LayerSeparation",
+      "",
+      0,
+      "",
+      0,
+      3}; // Increase layer separation (Z- axis scaling) in perspectiveView
+  Parameter mLayerScaling{"LayerScaling",
+                          "",
+                          1.0,
+                          "",
+                          0,
+                          3}; // Increase layer size in projection view
 
-  ParameterVec3 mSlicingPlanePoint{ "SlicingPlanePoint", "", Vec3f(0.0f, 0.0, 0.0)};
-  ParameterVec3 mSlicingPlaneNormal {"SliceNormal", "", Vec3f(0.0f, 0.0f, 1.0)};
+  ParameterVec3 mSlicingPlanePoint{"SlicingPlanePoint", "",
+                                   Vec3f(0.0f, 0.0, 0.0)};
+  ParameterVec3 mSlicingPlaneNormal{"SliceNormal", "", Vec3f(0.0f, 0.0f, 1.0)};
 
-  Parameter mSliceRotationPitch{"SliceRotationPitch", "SliceAngles", 0.0, "", - M_PI, M_PI};
-  Parameter mSliceRotationRoll{"SliceRotationRoll", "SliceAngles", 0.0, "", - M_PI/2.0, M_PI/2.0};
-  Parameter mSlicingPlaneDistance{ "SlicingPlaneThickness", "", 3.0, "", 0.0f, 30.0f };
+  Parameter mSliceRotationPitch{
+      "SliceRotationPitch", "SliceAngles", 0.0, "", -M_PI, M_PI};
+  Parameter mSliceRotationRoll{"SliceRotationRoll", "SliceAngles", 0.0, "",
+                               -M_PI / 2.0,         M_PI / 2.0};
+  Parameter mSlicingPlaneDistance{
+      "SlicingPlaneThickness", "", 3.0, "", 0.0f, 30.0f};
 
-  Parameter mPerspectiveRotY {"perspectiveRotY", "", -75, "", -90, 90};
+  Parameter mPerspectiveRotY{"perspectiveRotY", "", -75, "", -90, 90};
 
-  ParameterBool mShowGrid {"ShowGrid", "", 0.0};
-  Parameter mGridSpacing {"GridSpacing", "", 10.0, "", 1.0, 20.0};
-  ParameterMenu mGridType {"GridType"};
+  ParameterBool mShowGrid{"ShowGrid", "", 0.0};
+  Parameter mGridSpacing{"GridSpacing", "", 10.0, "", 1.0, 20.0};
+  ParameterMenu mGridType{"GridType"};
 
-  Parameter mGridXOffset {"GridXOffset", "", 0.0, "", 0.0, 5.0};
-  Parameter mGridYOffset {"GridYOffset", "", 0.0, "", 0.0, 5.0};
+  Parameter mGridXOffset{"GridXOffset", "", 0.0, "", 0.0, 5.0};
+  Parameter mGridYOffset{"GridYOffset", "", 0.0, "", 0.0, 5.0};
 
   ParameterBundle bundle{"CASMDataset"};
 };
 
 // -----------------------------------------------------------------
 
-class DataDisplay : public DataDisplayParameters{
+class DataDisplay : public DataDisplayParameters {
 public:
-
   vector<AtomProperties> atomPropertiesProj;
 
   std::map<std::string, ElementData> elementData;
 
   DatasetManager mDatasetManager;
 
-  bool mRunComputation {true};
+  bool mRunComputation{true};
 
   // #INSTANCED_RENDERING: declare
   ShaderProgram instancing_shader;
@@ -283,7 +293,7 @@ public:
 
   // Pickables
   PickableManager mPickableManager;
-  PickableBB graphPickable {"graph"};
+  PickableBB graphPickable{"graph"};
   PickableBB parallelPickable{"parallel"};
   PickableBB perspectivePickable{"perspective"};
   PickableBB slicePickable{"slice"};
@@ -305,7 +315,8 @@ public:
 
   void setFont(std::string name, float size);
 
-  // Functions to change increase/decrease parameters according to internal parameter spaces
+  // Functions to change increase/decrease parameters according to internal
+  // parameter spaces
 
   void nextTemp() {
     mDatasetManager.mParameterSpaces["temperature"]->stepIncrement();
@@ -331,40 +342,44 @@ public:
     mDatasetManager.mParameterSpaces["chempotB"]->stepDecrease();
   }
 
-  void nextTime() {
-    mDatasetManager.mParameterSpaces["time"]->stepIncrement();
-  }
+  void nextTime() { mDatasetManager.mParameterSpaces["time"]->stepIncrement(); }
 
   void previousTime() {
     mDatasetManager.mParameterSpaces["time"]->stepDecrease();
   }
 
   void nextLayer() {
-    mSlicingPlanePoint = mSlicingPlanePoint.get() + mSlicingPlaneNormal.get().normalized() * mSlicingPlaneDistance;
+    mSlicingPlanePoint =
+        mSlicingPlanePoint.get() +
+        mSlicingPlaneNormal.get().normalized() * mSlicingPlaneDistance;
   }
 
   void previousLayer() {
-    mSlicingPlanePoint = mSlicingPlanePoint.get() - mSlicingPlaneNormal.get().normalized() * mSlicingPlaneDistance;
+    mSlicingPlanePoint =
+        mSlicingPlanePoint.get() -
+        mSlicingPlaneNormal.get().normalized() * mSlicingPlaneDistance;
   }
 
-//  void requestDataLoad() {
-//    mRequestLoad = true;
-//  }
+  //  void requestDataLoad() {
+  //    mRequestLoad = true;
+  //  }
 
-  void requestInitDataset() {
-    mRequestInit = true;
-  }
+  void requestInitDataset() { mRequestInit = true; }
 
   void dumpImages(std::string dumpPrefix);
 
   void computeSlicing() {
 
     if (mRunComputation) {
-      mSlicingPlaneDistance = findDistanceNormal(mAligned4fData, layerDir.get());
+      mSlicingPlaneDistance =
+          findDistanceNormal(mAligned4fData, layerDir.get());
       std::cout << "Data Boundaries:" << std::endl;
-      std::cout << "X " << mDataBoundaries.minx << " -> " << mDataBoundaries.maxx << std::endl;
-      std::cout << "Y " << mDataBoundaries.miny << " -> " << mDataBoundaries.maxy << std::endl;
-      std::cout << "Z " << mDataBoundaries.minz << " -> " << mDataBoundaries.maxz << std::endl;
+      std::cout << "X " << mDataBoundaries.minx << " -> "
+                << mDataBoundaries.maxx << std::endl;
+      std::cout << "Y " << mDataBoundaries.miny << " -> "
+                << mDataBoundaries.maxy << std::endl;
+      std::cout << "Z " << mDataBoundaries.minz << " -> "
+                << mDataBoundaries.maxz << std::endl;
       Vec3f point = mSlicingPlanePoint;
       point.z = mDataBoundaries.minz;
       mSlicingPlanePoint = point;
@@ -372,8 +387,8 @@ public:
   }
 
   void resetSlicing() {
-    mSlicingPlanePoint.set({mDataBoundaries.minx, mDataBoundaries.miny,
-                            mDataBoundaries.minz});
+    mSlicingPlanePoint.set(
+        {mDataBoundaries.minx, mDataBoundaries.miny, mDataBoundaries.minz});
 
     mSlicingPlaneDistance = mDataBoundaries.maxz - mDataBoundaries.minz;
     mSliceRotationRoll.set(0);
@@ -382,9 +397,7 @@ public:
   }
 
 protected:
-
-  Texture& iso_scene() { return fbo_iso.tex(); }
-
+  Texture &iso_scene() { return fbo_iso.tex(); }
 
   // This function should be called whenever there is new atom position data
   void updateDisplayBuffers();
@@ -424,7 +437,8 @@ protected:
       mParamText = "Processing ...";
     } else {
       auto subDir = mDatasetManager.getSubDir();
-      auto temperatureId = mDatasetManager.mParameterSpaces["temperature"]->getCurrentId();
+      auto temperatureId =
+          mDatasetManager.mParameterSpaces["temperature"]->getCurrentId();
       std::string timeId;
       if (mDatasetManager.mParameterSpaces["time"]->size() > 0) {
         timeId = mDatasetManager.mParameterSpaces["time"]->getCurrentId();
@@ -432,10 +446,10 @@ protected:
       if (subDir.size() > 0) {
         mParamText = subDir;
       }
-      if (temperatureId.size()  > 0) {
+      if (temperatureId.size() > 0) {
         mParamText += " temp:" + temperatureId + " ";
       }
-      if (timeId.size()  > 0) {
+      if (timeId.size() > 0) {
         mParamText += " time:" + timeId;
       }
       if (mParamText.size() == 0) {
@@ -482,7 +496,6 @@ protected:
   //    }
 
 private:
-
   VAOMesh axis;
   VAOMesh orthoMesh;
   VAOMesh graphlinesMesh;
@@ -499,9 +512,9 @@ private:
 
   EasyFBO fbo_iso;
 
-//  bool mRequestLoad {false};
-  std::atomic<bool> mProcessing{ false };
-  bool mRequestInit {false};
+  //  bool mRequestLoad {false};
+  std::atomic<bool> mProcessing{false};
+  bool mRequestInit{false};
 
   typedef struct {
     int counts;
@@ -513,7 +526,6 @@ private:
   BoundingBox_ mDataBoundaries;
 
   float mMarkerScale; // Global marker scaling factor
-
 };
 
 #endif // DATASETDISPLAY_HPP

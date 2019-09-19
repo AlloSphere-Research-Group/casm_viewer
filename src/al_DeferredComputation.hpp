@@ -1,6 +1,7 @@
 #ifndef AL_DEFERREDCOMPUTATION_HPP
 #define AL_DEFERREDCOMPUTATION_HPP
 
+#include <condition_variable>
 #include <iostream>
 #include <memory>
 #include <mutex>

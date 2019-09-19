@@ -1,21 +1,17 @@
 #ifndef AL_DEFERREDCOMPUTATION_HPP
 #define AL_DEFERREDCOMPUTATION_HPP
 
-#include <mutex>
-#include <memory>
-#include <vector>
 #include <iostream>
+#include <memory>
+#include <mutex>
+#include <vector>
 
 // -----------------------------------------
 
 namespace al {
 
-
-template<class DataType>
-class BufferManager
-{
+template <class DataType> class BufferManager {
 public:
-
   const int mSize;
 
   BufferManager(uint16_t size = 2) : mSize(size) {
@@ -36,19 +32,22 @@ public:
   std::shared_ptr<DataType> getWritable() {
     std::unique_lock<std::mutex> lk(mDataLock);
     // TODO add timeout?
-    while (mData[mWriteBuffer].use_count() > 1 ) {
+    while (mData[mWriteBuffer].use_count() > 1) {
       mWriteBuffer++;
       if (mWriteBuffer == mReadBuffer) {
         mWriteBuffer++;
       }
-      if (mWriteBuffer >= mSize) {mWriteBuffer = 0;}
+      if (mWriteBuffer >= mSize) {
+        mWriteBuffer = 0;
+      }
     }
     return mData[mWriteBuffer];
   }
 
   void doneWriting(std::shared_ptr<DataType> buffer) {
     std::unique_lock<std::mutex> lk(mDataLock);
-    mReadBuffer = std::distance(mData.begin(), std::find(mData.begin(), mData.end(), buffer));
+    mReadBuffer = std::distance(mData.begin(),
+                                std::find(mData.begin(), mData.end(), buffer));
     mNewData = true;
   }
 
@@ -61,28 +60,23 @@ public:
     return mData[mReadBuffer];
   }
 
-  bool newDataAvailable() {return mNewData;}
+  bool newDataAvailable() { return mNewData; }
 
 protected:
-
   std::vector<std::shared_ptr<DataType>> mData;
 
   std::mutex mDataLock;
-  bool mNewData {false};
-  uint16_t mReadBuffer {0};
-  uint16_t mWriteBuffer {1};
+  bool mNewData{false};
+  uint16_t mReadBuffer{0};
+  uint16_t mWriteBuffer{1};
 
 private:
-
 };
 
-
-template<class DataType>
-class DeferredComputation : public BufferManager<DataType>
-{
-  public:
-
-  DeferredComputation(uint16_t size = 2) : BufferManager(size) {  }
+template <class DataType>
+class DeferredComputation : public BufferManager<DataType> {
+public:
+  DeferredComputation(uint16_t size = 2) : BufferManager<DataType>(size) {}
 
   ~DeferredComputation() {
     if (mProcessingThread) {
@@ -90,39 +84,44 @@ class DeferredComputation : public BufferManager<DataType>
     }
   }
 
-//  template<typename ...ProcessParams>
-//  bool process(bool(*func)(std::shared_ptr<DataType>, ProcessParams... ),
-//               ProcessParams... params) {
-//    // TODO do a try lock and fail gracefully to avoid accumulating process calls?
+  //  template<typename ...ProcessParams>
+  //  bool process(bool(*func)(std::shared_ptr<DataType>, ProcessParams... ),
+  //               ProcessParams... params) {
+  //    // TODO do a try lock and fail gracefully to avoid accumulating process
+  //    calls?
 
-//    std::cout << "Starting process" << std::endl;
-//    std::unique_lock<std::mutex> lk(mProcessLock);
-//    uint16_t freeBuffer = (mReadBuffer + 1) % mSize;
-//    if (mData[freeBuffer].use_count() == 1 ) { // TODO wait a bit or block for the release of buffer?
-//      if (func(mData[freeBuffer], params... )) {
-//        mNewData = true;
-//        mReadBuffer = (mReadBuffer + 1) % mSize;
-//        std::cout << "Ending process - ok" << std::endl;
-//        return true;
-//      } else {
-//        std::cerr << "ERROR: Function returned false" << std::endl;
-//      }
-//    } else {
-//      std::cerr << "ERROR: Ignoring process request as target buffer busy" << std::endl;
-//    }
-//    std::cout << "Ending process - failed" << std::endl;
-//    return false;
-//  }
+  //    std::cout << "Starting process" << std::endl;
+  //    std::unique_lock<std::mutex> lk(mProcessLock);
+  //    uint16_t freeBuffer = (mReadBuffer + 1) % mSize;
+  //    if (mData[freeBuffer].use_count() == 1 ) { // TODO wait a bit or block
+  //    for the release of buffer?
+  //      if (func(mData[freeBuffer], params... )) {
+  //        mNewData = true;
+  //        mReadBuffer = (mReadBuffer + 1) % mSize;
+  //        std::cout << "Ending process - ok" << std::endl;
+  //        return true;
+  //      } else {
+  //        std::cerr << "ERROR: Function returned false" << std::endl;
+  //      }
+  //    } else {
+  //      std::cerr << "ERROR: Ignoring process request as target buffer busy"
+  //      << std::endl;
+  //    }
+  //    std::cout << "Ending process - failed" << std::endl;
+  //    return false;
+  //  }
 
-  template<typename Function, typename ...ProcessParams>
+  template <typename Function, typename... ProcessParams>
   bool process(Function func, ProcessParams... params) {
-    // TODO do a try lock and fail gracefully to avoid accumulating process calls?
+    // TODO do a try lock and fail gracefully to avoid accumulating process
+    // calls?
 
     std::cout << "Starting process" << std::endl;
     std::unique_lock<std::mutex> lk(mProcessLock);
     uint16_t freeBuffer = (mReadBuffer + 1) % mSize;
-    if (mData[freeBuffer].use_count() == 1 ) { // TODO wait a bit or block for the release of buffer?
-      if (func(mData[freeBuffer], params... )) {
+    if (mData[freeBuffer].use_count() ==
+        1) { // TODO wait a bit or block for the release of buffer?
+      if (func(mData[freeBuffer], params...)) {
         mNewData = true;
         mReadBuffer = (mReadBuffer + 1) % mSize;
         std::cout << "Ending process - ok" << std::endl;
@@ -131,15 +130,15 @@ class DeferredComputation : public BufferManager<DataType>
         std::cerr << "ERROR: Function returned false" << std::endl;
       }
     } else {
-      std::cerr << "ERROR: Ignoring process request as target buffer busy" << std::endl;
+      std::cerr << "ERROR: Ignoring process request as target buffer busy"
+                << std::endl;
     }
     std::cout << "Ending process - failed" << std::endl;
     return false;
   }
 
-  template<typename Function, typename ...ProcessParams>
-  void processAsync(Function &&func,
-                    ProcessParams&&... params) {
+  template <typename Function, typename... ProcessParams>
+  void processAsync(Function &&func, ProcessParams &&... params) {
     std::unique_lock<std::mutex> lk(mThreadLock);
     if (mProcessingThread) {
       mProcessingThread->join();
@@ -150,7 +149,8 @@ class DeferredComputation : public BufferManager<DataType>
       std::unique_lock<std::mutex> lck(mAsyncMutex);
       mProcessing = true;
       mAsyncSignal.notify_all();
-      process(std::forward<Function>(func), std::forward<ProcessParams>(params)...);
+      process(std::forward<Function>(func),
+              std::forward<ProcessParams>(params)...);
       mProcessing = false;
     });
     mAsyncSignal.wait(lck); // Wait for thread to start
@@ -159,21 +159,22 @@ class DeferredComputation : public BufferManager<DataType>
   std::mutex mAsyncMutex;
   std::condition_variable mAsyncSignal;
 
-//  template<typename ...ProcessParams>
-//  void processAsync(bool(*func)(std::shared_ptr<DataType>, ProcessParams... ),
-//                    std::function<void(bool)> callback,
-//                    ProcessParams... params) {
-//    std::unique_lock<std::mutex> lk(mThreadLock);
-//    if (mProcessingThread) {
-//      mProcessingThread->join();
-//    }
-//    mProcessingThread = std::make_unique<std::thread>([&, this]() {
-//      bool ok = process(func, params...);
-//      callback(ok);
-//    });
-//  }
+  //  template<typename ...ProcessParams>
+  //  void processAsync(bool(*func)(std::shared_ptr<DataType>, ProcessParams...
+  //  ),
+  //                    std::function<void(bool)> callback,
+  //                    ProcessParams... params) {
+  //    std::unique_lock<std::mutex> lk(mThreadLock);
+  //    if (mProcessingThread) {
+  //      mProcessingThread->join();
+  //    }
+  //    mProcessingThread = std::make_unique<std::thread>([&, this]() {
+  //      bool ok = process(func, params...);
+  //      callback(ok);
+  //    });
+  //  }
 
-  bool processing () { return mProcessing; }
+  bool processing() { return mProcessing; }
 
 private:
   std::mutex mThreadLock;
@@ -183,7 +184,6 @@ private:
   std::mutex mProcessLock;
 };
 
-} // al
-
+} // namespace al
 
 #endif // AL_DEFERREDCOMPUTATION_HPP

@@ -118,12 +118,15 @@ public:
 
     std::cout << "Starting process" << std::endl;
     std::unique_lock<std::mutex> lk(mProcessLock);
-    uint16_t freeBuffer = (mReadBuffer + 1) % mSize;
-    if (mData[freeBuffer].use_count() ==
+    uint16_t freeBuffer = (BufferManager<DataType>::mReadBuffer + 1) %
+                          BufferManager<DataType>::mSize;
+    if (BufferManager<DataType>::mData[freeBuffer].use_count() ==
         1) { // TODO wait a bit or block for the release of buffer?
-      if (func(mData[freeBuffer], params...)) {
-        mNewData = true;
-        mReadBuffer = (mReadBuffer + 1) % mSize;
+      if (func(BufferManager<DataType>::mData[freeBuffer], params...)) {
+        BufferManager<DataType>::mNewData = true;
+        BufferManager<DataType>::mReadBuffer =
+            (BufferManager<DataType>::mReadBuffer + 1) %
+            BufferManager<DataType>::mSize;
         std::cout << "Ending process - ok" << std::endl;
         return true;
       } else {

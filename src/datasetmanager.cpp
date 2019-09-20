@@ -110,6 +110,7 @@ void DatasetManager::initRoot() {
       {"param_chem_pot(a)", "chempotA"},
       {"param_chem_pot(b)", "chempotB"}};
   if (!f.fail()) {
+    mParameterForSubDir.clear();
     for (auto &paramSpace : mParameterSpaces) {
       paramSpace.second->lock();
       paramSpace.second->clear();
@@ -154,7 +155,7 @@ void DatasetManager::initRoot() {
           mParameterSpaces[key]->sort();
         }
         // set to current value to clamp if needed
-        mParameterSpaces[key]->parameter().set(
+        mParameterSpaces[key]->parameter().setNoCalls(
             mParameterSpaces[key]->parameter().get());
         if (mConditionsParameter.size() > 0) {
           std::cerr << "ERROR conditions parameter already set. Overwriting."
@@ -434,9 +435,12 @@ bool DatasetManager::loadDiff(int timeIndex) {
                 this_diff_labels[change]) { // Look only for changes
               for (int curIndex = 0; curIndex < positions.second.size();
                    curIndex += 4) {
-                if (pos == Vec3f(positions.second[curIndex],
+//                  float distance = (pos - Vec3f(positions.second[curIndex],
+//                                 positions.second[curIndex + 1],
+//                                                positions.second[curIndex + 2])).mag();
+                if ((pos - Vec3f(positions.second[curIndex],
                                  positions.second[curIndex + 1],
-                                 positions.second[curIndex + 2])) {
+                                   positions.second[curIndex + 2])).mag() < 0.001f ) {
                   label = positions.first;
                   index = curIndex;
 
@@ -452,6 +456,7 @@ bool DatasetManager::loadDiff(int timeIndex) {
             }
           }
           if (label == "") {
+              std::cout << "ERROR: Label not found for index " << timeIndex  << " label " << this_diff_labels[change] << std::endl;
             return false;
           }
           if (this_diff_labels[change] == "Va") { // Remove atom
@@ -486,6 +491,8 @@ bool DatasetManager::loadDiff(int timeIndex) {
       mHistory.push_back(historyPoint);
     }
     diffLoaded = true;
+  } else if (timeIndex > targetIndex) {
+
   }
   return diffLoaded;
 }
@@ -568,7 +575,6 @@ void DatasetManager::getAtomPositions() {
       // Load diffs for this parameter space sample
       std::ifstream f(fullconditionPath + "time_diffs.json");
       std::string str;
-      ;
       if (!f.fail()) {
 
         f.seekg(0, std::ios::end);

@@ -136,6 +136,8 @@ public:
   ParameterString pythonScriptPath{"pythonScriptPath"};
   ParameterString pythonBinary{"pythonBinary"};
 
+  ParameterBool recallPositions{"recallPositions", "", 1.0};
+
   std::unique_ptr<PresetHandler> presetHandler;
   std::unique_ptr<PresetSequencer> sequencer;
   std::unique_ptr<SequenceRecorder> recorder;
@@ -217,11 +219,17 @@ public:
     if (isPrimary()) {
       for (auto *display : dataDisplays) {
         *presetHandler << display->bundle;
+        *presetHandler << display->graphPickable.bundle
+                       << display->parallelPickable.bundle
+                       << display->perspectivePickable.bundle;
         vdvBundle << display->bundle;
       }
       // Add parameters that are not part of the bundle
       *presetHandler << Z << X; //
-      presetHandler << if (presetServer) { *presetServer << *presetHandler; }
+
+      if (presetServer) {
+        *presetServer << *presetHandler;
+      }
       *sequencer << *presetHandler;
       *recorder << *presetHandler;
       parameterServer().notifyAll();
@@ -927,6 +935,7 @@ public:
 
     } else if (selected == 2) {
       ParameterGUI::drawPresetHandler(presetHandler.get(), 10, 4);
+      ParameterGUI::draw(&recallPositions);
       int currentSequencerItem = 0;
       ParameterGUI::drawPresetSequencer(sequencer.get(), currentSequencerItem);
       ParameterGUI::drawSequenceRecorder(recorder.get());
@@ -1185,6 +1194,10 @@ public:
             if (display->mDatasetManager.buildRootPath().size() > 0) {
               presetHandler->setRootPath(
                   display->mDatasetManager.buildRootPath());
+              if (!File::exists(display->mDatasetManager.buildRootPath() +
+                                value + "/presets")) {
+                Dir::make(value + "/presets");
+              }
               presetHandler->setSubDirectory(value + "/presets");
               presetHandler->setCurrentPresetMap("default", true);
               std::cout << "Preset Handler sub dir set to " << value
@@ -1517,10 +1530,28 @@ public:
         display->setFont(font.get(), value);
       }
     });
+    recallPositions.registerChangeCallback([&](float value) {
+      for (auto *display : dataDisplays) {
+        for (auto *param : display->graphPickable.bundle.parameters()) {
+          std::string addr = display->graphPickable.bundle.bundlePrefix();
+          presetHandler->skipParameter(addr + param->getFullAddress(),
+                                       value != 1.0f);
+        }
+        for (auto *param : display->parallelPickable.bundle.parameters()) {
+          std::string addr = display->parallelPickable.bundle.bundlePrefix();
+          presetHandler->skipParameter(addr + param->getFullAddress(),
+                                       value != 1.0f);
+        }
+        for (auto *param : display->perspectivePickable.bundle.parameters()) {
+          std::string addr = display->perspectivePickable.bundle.bundlePrefix();
+          presetHandler->skipParameter(addr + param->getFullAddress(),
+                                       value != 1.0f);
+        }
+      }
+    });
   }
 
   void cleanParameterSpace(string datasetPath) {
-
     if (File::isDirectory(dataRoot() + datasetPath)) {
       FileList subDirs =
           filterInDir(dataRoot() + datasetPath, [&](FilePath const &fp) {
@@ -1537,8 +1568,8 @@ public:
                       << std::endl;
           }
         }
-        // FIXME This should be removed once no files are generated outside the
-        // cache directory
+        // FIXME This should be removed once no files are generated outside
+        // the cache directory
         std::vector<std::string> additionalCacheFiles = {"transfmat",
                                                          "template_POSCAR"};
         for (auto fileToRemove : additionalCacheFiles) {

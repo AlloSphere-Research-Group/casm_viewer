@@ -138,13 +138,12 @@ void DataDisplay::init() {
       [&](std::string value) {
         if (value != mDatasetManager.mCurrentDataset.get()) {
           this->requestInitDataset();
-          //      this->requestDataLoad();
         }
       });
 
   mShowAtoms.registerChangeCallback([this](uint16_t value) {
     if (mShowAtoms.get() != value) {
-      //      this->requestDataLoad();
+        mDatasetManager.getAtomPositions();
     }
   });
 
@@ -203,11 +202,16 @@ void DataDisplay::init() {
   mPlotYAxis.registerChangeCallback([this](float value) {
     if (mPlotYAxis.get() != value) {
       //      this->requestDataLoad();
+
+      mDatasetManager.getAtomPositions();
     }
   });
   // TODO we don't need to do a full data load here, just recompute the graph
   mPlotXAxis.registerChangeCallback([this](float value) {
     if (mPlotXAxis.get() != value) {
+
+
+        mDatasetManager.getAtomPositions();
       //      this->requestDataLoad();
     }
   });
@@ -274,6 +278,7 @@ void DataDisplay::initRootDirectory() {
                         species.second.end());
     }
   }
+  mShowAtoms.setNoCalls(0);
   // Only update menu and selection if it has changed
   if (atomLabels != mShowAtoms.getElements()) {
     // Fill the atoms that can be showed

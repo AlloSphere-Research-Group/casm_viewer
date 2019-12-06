@@ -31,7 +31,7 @@
 #include "datadisplay.hpp"
 
 #ifdef AL_WINDOWS
-#include <direct.h> // for _chdir() and _getcwd()
+#include <direct.h>  // for _chdir() and _getcwd()
 #define chdir _chdir
 #define getcwd _getcwd
 #undef rank
@@ -82,7 +82,7 @@ struct ObjectTransformHandler : WindowEventHandler {
 };
 
 class MyApp : public DistributedAppWithState<State> {
-public:
+ public:
   // Parameters and triggers for interaction commands
   Trigger resetView{"resetView"};
   Trigger stepXpos{"stepXpos"};
@@ -172,15 +172,14 @@ public:
   }
 
   virtual void onCreate() override {
-
     imguiInit();
 
     // disable nav control mouse drag to look
     navControl().useMouse(false);
 
     // Create and configure displays
-    int numDisplays = 2; // 2 is a good number. Usually need one, but some times
-                         // need to compare 2
+    int numDisplays = 2;  // 2 is a good number. Usually need one, but some
+                          // times need to compare 2
 
     for (int i = 0; i < numDisplays; i++) {
       dataDisplays.push_back(new DataDisplay);
@@ -224,7 +223,7 @@ public:
         vdvBundle << display->bundle;
       }
       // Add parameters that are not part of the bundle
-      *presetHandler << Z << X; //
+      *presetHandler << Z << X;  //
 
       if (presetServer) {
         *presetServer << *presetHandler;
@@ -233,9 +232,9 @@ public:
       *recorder << *presetHandler;
       parameterServer().notifyAll();
       backgroundColor.set(
-          backgroundColor.get()); // Set current value to update on renderers
+          backgroundColor.get());  // Set current value to update on renderers
       sliceBackground.set(
-          sliceBackground.get()); // Set current value to update on renderers
+          sliceBackground.get());  // Set current value to update on renderers
     }
 
     // use object control for model matrix
@@ -274,7 +273,7 @@ public:
     //      }
     //    }
     if (al_get_hostname() ==
-        "moxi") { // Fullscreen to two monitors on MOXI machine
+        "moxi") {  // Fullscreen to two monitors on MOXI machine
       std::cout << "On MOXI! --------------------------------------"
                 << std::endl;
       int width, height;
@@ -303,7 +302,6 @@ public:
   virtual void onAnimate(double /*dt*/) override {
     object_transform.step();
     if (isPrimary()) {
-
       if (showGui) {
         prepareGui();
       }
@@ -412,7 +410,6 @@ public:
   virtual bool onKeyDown(const Keyboard &k) override {
     if (isPrimary()) {
       if (!ParameterGUI::usingKeyboard()) {
-
         for (auto *display : dataDisplays) {
           display->mPickableManager.onKeyDown(k);
           display->perspectivePickable.testChildren = k.shift();
@@ -420,67 +417,67 @@ public:
 
         int index;
         switch (k.key()) {
-        case ' ':
-          showGui = !showGui;
-          break;
-        case 'b':
-          dataDisplays[vdvBundle.currentBundle()]->mPerspectiveRotY =
-              dataDisplays[vdvBundle.currentBundle()]->mPerspectiveRotY + 5;
-          break;
-        case 'v':
-          dataDisplays[vdvBundle.currentBundle()]->mPerspectiveRotY =
-              dataDisplays[vdvBundle.currentBundle()]->mPerspectiveRotY - 5;
-          break;
-        case '[':
-          dataDisplays[vdvBundle.currentBundle()]->mLayerScaling =
-              dataDisplays[vdvBundle.currentBundle()]->mLayerScaling + 0.05f;
-          break;
-        case ']':
-          dataDisplays[vdvBundle.currentBundle()]->mLayerScaling =
-              dataDisplays[vdvBundle.currentBundle()]->mLayerScaling - 0.05f;
-          break;
-        case '-':
-          mJumpLayerNeg.trigger(); // This will trigger a change
-          break;
-        case '=':
-          mJumpLayerPos.trigger(); // This will trigger a change
-          break;
-        case 'o':
-          stepTempNeg.trigger(); // This will trigger a change
-          break;
-        case 'p':
-          stepTempPos.trigger(); // This will trigger a change
-          break;
-        case 'l':
-          stepChempotNeg.trigger(); // This will trigger a change
-          break;
-        case ';':
-          stepChempotPos.trigger(); // This will trigger a change
-          break;
-        case '.':
-          stepChempot2Neg.trigger(); // This will trigger a change
-          stepTimeNeg.trigger();
-          break;
-        case '/':
-          stepChempot2Pos.trigger(); // This will trigger a change
-          stepTimePos.trigger();
-          break;
-        case 'q':
-          index = presetHandler->getCurrentPresetIndex() - 1;
-          if (index >= 0) {
+          case ' ':
+            showGui = !showGui;
+            break;
+          case 'b':
+            dataDisplays[vdvBundle.currentBundle()]->mPerspectiveRotY =
+                dataDisplays[vdvBundle.currentBundle()]->mPerspectiveRotY + 5;
+            break;
+          case 'v':
+            dataDisplays[vdvBundle.currentBundle()]->mPerspectiveRotY =
+                dataDisplays[vdvBundle.currentBundle()]->mPerspectiveRotY - 5;
+            break;
+          case '[':
+            dataDisplays[vdvBundle.currentBundle()]->mLayerScaling =
+                dataDisplays[vdvBundle.currentBundle()]->mLayerScaling + 0.05f;
+            break;
+          case ']':
+            dataDisplays[vdvBundle.currentBundle()]->mLayerScaling =
+                dataDisplays[vdvBundle.currentBundle()]->mLayerScaling - 0.05f;
+            break;
+          case '-':
+            mJumpLayerNeg.trigger();  // This will trigger a change
+            break;
+          case '=':
+            mJumpLayerPos.trigger();  // This will trigger a change
+            break;
+          case 'o':
+            stepTempNeg.trigger();  // This will trigger a change
+            break;
+          case 'p':
+            stepTempPos.trigger();  // This will trigger a change
+            break;
+          case 'l':
+            stepChempotNeg.trigger();  // This will trigger a change
+            break;
+          case ';':
+            stepChempotPos.trigger();  // This will trigger a change
+            break;
+          case '.':
+            stepChempot2Neg.trigger();  // This will trigger a change
+            stepTimeNeg.trigger();
+            break;
+          case '/':
+            stepChempot2Pos.trigger();  // This will trigger a change
+            stepTimePos.trigger();
+            break;
+          case 'q':
+            index = presetHandler->getCurrentPresetIndex() - 1;
+            if (index >= 0) {
+              presetHandler->recallPreset(index);
+            }
+            break;
+          case 'w':
+            index = presetHandler->getCurrentPresetIndex() + 1;
             presetHandler->recallPreset(index);
-          }
-          break;
-        case 'w':
-          index = presetHandler->getCurrentPresetIndex() + 1;
-          presetHandler->recallPreset(index);
-          break;
+            break;
 
-        case 'z':
-          mAlignTemperatures.trigger();
-          break;
-        default:
-          break;
+          case 'z':
+            mAlignTemperatures.trigger();
+            break;
+          default:
+            break;
         }
       }
     }
@@ -488,7 +485,6 @@ public:
   }
 
   virtual bool onKeyUp(Keyboard const &k) override {
-
     for (auto *display : dataDisplays) {
       display->mPickableManager.onKeyUp(k);
       display->perspectivePickable.testChildren = k.shift();
@@ -533,7 +529,7 @@ public:
       for (auto *display : dataDisplays) {
         if (display->mVisible != 0.0f) {
           display->mPickableManager.event(
-              PickEvent(Drag, r, v)); // id, button, v);
+              PickEvent(Drag, r, v));  // id, button, v);
         }
       }
     } else if ("/rotate" == m.addressPattern()) {
@@ -573,14 +569,13 @@ public:
       for (auto *display : dataDisplays) {
         if (display->mVisible != 0.0f) {
           display->mPickableManager.event(
-              PickEvent(Unpick, r)); //, id, button);
+              PickEvent(Unpick, r));  //, id, button);
         }
       }
     }
   }
 
   bool onMouseMove(const Mouse &m) override {
-
     for (auto *display : dataDisplays) {
       if (display->mVisible != 0.0f) {
         if (!ParameterGUI::usingInput()) {
@@ -610,8 +605,7 @@ public:
 
   bool onMouseDrag(const Mouse &m) override {
     if (isPrimary()) {
-      if (showGui && ParameterGUI::usingInput())
-        return true;
+      if (showGui && ParameterGUI::usingInput()) return true;
       for (auto *display : dataDisplays) {
         if (display->mVisible != 0.0f) {
           display->mPickableManager.onMouseDrag(graphics(), m, width(),
@@ -667,7 +661,6 @@ public:
 
 #ifdef AL_EXT_OPENVR
   void drawVR(Graphics &g) {
-
     g.clear(backgroundColor);
     drawScene(g);
 
@@ -737,7 +730,7 @@ public:
         mDataRootPath.setElements(elements);
         auto current = mDataRootPath.get();
         if (current < 0 && elements.size() > 0) {
-          mDataRootPath.set(current); // Force calling callbacks.
+          mDataRootPath.set(current);  // Force calling callbacks.
         }
       }
       ParameterGUI::draw(&mAvailableDatasets);
@@ -745,7 +738,6 @@ public:
       ParameterGUI::draw(&mRecomputeSpace);
 
       if (ImGui::Button("Load")) {
-
         std::string conformedPath =
             File::conformDirectory(mDataRootPath.getCurrent());
         std::replace(conformedPath.begin(), conformedPath.end(), '\\', '/');
@@ -771,7 +763,6 @@ public:
         selector->start(mDataRootPath.getCurrent());
       }
       if (selector && selector->drawFileSelector()) {
-
         auto elements = mDataRootPath.getElements();
 
         auto selectedItems = selector->getSelection();
@@ -915,7 +906,6 @@ public:
         ParameterGUI::drawParameterMeta(&mAvailableDatasets);
 
         if (ImGui::Button("Load")) {
-
           std::string conformedPath =
               File::conformDirectory(mDataRootPath.getCurrent());
           std::replace(conformedPath.begin(), conformedPath.end(), '\\', '/');
@@ -950,7 +940,6 @@ public:
       if (helpText.size() == 0) {
         std::ifstream t("help.txt");
         if (t.is_open()) {
-
           t.seekg(0, std::ios::end);
           helpText.reserve(t.tellg());
           t.seekg(0, std::ios::beg);
@@ -1030,7 +1019,7 @@ public:
     configLoader2.writeFile();
 
     std::string scriptPath = configLoader2.gets("pythonScriptsPath");
-    if (scriptPath.substr(0, 2) == "..") { // Make path absolute
+    if (scriptPath.substr(0, 2) == "..") {  // Make path absolute
       char cwd[256];
       getcwd(cwd, sizeof(cwd));
       std::string cwdString = cwd;
@@ -1107,7 +1096,6 @@ public:
   }
 
   void readElementsIni() {
-
     // Read elements.ini file
     std::ifstream f("elements.ini");
     if (f.is_open()) {
@@ -1116,7 +1104,7 @@ public:
         std::stringstream ss(line);
         std::string field;
         while (field.size() == 0) {
-          std::getline(ss, field, ' '); // atom number
+          std::getline(ss, field, ' ');  // atom number
         }
         field = "";
         while (field.size() == 0) {
@@ -1130,11 +1118,11 @@ public:
         float radius = stof(field);
         field = "";
         while (field.size() == 0) {
-          std::getline(ss, field, ' '); // Ignore VdW radius
+          std::getline(ss, field, ' ');  // Ignore VdW radius
         }
         field = "";
         while (field.size() == 0) {
-          std::getline(ss, field, ' '); // Ignore Ionic radius
+          std::getline(ss, field, ' ');  // Ignore Ionic radius
         }
         field = "";
         while (field.size() == 0) {
@@ -1165,7 +1153,7 @@ public:
 
   void processScreenshot() {
     std::unique_lock<std::mutex> lk(mScreenshotMutex);
-    if (mScreenshotPrefix.size() > 0) { // Take screenshot
+    if (mScreenshotPrefix.size() > 0) {  // Take screenshot
       std::vector<unsigned char> mPixels;
       mPixels.resize(width() * height() * 3);
       unsigned char *pixs = &mPixels[0];
@@ -1188,7 +1176,6 @@ public:
   }
 
   void registerParameterCallbacks() {
-
     for (auto *display : dataDisplays) {
       display->mVisible.registerChangeCallback(
           [this](float) { updateTitle(); });
@@ -1210,7 +1197,7 @@ public:
                         << std::endl;
             }
             updateTitle();
-            mAutoAdvance = 0.0; // Turn off auto advance
+            mAutoAdvance = 0.0;  // Turn off auto advance
           });
     }
 
@@ -1637,12 +1624,13 @@ public:
   }
 
   Rayd rayTransformAllosphere(Rayd r) {
-    double t = r.intersectAllosphere(); // get t on surface of allosphere screen
+    double t =
+        r.intersectAllosphere();  // get t on surface of allosphere screen
     Vec3f pos =
-        nav().quat().rotate(r(t)); // rotate point on allosphere to match
-                                   // current nav orientation (check this)
-    Rayd ray(nav().pos(), pos); // ray from sphere center (camera location) to
-                                // intersected location
+        nav().quat().rotate(r(t));  // rotate point on allosphere to match
+                                    // current nav orientation (check this)
+    Rayd ray(nav().pos(), pos);  // ray from sphere center (camera location) to
+                                 // intersected location
     return ray;
   }
 

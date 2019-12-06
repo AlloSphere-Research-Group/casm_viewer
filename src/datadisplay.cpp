@@ -143,7 +143,7 @@ void DataDisplay::init() {
 
   mShowAtoms.registerChangeCallback([this](uint16_t value) {
     if (mShowAtoms.get() != value) {
-        mDatasetManager.getAtomPositions();
+      mDatasetManager.getAtomPositions();
     }
   });
 
@@ -210,8 +210,7 @@ void DataDisplay::init() {
   mPlotXAxis.registerChangeCallback([this](float value) {
     if (mPlotXAxis.get() != value) {
 
-
-        mDatasetManager.getAtomPositions();
+      mDatasetManager.getAtomPositions();
       //      this->requestDataLoad();
     }
   });
@@ -227,7 +226,7 @@ void DataDisplay::init() {
         loadGraphTexture(value);
       });
 
-  mLabelFont.align(TEXT_ALIGN::LEFT);
+  mLabelFont.alignLeft();
 
   bundle << mDatasetManager.mRootPath;
   bundle << mDatasetManager.mCurrentDataset;
@@ -484,13 +483,14 @@ void DataDisplay::draw(Graphics &g) { // Load data after drawing frame to allow
 void DataDisplay::setFont(string name, float size) {
   std::unique_lock<std::mutex> lk(mDrawLock);
   if (File::exists(name)) {
-    if (!mLabelFont.load(name, size)) {
+    if (!mLabelFont.load(name.c_str(), size, 1024)) {
       std::cout << "Failed to load font: " << name << std::endl;
-      if (!mLabelFont.load("C:\\Windows\\Fonts\\arial.ttf")) {
+      if (!mLabelFont.load("C:\\Windows\\Fonts\\arial.ttf", size, 1024)) {
       }
 
       if (!mLabelFont.load(
-              "/usr/share/fonts/truetype/ttf-bitstream-vera/Vera.ttf")) {
+              "/usr/share/fonts/truetype/ttf-bitstream-vera/Vera.ttf", size,
+              1024)) {
         throw;
       }
     } else {
@@ -1251,7 +1251,16 @@ void DataDisplay::drawPerspective(Graphics &g) {
       //            g.scale(dist * 0.5);
     }
     g.translate(0.0, -1.5, 0); // Push the text down a bit
-    mLabelFont.render(g, mDatasetManager.currentDataset() + " " + mParamText);
+
+    // Draw label
+    Mesh mesh;
+    mLabelFont.write(
+        mesh, (mDatasetManager.currentDataset() + " " + mParamText).c_str(),
+        1.0);
+    g.texture();
+    mLabelFont.tex.bind();
+    g.draw(mesh);
+    mLabelFont.tex.unbind();
   }
 
   g.popMatrix();
@@ -1298,7 +1307,16 @@ void DataDisplay::drawParallelProjection(Graphics &g) {
     } else {
       g.scale(0.3f);
     }
-    mLabelFont.render(g, mDatasetManager.currentDataset() + " " + mParamText);
+
+    // Draw label
+    Mesh mesh;
+    mLabelFont.write(
+        mesh, (mDatasetManager.currentDataset() + " " + mParamText).c_str(),
+        1.0);
+    g.texture();
+    mLabelFont.tex.bind();
+    g.draw(mesh);
+    mLabelFont.tex.unbind();
   }
   g.popMatrix();
   parallelPickable.drawBB(g);
@@ -1319,8 +1337,8 @@ void DataDisplay::drawGraph(Graphics &g) {
   if (mGraphTextureLock.try_lock()) {
     if (mGraphFilePathToLoad.size() > 0) {
 
-      auto imageData = imgModule::loadImage(mGraphFilePathToLoad.c_str());
-      if (imageData.data.size() == 0) {
+      Image img(mGraphFilePathToLoad.c_str());
+      if (img.loaded()) {
         static bool messagePrinted = false;
         static std::string lastFailed;
         if (lastFailed != mGraphFilePathToLoad) {
@@ -1344,8 +1362,8 @@ void DataDisplay::drawGraph(Graphics &g) {
         //                         imageData.width << ", " << imageData.height
         //                         << endl;
 
-        mGraphTexture.resize(imageData.width, imageData.height);
-        mGraphTexture.submit(imageData.data.data(), GL_RGBA, GL_UNSIGNED_BYTE);
+        mGraphTexture.resize(img.width(), img.height());
+        mGraphTexture.submit(img.pixels(), GL_RGBA, GL_UNSIGNED_BYTE);
 
         mGraphTexture.filter(Texture::LINEAR_MIPMAP_LINEAR);
         mGraphFilePath = mGraphFilePathToLoad;
@@ -1368,7 +1386,16 @@ void DataDisplay::drawGraph(Graphics &g) {
     } else {
       g.scale(0.2f);
     }
-    mLabelFont.render(g, mDatasetManager.currentDataset() + " " + mParamText);
+
+    // Draw label
+    Mesh mesh;
+    mLabelFont.write(
+        mesh, (mDatasetManager.currentDataset() + " " + mParamText).c_str(),
+        1.0);
+    g.texture();
+    mLabelFont.tex.bind();
+    g.draw(mesh);
+    mLabelFont.tex.unbind();
   }
   g.popMatrix();
   graphPickable.drawBB(g);

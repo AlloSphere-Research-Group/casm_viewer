@@ -15,22 +15,23 @@
 #include <thread>
 #include <vector>
 
-#include "al/core.hpp"
-#include "al/core/math/al_Matrix4.hpp"
+#undef CIEXYZ
 
-#include "al/core/graphics/al_Light.hpp"
-#include "al/core/io/al_CSVReader.hpp"
-#include "al/core/io/al_File.hpp"
-#include "al/core/types/al_Color.hpp"
-#include "al/util/al_FontModule.hpp"
-#include "al/util/al_Toml.hpp"
-#include "al/util/ui/al_Parameter.hpp"
-#include "al/util/ui/al_ParameterBundle.hpp"
-#include "al/util/ui/al_Pickable.hpp"
-#include "al/util/ui/al_PickableManager.hpp"
-#include "al/util/ui/al_PickableRotateHandle.hpp"
+#include "al/math/al_Matrix4.hpp"
 
-#include "module/img/loadImage.hpp"
+#include "al/graphics/al_Font.hpp"
+#include "al/graphics/al_Light.hpp"
+#include "al/io/al_CSVReader.hpp"
+#include "al/io/al_File.hpp"
+#include "al/io/al_Toml.hpp"
+#include "al/types/al_Color.hpp"
+#include "al/ui/al_Parameter.hpp"
+#include "al/ui/al_ParameterBundle.hpp"
+#include "al/ui/al_Pickable.hpp"
+#include "al/ui/al_PickableManager.hpp"
+#include "al/ui/al_PickableRotateHandle.hpp"
+
+#include "al/graphics/al_Image.hpp"
 
 #include "al_DataScript.hpp"
 #include "al_VASPReader.hpp"
@@ -508,7 +509,7 @@ private:
   std::string mGraphFilePathToLoad;
   std::string mGraphFilePath;
 
-  FontModule mLabelFont;
+  Font mLabelFont;
 
   EasyFBO fbo_iso;
 

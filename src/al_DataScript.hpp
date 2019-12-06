@@ -8,9 +8,9 @@
 #include <thread>
 #include <vector>
 
-#include "al/core/io/al_File.hpp"
-#include "al/util/ui/al_Parameter.hpp"
-#include "al/util/ui/al_ParameterServer.hpp"
+#include "al/io/al_File.hpp"
+#include "al/ui/al_Parameter.hpp"
+#include "al/ui/al_ParameterServer.hpp"
 
 #include "json.hpp"
 

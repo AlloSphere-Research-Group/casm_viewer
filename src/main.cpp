@@ -2,34 +2,31 @@
 #include <memory>
 
 #ifdef AL_WINDOWS
-#define NOMINMAX
+//#define NOMINMAX
 #undef far
 #endif
 
-#include "al/core.hpp"
-#include "al/core/app/al_DistributedApp.hpp"
+#include "al/app/al_DistributedApp.hpp"
+#include "al/graphics/al_Image.hpp"
 #include "al/sphere/al_SphereUtils.hpp"
-#include "al/util/ui/al_FileSelector.hpp"
-#include "al/util/ui/al_HtmlInterfaceServer.hpp"
-#include "al/util/ui/al_Parameter.hpp"
-#include "al/util/ui/al_ParameterGUI.hpp"
-#include "al/util/ui/al_Preset.hpp"
-#include "al/util/ui/al_SequenceRecorder.hpp"
+#include "al/ui/al_FileSelector.hpp"
+#include "al/ui/al_HtmlInterfaceServer.hpp"
+#include "al/ui/al_Parameter.hpp"
+#include "al/ui/al_ParameterGUI.hpp"
+#include "al/ui/al_Pickable.hpp"
+#include "al/ui/al_PresetHandler.hpp"
+#include "al/ui/al_SequenceRecorder.hpp"
 
 #include "al_DeferredComputation.hpp"
 #include "al_PeriodicTask.hpp"
 
-//#undef AL_EXT_OPENVR
-
-#ifdef AL_EXT_OPENVR
-#include "al_ext/openvr/al_OpenVRWrapper.hpp"
-#endif
+#include "al_ext/openvr/al_OpenVRDomain.hpp"
 
 #undef AL_BUILD_MPI
 
-#define STB_IMAGE_WRITE_STATIC
-#define STB_IMAGE_WRITE_IMPLEMENTATION
-#include "module/img/stb_image_write.h"
+//#define STB_IMAGE_WRITE_STATIC
+//#define STB_IMAGE_WRITE_IMPLEMENTATION
+//#include "module/img/stb_image_write.h"
 
 #include "datadisplay.hpp"
 
@@ -37,6 +34,8 @@
 #include <direct.h> // for _chdir() and _getcwd()
 #define chdir _chdir
 #define getcwd _getcwd
+#undef rank
+#undef CIEXYZ
 #endif
 
 using namespace al;
@@ -82,7 +81,7 @@ struct ObjectTransformHandler : WindowEventHandler {
   }
 };
 
-class MyApp : public DistributedApp<State> {
+class MyApp : public DistributedAppWithState<State> {
 public:
   // Parameters and triggers for interaction commands
   Trigger resetView{"resetView"};
@@ -159,7 +158,7 @@ public:
   bool mMarkUpdateTitle{true};
 
 #ifdef AL_EXT_OPENVR
-  OpenVRWrapper mOpenVR;
+  std::shared_ptr<OpenVRDomain> openVRDomain;
   VAOMesh mControllerMesh;
 #endif
 
@@ -174,7 +173,7 @@ public:
 
   virtual void onCreate() override {
 
-    ParameterGUI::initialize();
+    imguiInit();
 
     // disable nav control mouse drag to look
     navControl().useMouse(false);
@@ -186,9 +185,9 @@ public:
     for (int i = 0; i < numDisplays; i++) {
       dataDisplays.push_back(new DataDisplay);
       dataDisplays.back()->init();
-      dataDisplays.back()->mDatasetManager.mRunProcessors = rank() == 0;
-      dataDisplays.back()->mRunComputation = rank() == 0;
-      dataDisplays.back()->mDatasetManager.mGlobalRoot = dataRoot();
+      dataDisplays.back()->mDatasetManager.mRunProcessors = rank == 0;
+      dataDisplays.back()->mRunComputation = rank == 0;
+      dataDisplays.back()->mDatasetManager.mGlobalRoot = dataRoot;
     }
 
     // Initialize default view.
@@ -244,52 +243,57 @@ public:
     object_transform.setHome(Vec3f(0, 0, 0));
     object_transform.reset();
 
-    if (hasRole(ROLE_SIMULATOR) || hasRole(ROLE_DESKTOP)) {
+    if (isPrimary()) {
       nav().pos(0, 1.5, 5);
       nav().setHome();
       navControl().useMouse(false);
-    } else if (hasRole(ROLE_DESKTOP_REPLICA)) {
+    } else if (!hasCapability(CAP_OMNIRENDERING)) {
+      // i.e. desktop replica
       nav().pos(0, 1.5, 5);
     }
 
     // For distributed running in allo infrastructure
-    if (!(hasRole(ROLE_SIMULATOR) || hasRole(ROLE_DESKTOP))) {
+    if (!isPrimary()) {
       std::string simulatorIp = "atari.1g";
       parameterServer().requestAllParameters(simulatorIp, 9010);
     }
 
-    // Configure host dependent display options
-    if (hasRole(ROLE_RENDERER)) {
+    //    // Configure host dependent display options
+    //    if (hasCapability(CAP_OMNIRENDERING)) {
 
-      if (group() == 1) {
-        std::cout << "Setting up display for group 1: SPHERE" << std::endl;
-        // this function loads config files if hostname suggests that the app
-        // is running in sphere renderer. If not it loads fake configuration to
-        // show cubemap view
-        load_perprojection_configuration();
-        cursorHide(true);
-      }
-    }
+    //      if (group == 1) {
+    //        std::cout << "Setting up display for group 1: SPHERE" <<
+    //        std::endl;
+    //        // this function loads config files if hostname suggests that the
+    //        app
+    //        // is running in sphere renderer. If not it loads fake
+    //        configuration to
+    //        // show cubemap view
+    //        load_perprojection_configuration();
+    //        cursorHide(true);
+    //      }
+    //    }
     if (al_get_hostname() ==
         "moxi") { // Fullscreen to two monitors on MOXI machine
       std::cout << "On MOXI! --------------------------------------"
                 << std::endl;
       int width, height;
-      sphere::get_fullscreen_dimension(&width, &height);
+      sphere::getFullscreenDimension(&width, &height);
       std::cout << "Setting fullscreen dimensions " << width << "," << height
                 << std::endl;
       if (width != 0 && height != 0) {
         decorated(false);
         dimensions(0, 0, width, height);
-        stereo(true);
+        //        stereo(true);
         cursorHide(false);
       }
     }
 
 #ifdef AL_EXT_OPENVR
-    if (!mOpenVR.init()) {
-      std::cerr << "ERROR: OpenVR init returned error" << std::endl;
-    }
+    openVRDomain = OpenVRDomain::enableVR(this);
+    openVRDomain->setDrawFunction(
+        std::bind(&MyApp::drawVR, this, std::placeholders::_1));
+
     addWireBox(mControllerMesh, 0.1f);
     mControllerMesh.scale(0.1f, 0.1f, 1);
     mControllerMesh.update();
@@ -298,9 +302,12 @@ public:
 
   virtual void onAnimate(double /*dt*/) override {
     object_transform.step();
-    if (role() == ROLE_SIMULATOR || role() == ROLE_DESKTOP) {
+    if (isPrimary()) {
+
+      if (showGui) {
+        prepareGui();
+      }
       navControl().active(!ParameterGUI::usingInput());
-    } else if (role() == ROLE_RENDERER) {
     }
 
     // fbo operations should be done outside onDraw so it does not mess with
@@ -310,10 +317,10 @@ public:
     }
 #ifdef AL_EXT_OPENVR
     // Update traking and controller data;
-    mOpenVR.update();
+    //    mOpenVR.update();
 
-    auto l = mOpenVR.LeftController;
-    auto r = mOpenVR.RightController;
+    auto l = openVRDomain->mOpenVR.LeftController;
+    auto r = openVRDomain->mOpenVR.RightController;
     auto ray = r.ray();
 
     if (l.touchpadPress()) {
@@ -375,12 +382,6 @@ public:
         }
       }
     }
-
-    // openVR draw.
-    // Draw in onAnimate, to make sure drawing happens only once per frame
-    // Pass a function that takes Graphics &g argument
-    mOpenVR.draw(std::bind(&MyApp::drawVR, this, std::placeholders::_1),
-                 mGraphics);
 #endif
   }
 
@@ -399,18 +400,17 @@ public:
       mMarkUpdateTitle = false;
     }
     drawScene(g);
-    if (hasRole(ROLE_RENDERER) || hasRole(ROLE_DESKTOP_REPLICA)) {
-      // Nothing for now
-    } else if (hasRole(ROLE_SIMULATOR) || hasRole(ROLE_DESKTOP)) {
+    if (isPrimary()) {
       processScreenshot();
+
       if (showGui) {
-        drawGui();
+        imguiDraw();
       }
     }
   }
 
-  virtual void onKeyDown(const Keyboard &k) override {
-    if (hasRole(ROLE_SIMULATOR) || hasRole(ROLE_DESKTOP)) {
+  virtual bool onKeyDown(const Keyboard &k) override {
+    if (isPrimary()) {
       if (!ParameterGUI::usingKeyboard()) {
 
         for (auto *display : dataDisplays) {
@@ -484,14 +484,16 @@ public:
         }
       }
     }
+    return true;
   }
 
-  virtual void onKeyUp(Keyboard const &k) override {
+  virtual bool onKeyUp(Keyboard const &k) override {
 
     for (auto *display : dataDisplays) {
       display->mPickableManager.onKeyUp(k);
       display->perspectivePickable.testChildren = k.shift();
     }
+    return true;
   }
 
   virtual void onMessage(osc::Message &m) override {
@@ -577,7 +579,7 @@ public:
     }
   }
 
-  virtual void onMouseMove(const Mouse &m) {
+  bool onMouseMove(const Mouse &m) override {
 
     for (auto *display : dataDisplays) {
       if (display->mVisible != 0.0f) {
@@ -589,9 +591,10 @@ public:
         }
       }
     }
+    return true;
   }
 
-  virtual void onMouseDown(const Mouse &m) {
+  bool onMouseDown(const Mouse &m) override {
     for (auto *display : dataDisplays) {
       if (display->mVisible != 0.0f) {
         if (!ParameterGUI::usingInput()) {
@@ -602,12 +605,13 @@ public:
         }
       }
     }
+    return true;
   }
 
-  virtual void onMouseDrag(const Mouse &m) {
-    if (hasRole(ROLE_SIMULATOR) || hasRole(ROLE_DESKTOP)) {
+  bool onMouseDrag(const Mouse &m) override {
+    if (isPrimary()) {
       if (showGui && ParameterGUI::usingInput())
-        return;
+        return true;
       for (auto *display : dataDisplays) {
         if (display->mVisible != 0.0f) {
           display->mPickableManager.onMouseDrag(graphics(), m, width(),
@@ -615,15 +619,17 @@ public:
         }
       }
     }
+    return true;
   }
-  virtual void onMouseUp(const Mouse &m) {
-    if (hasRole(ROLE_SIMULATOR) || hasRole(ROLE_DESKTOP)) {
+  virtual bool onMouseUp(const Mouse &m) {
+    if (isPrimary()) {
       for (auto *display : dataDisplays) {
         if (display->mVisible != 0.0f) {
           display->mPickableManager.onMouseUp(graphics(), m, width(), height());
         }
       }
     }
+    return true;
   }
 
   void onSound(AudioIOData &io) override {
@@ -643,10 +649,10 @@ public:
     if (isPrimary()) {
       storeConfiguration();
     }
-    ParameterGUI::cleanup();
-#ifdef AL_EXT_OPENVR
-    mOpenVR.close();
-#endif
+    imguiShutdown();
+    //#ifdef AL_EXT_OPENVR
+    //    mOpenVR.close();
+    //#endif
   }
 
   // ---- Drawing functions
@@ -667,16 +673,16 @@ public:
 
     // Draw markers for the controllers
     g.pushMatrix();
-    g.translate(mOpenVR.LeftController.pos);
-    g.rotate(mOpenVR.LeftController.quat);
+    g.translate(openVRDomain->mOpenVR.LeftController.pos);
+    g.rotate(openVRDomain->mOpenVR.LeftController.quat);
     g.color(0, 1, 1);
     g.draw(mControllerMesh);
     g.popMatrix();
 
     // right hand
     g.pushMatrix();
-    g.translate(mOpenVR.RightController.pos);
-    g.rotate(mOpenVR.RightController.quat);
+    g.translate(openVRDomain->mOpenVR.RightController.pos);
+    g.rotate(openVRDomain->mOpenVR.RightController.quat);
     g.color(1, 0, 1);
     g.draw(mControllerMesh);
     g.popMatrix();
@@ -684,7 +690,7 @@ public:
     // draw controller rays
     g.blendOn();
     g.blendModeTrans();
-    auto r1 = mOpenVR.RightController.ray();
+    auto r1 = openVRDomain->mOpenVR.RightController.ray();
     //    auto r2 = mOpenVR.LeftController.ray();
     Mesh rays;
     // TODO can we make the ray fade out in the distance?
@@ -717,8 +723,8 @@ public:
       //          ImGui::Text("Recalculating parameter space");
       //        }
 
-      if (dataRoot().size() > 0) {
-        ImGui::Text("Data root: %s", dataRoot().c_str());
+      if (dataRoot.size() > 0) {
+        ImGui::Text("Data root: %s", dataRoot.c_str());
       }
       ParameterGUI::draw(&mDataRootPath);
       ImGui::SameLine();
@@ -761,7 +767,7 @@ public:
       // Directory GUI
       static FileSelector *selector;
       if (ImGui::Button("Add directory")) {
-        selector = new FileSelector(dataRoot(), File::isDirectory);
+        selector = new FileSelector(dataRoot, File::isDirectory);
         selector->start(mDataRootPath.getCurrent());
       }
       if (selector && selector->drawFileSelector()) {
@@ -864,17 +870,17 @@ public:
     }
   }
 
-  // GUI drawing handler
-  void drawGui() {
-    ParameterGUI::beginDraw();
+  void prepareGui() {
     if (parameterSpaceProcessor.runningAsync()) {
+      imguiBeginFrame();
       ParameterGUI::beginPanel("Loading");
       ImGui::Text("Processing parameter space... Please wait.");
       ParameterGUI::endPanel();
-      ParameterGUI::endDraw();
+      imguiEndFrame();
       return;
     }
 
+    imguiBeginFrame();
     ImGui::SetNextWindowBgAlpha(0.9f);
     ImGui::PushID("CASMViewer");
     ParameterGUI::beginPanel("CASM Viewer");
@@ -887,7 +893,7 @@ public:
     ImGui::NextColumn();
     if (ImGui::Selectable("Data", selected == 1)) {
       selected = 1;
-    };
+    }
     ImGui::NextColumn();
     if (ImGui::Selectable("Presets", selected == 2)) {
       selected = 2;
@@ -962,7 +968,7 @@ public:
 
     ParameterGUI::endPanel();
     ImGui::PopID();
-    ParameterGUI::endDraw();
+    imguiEndFrame();
   }
 
   void setupParameterServer() {
@@ -1049,14 +1055,14 @@ public:
 
     std::string joinedRootPaths;
     auto paths = configLoader2.getVector<string>("dataRootPaths");
-    if (rank() == 0) {
+    if (rank == 0) {
       //      for (auto path: paths) {
       //        processParameterSpace(path);
       //      }
     }
     mDataRootPath.setElements(paths);
     mDataRootPath.registerChangeCallback([&](int index) {
-      if (rank() == 0) {
+      if (this->rank == 0) {
         processParameterSpace(mDataRootPath.getElements()[index]);
       }
     });
@@ -1173,9 +1179,9 @@ public:
                                 "/graphics/");
       std::string imagePath = dumpDirectory + mScreenshotPrefix + "_screen.png";
 
-      stbi_flip_vertically_on_write(1);
-      stbi_write_png(imagePath.c_str(), width(), height(), 3, pixs,
-                     width() * 3);
+      //      stbi_flip_vertically_on_write(1);
+      //      stbi_write_png(imagePath.c_str(), width(), height(), 3, pixs,
+      //                     width() * 3);
 
       mScreenshotPrefix = "";
     }
@@ -1209,7 +1215,7 @@ public:
     }
 
     // Triggers and callbacks that should only be handled by rank 0
-    if (rank() == 0) {
+    if (rank == 0) {
       stepXpos.registerChangeCallback([this](float value) {
         ObjectTransformHandler &oth = this->object_transform;
         oth.quat =
@@ -1552,13 +1558,13 @@ public:
   }
 
   void cleanParameterSpace(string datasetPath) {
-    if (File::isDirectory(dataRoot() + datasetPath)) {
+    if (File::isDirectory(dataRoot + datasetPath)) {
       FileList subDirs =
-          filterInDir(dataRoot() + datasetPath, [&](FilePath const &fp) {
+          filterInDir(dataRoot + datasetPath, [&](FilePath const &fp) {
             std::cout << fp.filepath() << std::endl;
             return File::isDirectory(fp.filepath());
           });
-      subDirs.add(FilePath(dataRoot() + datasetPath));
+      subDirs.add(FilePath(dataRoot + datasetPath));
       for (auto subDir : subDirs) {
         std::string cachedOutputDir = subDir.filepath() + "/cached_output/";
         if (File::exists(cachedOutputDir) &&
@@ -1587,7 +1593,7 @@ public:
   void processParameterSpace(string rootPath) {
     parameterSpaceProcessor.verbose(true);
 
-    auto filelist = itemListInDir(dataRoot() + rootPath);
+    auto filelist = itemListInDir(dataRoot + rootPath);
     for (FilePath &element : filelist) {
       if (File::isDirectory(element.filepath())) {
         // Attempt to generate data space for all directories in root dir.
@@ -1604,7 +1610,7 @@ public:
                         << element.filepath() << std::endl;
               if (ok && File::exists(File::conformPathToOS(element.filepath()) +
                                      "cached_output/_parameter_space.json")) {
-                updateAvailableDatasets(this->dataRoot() + rootPath);
+                updateAvailableDatasets(this->dataRoot + rootPath);
               } else {
                 Dir::removeRecursively(element.filepath() + "/cached_output");
               }
@@ -1631,7 +1637,7 @@ public:
   }
 
   Rayd rayTransformAllosphere(Rayd r) {
-    float t = r.intersectAllosphere(); // get t on surface of allosphere screen
+    double t = r.intersectAllosphere(); // get t on surface of allosphere screen
     Vec3f pos =
         nav().quat().rotate(r(t)); // rotate point on allosphere to match
                                    // current nav orientation (check this)
@@ -1640,7 +1646,7 @@ public:
     return ray;
   }
 
-  const char *flowAddress() override { return "interface"; }
+  //  const char *flowAddress() override { return "interface"; }
 
   void updateTitle() { mMarkUpdateTitle = true; }
 };
@@ -1650,9 +1656,10 @@ int main() {
   app->fps(60);
   app->title("Casm Viewer");
   app->dimensions(1200, 800);
-  app->stereo(true);
-  app->displayMode(app->displayMode() | Window::STEREO_BUF);
+  //  app->stereo(true);
+  //  app->displayMode(app->displayMode() | Window::STEREO_BUF);
   //  app.print();
   //  app.initAudio();
   app->start();
+  return 0;
 }

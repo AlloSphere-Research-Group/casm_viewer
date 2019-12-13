@@ -128,7 +128,6 @@ void DataDisplay::init() {
                   << parameterSpace.second->idAt(
                          parameterSpace.second->getIndexForValue(value));
         mDatasetManager.getAtomPositions();
-        //        this->requestDataLoad();
       }
     });
   }
@@ -205,8 +204,6 @@ void DataDisplay::init() {
   // TODO we don't need to do a full data load here, just recompute the graph
   mPlotYAxis.registerChangeCallback([this](float value) {
     if (mPlotYAxis.get() != value) {
-      //      this->requestDataLoad();
-
       mDatasetManager.getAtomPositions();
     }
   });
@@ -214,7 +211,6 @@ void DataDisplay::init() {
   mPlotXAxis.registerChangeCallback([this](float value) {
     if (mPlotXAxis.get() != value) {
       mDatasetManager.getAtomPositions();
-      //      this->requestDataLoad();
     }
   });
 
@@ -232,13 +228,8 @@ void DataDisplay::init() {
         //            if (mGraphFilePathToLoad.size() > 0) {
         Image img(value);
         if (!img.loaded()) {
-          static bool messagePrinted = false;
-          static std::string lastFailed;
+          static std::string lastFailed = "";
           if (lastFailed != value) {
-            messagePrinted = false;
-            lastFailed = value;
-          }
-          if (!messagePrinted) {
 #ifdef AL_BUILD_MPI
             char name[MPI_MAX_PROCESSOR_NAME];
             int len;
@@ -246,25 +237,15 @@ void DataDisplay::init() {
             std::cout << name << ": ";
 #endif
             cout << "failed to load image " << value << endl;
-            messagePrinted = true;
+            lastFailed = value;
           }
           mGraphTexture.resize(4, 4);
-          // Will try again on next frame...
         } else {
-          //                         cout << "loaded image size: " <<
-          //                         imageData.width << ", " << imageData.height
-          //                         << endl;
-
           mGraphTexture.resize(img.width(), img.height());
           mGraphTexture.submit(img.pixels(), GL_RGBA, GL_UNSIGNED_BYTE);
 
           mGraphTexture.filter(Texture::LINEAR_MIPMAP_LINEAR);
-          //                    mGraphFilePath = mGraphFilePathToLoad;
-          //                    mGraphFilePathToLoad = "";
         }
-
-        //            mGraphTextureLock.unlock();
-        //        loadGraphTexture(value);
       });
 
   mLabelFont.alignLeft();
@@ -277,12 +258,11 @@ void DataDisplay::init() {
          << mDatasetManager.mParameterSpaces["chempotB"]->parameter();
   bundle << mDatasetManager.mParameterSpaces["time"]->parameter();
   bundle << mAtomMarkerSize;
-  //        bundle << mAtomOfInterest;
+
   bundle << mShowAtoms;
   bundle << mPlotXAxis;
   bundle << mPlotYAxis;
-  bundle << mShowGraph << mShowParallel /*<< mShowSurface */
-         << mShowPerspective /*<< mSingleProjection*/;
+  bundle << mShowGraph << mShowParallel << mShowPerspective;
 
   bundle << mLayerSeparation;
   bundle << mPerspectiveRotY;
@@ -371,6 +351,9 @@ void DataDisplay::prepare(Graphics &g, Matrix4f &transformMatrix) {
     mNeedsProcessing = true;
   }
   updateDisplayBuffers();
+
+  // Load new graph data if needed.
+  mDatasetManager.currentGraphName.processChange();
 
   // History mesh displays individual movements from their actual positions
   mHistoryMesh.primitive(Mesh::TRIANGLES);
@@ -1347,12 +1330,8 @@ void DataDisplay::drawParallelProjection(Graphics &g) {
 }
 
 void DataDisplay::drawGraph(Graphics &g) {
-  // Load new graph data if needed.
-  mDatasetManager.currentGraphName.processChange();
-
   graphPickable.pushMatrix(g);
-  // g.pushMatrix();
-  // g.translate(mGraphPose.get().pos() );
+
   Vec3f forward = graphPickable.pose.get().pos();
   forward.normalize();
 
@@ -1386,6 +1365,7 @@ void DataDisplay::drawGraph(Graphics &g) {
     g.draw(mesh);
     mLabelFont.tex.unbind();
   }
-  g.popMatrix();
+  graphPickable.popMatrix(g);
+
   graphPickable.drawBB(g);
 }

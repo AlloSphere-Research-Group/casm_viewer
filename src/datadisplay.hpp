@@ -196,7 +196,7 @@ const string instancing_frag = R"(
                                )";
 
 class AtomProperties {
-public:
+ public:
   string name;
   float drawScale;
   Color color;
@@ -209,8 +209,8 @@ struct ElementData {
 };
 
 class DataDisplayParameters {
-public:
-  ParameterVec3 layerDir{"LayerDir", ""}; // Direction of layers in data
+ public:
+  ParameterVec3 layerDir{"LayerDir", ""};  // Direction of layers in data
 
   ParameterMenu mAtomOfInterest{"AtomOfInterest", "", 0};
   ParameterChoice mShowAtoms{"ShowAtoms"};
@@ -242,13 +242,13 @@ public:
       0,
       "",
       0,
-      3}; // Increase layer separation (Z- axis scaling) in perspectiveView
+      3};  // Increase layer separation (Z- axis scaling) in perspectiveView
   Parameter mLayerScaling{"LayerScaling",
                           "",
                           1.0,
                           "",
                           0,
-                          3}; // Increase layer size in projection view
+                          3};  // Increase layer size in projection view
 
   ParameterVec3 mSlicingPlanePoint{"SlicingPlanePoint", "",
                                    Vec3f(0.0f, 0.0, 0.0)};
@@ -258,7 +258,7 @@ public:
       "SliceRotationPitch", "SliceAngles", 0.0, "", -M_PI, M_PI};
   Parameter mSliceRotationRoll{"SliceRotationRoll", "SliceAngles", 0.0, "",
                                -M_PI / 2.0,         M_PI / 2.0};
-  Parameter mSlicingPlaneDistance{
+  Parameter mSlicingPlaneThickness{
       "SlicingPlaneThickness", "", 3.0, "", 0.0f, 30.0f};
 
   Parameter mPerspectiveRotY{"perspectiveRotY", "", -75, "", -90, 90};
@@ -276,7 +276,7 @@ public:
 // -----------------------------------------------------------------
 
 class DataDisplay : public DataDisplayParameters {
-public:
+ public:
   vector<AtomProperties> atomPropertiesProj;
 
   std::map<std::string, ElementData> elementData;
@@ -352,27 +352,26 @@ public:
   void nextLayer() {
     mSlicingPlanePoint =
         mSlicingPlanePoint.get() +
-        mSlicingPlaneNormal.get().normalized() * mSlicingPlaneDistance;
+        mSlicingPlaneNormal.get().normalized() * mSlicingPlaneThickness;
   }
 
   void previousLayer() {
     mSlicingPlanePoint =
         mSlicingPlanePoint.get() -
-        mSlicingPlaneNormal.get().normalized() * mSlicingPlaneDistance;
+        mSlicingPlaneNormal.get().normalized() * mSlicingPlaneThickness;
   }
 
   //  void requestDataLoad() {
   //    mRequestLoad = true;
   //  }
 
-  void requestInitDataset() { mRequestInit = true; }
+  //  void requestInitDataset() { mRequestInit = true; }
 
   void dumpImages(std::string dumpPrefix);
 
   void computeSlicing() {
-
     if (mRunComputation) {
-      mSlicingPlaneDistance =
+      mSlicingPlaneThickness =
           findDistanceNormal(mAligned4fData, layerDir.get());
       std::cout << "Data Boundaries:" << std::endl;
       std::cout << "X " << mDataBoundaries.minx << " -> "
@@ -388,16 +387,15 @@ public:
   }
 
   void resetSlicing() {
-    mSlicingPlanePoint.set(
-        {mDataBoundaries.minx, mDataBoundaries.miny, mDataBoundaries.minz});
+    mSlicingPlanePoint.set({0, 0, mDataBoundaries.minz});
 
-    mSlicingPlaneDistance = mDataBoundaries.maxz - mDataBoundaries.minz;
+    mSlicingPlaneThickness = mDataBoundaries.maxz - mDataBoundaries.minz;
     mSliceRotationRoll.set(0);
     mSliceRotationPitch.set(0);
-    //      std::cout << mSlicingPlaneDistance.get() <<std::endl;
+    //      std::cout << mSlicingPlaneThickness.get() <<std::endl;
   }
 
-protected:
+ protected:
   Texture &iso_scene() { return fbo_iso.tex(); }
 
   // This function should be called whenever there is new atom position data
@@ -434,7 +432,7 @@ protected:
 
   void updateParameterText() {
     mParamText = "";
-    if (mProcessing.load()) {
+    if (mNeedsProcessing.load()) {
       mParamText = "Processing ...";
     } else {
       auto subDir = mDatasetManager.getSubDir();
@@ -496,7 +494,7 @@ protected:
   //        g.popViewMatrix();
   //    }
 
-private:
+ private:
   VAOMesh axis;
   VAOMesh orthoMesh;
   VAOMesh graphlinesMesh;
@@ -514,7 +512,7 @@ private:
   EasyFBO fbo_iso;
 
   //  bool mRequestLoad {false};
-  std::atomic<bool> mProcessing{false};
+  std::atomic<bool> mNeedsProcessing{false};
   bool mRequestInit{false};
 
   typedef struct {
@@ -526,7 +524,7 @@ private:
   std::vector<float> mAligned4fData;
   BoundingBox_ mDataBoundaries;
 
-  float mMarkerScale; // Global marker scaling factor
+  float mMarkerScale;  // Global marker scaling factor
 };
 
-#endif // DATASETDISPLAY_HPP
+#endif  // DATASETDISPLAY_HPP

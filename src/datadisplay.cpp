@@ -14,7 +14,6 @@
 #include <condition_variable>
 
 void DataDisplay::init() {
-
 #ifdef AL_BUILD_MPI
   MPI_Comm_rank(MPI_COMM_WORLD, &mWorldRank);
 #endif
@@ -56,9 +55,9 @@ void DataDisplay::init() {
     addSphere(instancing_mesh0.mesh, 1, 12, 6);
     instancing_mesh0.mesh.update();
     instancing_mesh0.init(instancing_vert, instancing_frag,
-                          1,         // location
-                          4,         // num elements
-                          GL_FLOAT); // type
+                          1,          // location
+                          4,          // num elements
+                          GL_FLOAT);  // type
 
     instancing_shader.compile(instancing_vert, instancing_frag);
 
@@ -83,7 +82,7 @@ void DataDisplay::init() {
   // x
   num_verts_added = addCube(axis);
   transform.setIdentity();
-  transform *= Matrix4f::rotation(M_PI / 2, 2, 0); // rotate from z to x
+  transform *= Matrix4f::rotation(M_PI / 2, 2, 0);  // rotate from z to x
   transform *= Matrix4f::translation(0, 0, 0.3);
   transform *= Matrix4f::scaling(0.02, 0.02, 1);
   axis.transform(transform, axis.vertices().size() - num_verts_added);
@@ -94,7 +93,7 @@ void DataDisplay::init() {
   // y
   num_verts_added = addCube(axis);
   transform.setIdentity();
-  transform *= Matrix4f::rotation(M_PI / 2, 2, 1); // rotate from z to y
+  transform *= Matrix4f::rotation(M_PI / 2, 2, 1);  // rotate from z to y
   transform *= Matrix4f::translation(0, 0, 0.3);
   transform *= Matrix4f::scaling(0.02, 0.02, 1);
   axis.transform(transform, axis.vertices().size() - num_verts_added);
@@ -119,11 +118,11 @@ void DataDisplay::init() {
     parameterSpace.second->parameter().registerChangeCallback([&](float value) {
       if (parameterSpace.second->getCurrentId() !=
           parameterSpace.second->idAt(parameterSpace.second->getIndexForValue(
-              value))) { // Only reload if id has changed
+              value))) {  // Only reload if id has changed
 
         parameterSpace.second->parameter().setNoCalls(
-            value); // To have the internal value already changed for the
-                    // following functions.
+            value);  // To have the internal value already changed for the
+                     // following functions.
         std::cout << value << " : " << parameterSpace.second->getCurrentId()
                   << "..."
                   << parameterSpace.second->idAt(
@@ -134,10 +133,15 @@ void DataDisplay::init() {
     });
   }
 
+  // We need to process the callbacks for this within the graphics thread.
+  mDatasetManager.mCurrentDataset.setSynchronousCallbacks();
   mDatasetManager.mCurrentDataset.registerChangeCallback(
       [&](std::string value) {
         if (value != mDatasetManager.mCurrentDataset.get()) {
-          this->requestInitDataset();
+          // First force application of value
+          mDatasetManager.mCurrentDataset.setLocking(value);
+          initRootDirectory();
+          resetSlicing();
         }
       });
 
@@ -174,7 +178,7 @@ void DataDisplay::init() {
     // mSlicingPlaneNormal.setNoCalls();
   });
 
-  mSlicingPlaneDistance.registerChangeCallback([this](float v) {
+  mSlicingPlaneThickness.registerChangeCallback([this](float v) {
     auto m = slicePickable.bb.max;
     m.z = v;
     slicePickable.bb.set(slicePickable.bb.min, m);
@@ -209,7 +213,6 @@ void DataDisplay::init() {
   // TODO we don't need to do a full data load here, just recompute the graph
   mPlotXAxis.registerChangeCallback([this](float value) {
     if (mPlotXAxis.get() != value) {
-
       mDatasetManager.getAtomPositions();
       //      this->requestDataLoad();
     }
@@ -247,7 +250,7 @@ void DataDisplay::init() {
   bundle << mPerspectiveRotY;
   bundle << mSlicingPlaneNormal;
   bundle << mSliceRotationPitch << mSliceRotationRoll;
-  bundle << mSlicingPlanePoint << mSlicingPlaneDistance << mLayerScaling;
+  bundle << mSlicingPlanePoint << mSlicingPlaneThickness << mLayerScaling;
   bundle << mShowGrid << mGridType << mGridSpacing << mGridXOffset
          << mGridYOffset;
 
@@ -321,134 +324,120 @@ void DataDisplay::initRootDirectory() {
 }
 
 void DataDisplay::prepare(Graphics &g, Matrix4f &transformMatrix) {
-  if (mProcessing) {
-    if (mRequestInit) {
-      initRootDirectory();
-      mRequestInit = false;
-      resetSlicing();
-    } /*else if (mRequestLoad)  {
-      loadCurrentData();
-      mRequestLoad = false;
-    }*/
-    mProcessing = false;
+  if (mNeedsProcessing) {
+    mDatasetManager.mCurrentDataset.processChange();
+    mNeedsProcessing = false;
+  }
+  if (mDatasetManager.mCurrentDataset.hasChange()) {
+    // TODO display some message here that we are computing
+    mNeedsProcessing = true;
   }
   updateDisplayBuffers();
 
-  if (/*mRequestLoad ||*/ mRequestInit) {
-    mProcessing = true;
-  } // Schedule processing for the start of next frame
+  // History mesh displays individual movements from their actual positions
+  mHistoryMesh.primitive(Mesh::TRIANGLES);
+  mHistoryMesh.reset();
 
-  if (!mProcessing) { // If not currently doing computation prepare for drawing
-    // History mesh displays individual movements from their actual positions
-    mHistoryMesh.primitive(Mesh::TRIANGLES);
-    mHistoryMesh.reset();
+  float historyWidth = 0.65f;
+  size_t counter = mDatasetManager.mHistory.size() - 1;
+  for (auto historyPoint = mDatasetManager.mHistory.begin();
+       historyPoint != mDatasetManager.mHistory.end(); historyPoint++) {
+    HSV hsvColor(0.5f * float(counter) / mDatasetManager.mHistory.size(), 1.0,
+                 1.0);
+    Color c;
 
-    float historyWidth = 0.65f;
-    size_t counter = mDatasetManager.mHistory.size() - 1;
-    for (auto historyPoint = mDatasetManager.mHistory.begin();
-         historyPoint != mDatasetManager.mHistory.end(); historyPoint++) {
-
-      HSV hsvColor(0.5f * float(counter) / mDatasetManager.mHistory.size(), 1.0,
-                   1.0);
-      Color c;
-
-      // Assumes the plane's normal is the z-axis
-      Vec3f orthogonalVec = (historyPoint->second - historyPoint->first)
-                                .cross({0, 0, 1})
-                                .normalize(historyWidth);
-      Vec3f orthogonalVec2 = (historyPoint->second - historyPoint->first)
-                                 .cross({1, 0, 0})
-                                 .normalize(historyWidth);
-      if (orthogonalVec2.mag() < 0.0001f) {
-        orthogonalVec2 = (historyPoint->second - historyPoint->first)
-                             .cross({0, 1, 0})
-                             .normalize(historyWidth);
-      }
-      assert(orthogonalVec2.mag() > 0.0001f);
-      ImGui::ColorConvertHSVtoRGB(hsvColor.h, hsvColor.s, hsvColor.v, c.r, c.g,
-                                  c.b);
-      c.a = 0.35f;
-      unsigned int previousSize = mHistoryMesh.vertices().size();
-      mHistoryMesh.color(c);
-      mHistoryMesh.vertex(historyPoint->first - orthogonalVec);
-      mHistoryMesh.color(c);
-      mHistoryMesh.vertex(historyPoint->second - orthogonalVec * 0.1f);
-      mHistoryMesh.color(c);
-      mHistoryMesh.vertex(historyPoint->first + orthogonalVec);
-      mHistoryMesh.color(c);
-      mHistoryMesh.vertex(historyPoint->second + orthogonalVec * 0.1f);
-
-      mHistoryMesh.index(previousSize);
-      mHistoryMesh.index(previousSize + 1);
-      mHistoryMesh.index(previousSize + 2);
-
-      mHistoryMesh.index(previousSize + 2);
-      mHistoryMesh.index(previousSize + 3);
-      mHistoryMesh.index(previousSize + 1);
-      counter--;
+    // Assumes the plane's normal is the z-axis
+    Vec3f orthogonalVec = (historyPoint->second - historyPoint->first)
+                              .cross({0, 0, 1})
+                              .normalize(historyWidth);
+    Vec3f orthogonalVec2 = (historyPoint->second - historyPoint->first)
+                               .cross({1, 0, 0})
+                               .normalize(historyWidth);
+    if (orthogonalVec2.mag() < 0.0001f) {
+      orthogonalVec2 = (historyPoint->second - historyPoint->first)
+                           .cross({0, 1, 0})
+                           .normalize(historyWidth);
     }
+    assert(orthogonalVec2.mag() > 0.0001f);
+    ImGui::ColorConvertHSVtoRGB(hsvColor.h, hsvColor.s, hsvColor.v, c.r, c.g,
+                                c.b);
+    c.a = 0.35f;
+    unsigned int previousSize = mHistoryMesh.vertices().size();
+    mHistoryMesh.color(c);
+    mHistoryMesh.vertex(historyPoint->first - orthogonalVec);
+    mHistoryMesh.color(c);
+    mHistoryMesh.vertex(historyPoint->second - orthogonalVec * 0.1f);
+    mHistoryMesh.color(c);
+    mHistoryMesh.vertex(historyPoint->first + orthogonalVec);
+    mHistoryMesh.color(c);
+    mHistoryMesh.vertex(historyPoint->second + orthogonalVec * 0.1f);
 
-    // Trajectory mesh displays the cumulative trajectory
-    mTrajectoryMesh.primitive(Mesh::TRIANGLES);
-    mTrajectoryMesh.reset();
-    Vec3f previousPoint(0, 0, 0);
-    float previousMag = 0.0;
+    mHistoryMesh.index(previousSize);
+    mHistoryMesh.index(previousSize + 1);
+    mHistoryMesh.index(previousSize + 2);
 
-    float trajectoryWidth = 0.35f;
-    counter = mDatasetManager.mHistory.size() - 1;
-    for (auto historyPoint = mDatasetManager.mHistory.begin();
-         historyPoint != mDatasetManager.mHistory.end(); historyPoint++) {
-
-      HSV hsvColor(0.5f * float(counter) / mDatasetManager.mHistory.size(), 1.0,
-                   1.0);
-      Color c;
-
-      // Assumes the plane's normal is the z-axis
-      Vec3f thisMovement = historyPoint->second - historyPoint->first;
-      Vec3f orthogonalVec =
-          thisMovement.cross({0, 0, 1}).normalize(trajectoryWidth);
-      ImGui::ColorConvertHSVtoRGB(hsvColor.h, hsvColor.s, hsvColor.v, c.r, c.g,
-                                  c.b);
-      c.a = 0.8f;
-      unsigned int previousSize = mTrajectoryMesh.vertices().size();
-      if (thisMovement.mag() >
-          fabs(mDataBoundaries.maxx - mDataBoundaries.minx) /
-              2.0f) { // Atom is wrapping around
-        //              c = Color(0.8f, 0.8f, 0.8f, 1.0f);
-        thisMovement = -thisMovement;
-        thisMovement.normalize(previousMag);
-      } else {
-        previousMag = thisMovement.mag();
-      }
-      mTrajectoryMesh.color(c);
-      mTrajectoryMesh.vertex(previousPoint - orthogonalVec);
-      mTrajectoryMesh.color(c);
-      mTrajectoryMesh.vertex(previousPoint + thisMovement -
-                             orthogonalVec * 0.2f);
-      mTrajectoryMesh.color(c);
-      mTrajectoryMesh.vertex(previousPoint + orthogonalVec);
-      mTrajectoryMesh.color(c);
-      mTrajectoryMesh.vertex(previousPoint + thisMovement +
-                             orthogonalVec * 0.2f);
-
-      mTrajectoryMesh.index(previousSize);
-      mTrajectoryMesh.index(previousSize + 1);
-      mTrajectoryMesh.index(previousSize + 2);
-
-      mTrajectoryMesh.index(previousSize + 2);
-      mTrajectoryMesh.index(previousSize + 3);
-      mTrajectoryMesh.index(previousSize + 1);
-      previousPoint = previousPoint + thisMovement;
-      counter--;
-    }
-
-    prepareParallelProjection(g, transformMatrix);
-    //        g.scale(1.0/(mDataBoundaries.maxy - mDataBoundaries.miny));
+    mHistoryMesh.index(previousSize + 2);
+    mHistoryMesh.index(previousSize + 3);
+    mHistoryMesh.index(previousSize + 1);
+    counter--;
   }
+
+  // Trajectory mesh displays the cumulative trajectory
+  mTrajectoryMesh.primitive(Mesh::TRIANGLES);
+  mTrajectoryMesh.reset();
+  Vec3f previousPoint(0, 0, 0);
+  float previousMag = 0.0;
+
+  float trajectoryWidth = 0.35f;
+  counter = mDatasetManager.mHistory.size() - 1;
+  for (auto historyPoint = mDatasetManager.mHistory.begin();
+       historyPoint != mDatasetManager.mHistory.end(); historyPoint++) {
+    HSV hsvColor(0.5f * float(counter) / mDatasetManager.mHistory.size(), 1.0,
+                 1.0);
+    Color c;
+
+    // Assumes the plane's normal is the z-axis
+    Vec3f thisMovement = historyPoint->second - historyPoint->first;
+    Vec3f orthogonalVec =
+        thisMovement.cross({0, 0, 1}).normalize(trajectoryWidth);
+    ImGui::ColorConvertHSVtoRGB(hsvColor.h, hsvColor.s, hsvColor.v, c.r, c.g,
+                                c.b);
+    c.a = 0.8f;
+    unsigned int previousSize = mTrajectoryMesh.vertices().size();
+    if (thisMovement.mag() > fabs(mDataBoundaries.maxx - mDataBoundaries.minx) /
+                                 2.0f) {  // Atom is wrapping around
+      //              c = Color(0.8f, 0.8f, 0.8f, 1.0f);
+      thisMovement = -thisMovement;
+      thisMovement.normalize(previousMag);
+    } else {
+      previousMag = thisMovement.mag();
+    }
+    mTrajectoryMesh.color(c);
+    mTrajectoryMesh.vertex(previousPoint - orthogonalVec);
+    mTrajectoryMesh.color(c);
+    mTrajectoryMesh.vertex(previousPoint + thisMovement - orthogonalVec * 0.2f);
+    mTrajectoryMesh.color(c);
+    mTrajectoryMesh.vertex(previousPoint + orthogonalVec);
+    mTrajectoryMesh.color(c);
+    mTrajectoryMesh.vertex(previousPoint + thisMovement + orthogonalVec * 0.2f);
+
+    mTrajectoryMesh.index(previousSize);
+    mTrajectoryMesh.index(previousSize + 1);
+    mTrajectoryMesh.index(previousSize + 2);
+
+    mTrajectoryMesh.index(previousSize + 2);
+    mTrajectoryMesh.index(previousSize + 3);
+    mTrajectoryMesh.index(previousSize + 1);
+    previousPoint = previousPoint + thisMovement;
+    counter--;
+  }
+
+  prepareParallelProjection(g, transformMatrix);
+  //        g.scale(1.0/(mDataBoundaries.maxy - mDataBoundaries.miny));
 }
 
-void DataDisplay::draw(Graphics &g) { // Load data after drawing frame to allow
-                                      // showing "in process" state
+void DataDisplay::draw(Graphics &g) {  // Load data after drawing frame to allow
+                                       // showing "in process" state
   if (mVisible == 0.0f) {
     return;
   }
@@ -540,7 +529,7 @@ void DataDisplay::dumpImages(string dumpPrefix) {
       line += std::to_string(*positionIt++) + ",";
       line += std::to_string(*positionIt++) + ",";
       line += std::to_string(*positionIt++) + "\n";
-      positionIt++; // Ignore label?
+      positionIt++;  // Ignore label?
       allPositionsFile.write(line);
     }
   }
@@ -549,7 +538,6 @@ void DataDisplay::dumpImages(string dumpPrefix) {
 
 void DataDisplay::updateDisplayBuffers() {
   if (mDatasetManager.positionBuffers.newDataAvailable()) {
-
     std::map<string, int> elementCounts;
 
     auto allPositions = mDatasetManager.positionBuffers.get();
@@ -612,8 +600,8 @@ void DataDisplay::updateDisplayBuffers() {
       mSlicingPlanePoint.setHint("miny", b.miny - (b.maxy));
       mSlicingPlanePoint.setHint("maxz", b.maxz);
       mSlicingPlanePoint.setHint("minz", b.minz - (b.maxz));
-      mSlicingPlaneDistance.min(mDataBoundaries.minz);
-      mSlicingPlaneDistance.max(mDataBoundaries.maxz);
+      mSlicingPlaneThickness.min(0.0);
+      mSlicingPlaneThickness.max(mDataBoundaries.maxz - mDataBoundaries.minz);
     }
 
     // Set active atoms and colors
@@ -641,7 +629,6 @@ void DataDisplay::updateDisplayBuffers() {
     for (auto atom : mShowAtoms.getElements()) {
       if (std::find(selectedElements.begin(), selectedElements.end(), atom) !=
           selectedElements.end()) {
-
         if (elementData.find(atom) != elementData.end()) {
           //                    std::cout << "Color for: " << atom << ":" <<
           //                    elementData[atom].color.r << " " <<
@@ -658,7 +645,7 @@ void DataDisplay::updateDisplayBuffers() {
           atomPropertiesPersp.push_back(
               AtomProperties{atom, elementData[atom].radius,
                              elementData[atom].color, Graphics::LINE});
-        } else { // Use defaults
+        } else {  // Use defaults
           atomPropertiesProj.push_back(
               AtomProperties{atom, 1.0f, *colorListIt});
 
@@ -763,7 +750,7 @@ void DataDisplay::prepareParallelProjection(Graphics &g,
   int w = fbo_iso.width() / 2;
   int h = fbo_iso.height() / 2;
   g.polygonMode(Graphics::FILL);
-  g.depthMask(true); // for axis rendering
+  g.depthMask(true);  // for axis rendering
 
   if (mSingleProjection.get() == 1.0f) {
     g.pushViewport(0, 0, 2 * w, 2 * h);
@@ -774,10 +761,10 @@ void DataDisplay::prepareParallelProjection(Graphics &g,
     //            g.viewMatrix(getLookAt({ 0.0f, 0.0f, cameraZ },
     //            { 0.0f, 0.0f, 0.0f },
     //            { 0.0f, 1.0f, 0.0f }));
-    g.viewMatrix(getLookAt(mSlicingPlanePoint,
-                           mSlicingPlanePoint.get() -
-                               mSlicingPlaneNormal.get().normalized(),
-                           {0.0f, 1.0f, 0.0f}));
+    g.viewMatrix(getLookAt(
+        mSlicingPlanePoint,
+        mSlicingPlanePoint.get() - mSlicingPlaneNormal.get().normalized(),
+        {0.0f, 1.0f, 0.0f}));
 
     g.blending(false);
     g.depthTesting(true);
@@ -807,7 +794,7 @@ void DataDisplay::prepareParallelProjection(Graphics &g,
           g.draw(mGridMesh);
           g.popMatrix();
         } else if (mGridType.getCurrent() == "triangle") {
-          float spacing = 0.86602540378f * mGridSpacing; // sin(60)
+          float spacing = 0.86602540378f * mGridSpacing;  // sin(60)
           g.pushMatrix();
           g.translate(mGridXOffset, mGridYOffset + spacing * i, 0);
           g.scale(maxrange * mLayerScaling);
@@ -841,7 +828,6 @@ void DataDisplay::prepareParallelProjection(Graphics &g,
       // ----------------------------------------
       int cumulativeCount = 0;
       for (auto &data : mAtomData) {
-
         if (mAlignData) {
           //            instancing_mesh0.attrib_data(
           //              mAligned4fData.size() * sizeof(float),
@@ -866,7 +852,7 @@ void DataDisplay::prepareParallelProjection(Graphics &g,
         }
         // now draw data with custom shader
         g.shader(instancing_mesh0.shader);
-        g.update(); // sends modelview and projection matrices
+        g.update();  // sends modelview and projection matrices
         g.shader().uniform("dataScale", scalingFactor);
         g.shader().uniform("layerSeparation", 1.0);
         // A scaling value of 4.0 found empirically...
@@ -882,7 +868,7 @@ void DataDisplay::prepareParallelProjection(Graphics &g,
         g.shader().uniform("plane_point", mSlicingPlanePoint.get());
         g.shader().uniform("plane_normal",
                            mSlicingPlaneNormal.get().normalized());
-        g.shader().uniform("second_plane_distance", mSlicingPlaneDistance);
+        g.shader().uniform("second_plane_distance", mSlicingPlaneThickness);
 
         //                    g.shader().uniform("far_clip", farClip);
         //                    g.shader().uniform("near_clip", near);
@@ -919,7 +905,7 @@ void DataDisplay::prepareParallelProjection(Graphics &g,
       if (atomPropertiesProj.size() > 0) {
         // now draw data with custom shader
         g.shader(instancing_mesh0.shader);
-        g.update(); // sends modelview and projection matrices
+        g.update();  // sends modelview and projection matrices
         g.shader().uniform("dataScale", scalingFactor);
         g.shader().uniform("layerSeparation", 1.0);
 
@@ -934,7 +920,7 @@ void DataDisplay::prepareParallelProjection(Graphics &g,
         g.shader().uniform("plane_point", mSlicingPlanePoint.get());
         g.shader().uniform("plane_normal",
                            mSlicingPlaneNormal.get().normalized());
-        g.shader().uniform("second_plane_distance", mSlicingPlaneDistance);
+        g.shader().uniform("second_plane_distance", mSlicingPlaneThickness);
         //                    g.shader().uniform("far_clip", farClip);
         //                    g.shader().uniform("near_clip", near);
         g.shader().uniform("clipped_mult", 0.0);
@@ -966,7 +952,7 @@ void DataDisplay::prepareParallelProjection(Graphics &g,
       if (atomPropertiesProj.size() > 0) {
         // now draw data with custom shader
         g.shader(instancing_mesh0.shader);
-        g.update(); // sends modelview and projection matrices
+        g.update();  // sends modelview and projection matrices
         g.shader().uniform("dataScale", scalingFactor);
         if (mShowRadius == 1.0f) {
           g.shader().uniform("markerScale", mAtomMarkerSize * mMarkerScale);
@@ -979,7 +965,7 @@ void DataDisplay::prepareParallelProjection(Graphics &g,
         g.shader().uniform("plane_point", mSlicingPlanePoint.get());
         g.shader().uniform("plane_normal",
                            mSlicingPlaneNormal.get().normalized());
-        g.shader().uniform("second_plane_distance", mSlicingPlaneDistance);
+        g.shader().uniform("second_plane_distance", mSlicingPlaneThickness);
         //                    g.shader().uniform("far_clip", farClip);
         //                    g.shader().uniform("near_clip", near);
         g.shader().uniform("clipped_mult", 0.0);
@@ -1011,7 +997,7 @@ void DataDisplay::prepareParallelProjection(Graphics &g,
       if (atomPropertiesProj.size() > 0) {
         // now draw data with custom shader
         g.shader(instancing_mesh0.shader);
-        g.update(); // sends modelview and projection matrices
+        g.update();  // sends modelview and projection matrices
         g.shader().uniform("dataScale", scalingFactor);
         if (mShowRadius == 1.0f) {
           g.shader().uniform("markerScale", mAtomMarkerSize * mMarkerScale);
@@ -1023,7 +1009,7 @@ void DataDisplay::prepareParallelProjection(Graphics &g,
         g.shader().uniform("plane_point", mSlicingPlanePoint.get());
         g.shader().uniform("plane_normal",
                            mSlicingPlaneNormal.get().normalized());
-        g.shader().uniform("second_plane_distance", mSlicingPlaneDistance);
+        g.shader().uniform("second_plane_distance", mSlicingPlaneThickness);
         //                    g.shader().uniform("far_clip", farClip);
         //                    g.shader().uniform("near_clip", near);
         g.shader().uniform("clipped_mult", 0.0);
@@ -1055,7 +1041,7 @@ void DataDisplay::prepareParallelProjection(Graphics &g,
       if (atomPropertiesProj.size() > 0) {
         // now draw data with custom shader
         g.shader(instancing_mesh0.shader);
-        g.update(); // sends modelview and projection matrices
+        g.update();  // sends modelview and projection matrices
         g.shader().uniform("dataScale", scalingFactor);
         if (mShowRadius == 1.0f) {
           g.shader().uniform("markerScale", mAtomMarkerSize * mMarkerScale);
@@ -1067,7 +1053,7 @@ void DataDisplay::prepareParallelProjection(Graphics &g,
         g.shader().uniform("plane_point", mSlicingPlanePoint.get());
         g.shader().uniform("plane_normal",
                            mSlicingPlaneNormal.get().normalized());
-        g.shader().uniform("second_plane_distance", mSlicingPlaneDistance);
+        g.shader().uniform("second_plane_distance", mSlicingPlaneThickness);
         //                    g.shader().uniform("far_clip", farClip);
         //                    g.shader().uniform("near_clip", near);
         g.shader().uniform("clipped_mult", 0.0);
@@ -1092,7 +1078,7 @@ void DataDisplay::drawPerspective(Graphics &g) {
   //        Vec3d normVector = reader.getNormalizingVector();
   //        Vec3d centeringVector = reader.getCenteringVector();
   if (mAligned4fData.size() == 0) {
-    return; // No data has been loaded
+    return;  // No data has been loaded
   }
 
   g.lens().far(2000);
@@ -1138,7 +1124,7 @@ void DataDisplay::drawPerspective(Graphics &g) {
 
   g.shader().uniform("plane_point", mSlicingPlanePoint.get());
   g.shader().uniform("plane_normal", mSlicingPlaneNormal.get().normalized());
-  g.shader().uniform("second_plane_distance", mSlicingPlaneDistance);
+  g.shader().uniform("second_plane_distance", mSlicingPlaneThickness);
   //        g.shader().uniform("near_clip", near);
   //        g.shader().uniform("far_clip", farClip);
   g.shader().uniform("clipped_mult", 0.45);
@@ -1192,7 +1178,7 @@ void DataDisplay::drawPerspective(Graphics &g) {
   const float x[2] = {mDataBoundaries.maxx, mDataBoundaries.minx};
   const float y[2] = {mDataBoundaries.maxy, mDataBoundaries.miny};
 
-  const float z[2] = {0.0, (mSlicingPlaneDistance)};
+  const float z[2] = {0.0, (mSlicingPlaneThickness)};
 
   for (int k = 0; k <= 1; k++) {
     for (int j = 0; j <= 1; j++) {
@@ -1209,9 +1195,9 @@ void DataDisplay::drawPerspective(Graphics &g) {
   g.shader().uniform("eye_sep", perspectivePickable.scale * g.lens().eyeSep() *
                                     g.eye() / 2.0f);
 
-  g.shader().uniform("eye_sep",
-                     /*perspectivePickable.scale * */ g.lens().eyeSep() *
-                         g.eye() / 2.0f);
+  g.shader().uniform(
+      "eye_sep",
+      /*perspectivePickable.scale * */ g.lens().eyeSep() * g.eye() / 2.0f);
 
   glLineWidth(5);
   g.polygonMode(Graphics::LINE);
@@ -1230,7 +1216,7 @@ void DataDisplay::drawPerspective(Graphics &g) {
 
   drawHistory(g);
 
-  g.popMatrix(); // pickable
+  g.popMatrix();  // pickable
 
   g.depthTesting(false);
   g.blending(true);
@@ -1250,7 +1236,7 @@ void DataDisplay::drawPerspective(Graphics &g) {
     } else {
       //            g.scale(dist * 0.5);
     }
-    g.translate(0.0, -1.5, 0); // Push the text down a bit
+    g.translate(0.0, -1.5, 0);  // Push the text down a bit
 
     // Draw label
     Mesh mesh;
@@ -1283,7 +1269,7 @@ void DataDisplay::drawParallelProjection(Graphics &g) {
   Mesh m;
   addTexQuad(m, w, h);
   iso_scene().filter(Texture::LINEAR_MIPMAP_LINEAR);
-  iso_scene().generateMipmap(); // XXX this works.. confusing api needs help..
+  iso_scene().generateMipmap();  // XXX this works.. confusing api needs help..
   iso_scene().bind();
   parallelPickable.pushMatrix(g);
   // g.pushMatrix();
@@ -1336,7 +1322,6 @@ void DataDisplay::drawGraph(Graphics &g) {
   // New image module puts origin on top right
   if (mGraphTextureLock.try_lock()) {
     if (mGraphFilePathToLoad.size() > 0) {
-
       Image img(mGraphFilePathToLoad.c_str());
       if (img.loaded()) {
         static bool messagePrinted = false;

@@ -340,8 +340,8 @@ class MyApp : public DistributedAppWithState<State> {
 
     if (r.touchpadDown()) {
       if (fabs(r.touchPos.x) > 0.4f) {
-        dataDisplays[vdvBundle.currentBundle()]->mSlicingPlaneDistance =
-            dataDisplays[vdvBundle.currentBundle()]->mSlicingPlaneDistance +
+        dataDisplays[vdvBundle.currentBundle()]->mSlicingPlaneThickness =
+            dataDisplays[vdvBundle.currentBundle()]->mSlicingPlaneThickness +
             r.touchPos.x * 0.2;
       }
       if (fabs(r.touchPos.y) > 0.4f) {
@@ -816,7 +816,7 @@ class MyApp : public DistributedAppWithState<State> {
         ParameterGUI::drawParameterMeta(
             &dataDisplays[vdvBundle.currentBundle()]->mSlicingPlaneNormal);
         ParameterGUI::drawParameterMeta(
-            &dataDisplays[vdvBundle.currentBundle()]->mSlicingPlaneDistance);
+            &dataDisplays[vdvBundle.currentBundle()]->mSlicingPlaneThickness);
 
         ParameterGUI::drawParameterMeta(&mJumpLayerNeg);
         ImGui::SameLine();

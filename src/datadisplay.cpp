@@ -218,6 +218,7 @@ void DataDisplay::init() {
     }
   });
 
+  mDatasetManager.currentGraphName.setSynchronousCallbacks();
   mDatasetManager.currentGraphName.registerChangeCallback(
       [this](std::string value) {
         std::string fullDatasetPath = File::conformPathToOS(
@@ -226,7 +227,44 @@ void DataDisplay::init() {
 
         std::cout << "loading graph " << value << " at " << fullDatasetPath
                   << std::endl;
-        loadGraphTexture(value);
+        // New image module puts origin on top right
+        //        if (mGraphTextureLock.try_lock()) {
+        //            if (mGraphFilePathToLoad.size() > 0) {
+        Image img(value);
+        if (!img.loaded()) {
+          static bool messagePrinted = false;
+          static std::string lastFailed;
+          if (lastFailed != value) {
+            messagePrinted = false;
+            lastFailed = value;
+          }
+          if (!messagePrinted) {
+#ifdef AL_BUILD_MPI
+            char name[MPI_MAX_PROCESSOR_NAME];
+            int len;
+            int ret = MPI_Get_processor_name(name, &len);
+            std::cout << name << ": ";
+#endif
+            cout << "failed to load image " << value << endl;
+            messagePrinted = true;
+          }
+          mGraphTexture.resize(4, 4);
+          // Will try again on next frame...
+        } else {
+          //                         cout << "loaded image size: " <<
+          //                         imageData.width << ", " << imageData.height
+          //                         << endl;
+
+          mGraphTexture.resize(img.width(), img.height());
+          mGraphTexture.submit(img.pixels(), GL_RGBA, GL_UNSIGNED_BYTE);
+
+          mGraphTexture.filter(Texture::LINEAR_MIPMAP_LINEAR);
+          //                    mGraphFilePath = mGraphFilePathToLoad;
+          //                    mGraphFilePathToLoad = "";
+        }
+
+        //            mGraphTextureLock.unlock();
+        //        loadGraphTexture(value);
       });
 
   mLabelFont.alignLeft();
@@ -1309,6 +1347,9 @@ void DataDisplay::drawParallelProjection(Graphics &g) {
 }
 
 void DataDisplay::drawGraph(Graphics &g) {
+  // Load new graph data if needed.
+  mDatasetManager.currentGraphName.processChange();
+
   graphPickable.pushMatrix(g);
   // g.pushMatrix();
   // g.translate(mGraphPose.get().pos() );
@@ -1319,44 +1360,7 @@ void DataDisplay::drawGraph(Graphics &g) {
     Quatf rot = Quatf::getBillboardRotation(-forward, Vec3f{0.0, 1.0f, 0.0f});
     g.rotate(rot);
   }
-  // New image module puts origin on top right
-  if (mGraphTextureLock.try_lock()) {
-    if (mGraphFilePathToLoad.size() > 0) {
-      Image img(mGraphFilePathToLoad.c_str());
-      if (img.loaded()) {
-        static bool messagePrinted = false;
-        static std::string lastFailed;
-        if (lastFailed != mGraphFilePathToLoad) {
-          messagePrinted = false;
-          lastFailed = mGraphFilePathToLoad;
-        }
-        if (!messagePrinted) {
-#ifdef AL_BUILD_MPI
-          char name[MPI_MAX_PROCESSOR_NAME];
-          int len;
-          int ret = MPI_Get_processor_name(name, &len);
-          std::cout << name << ": ";
-#endif
-          cout << "failed to load image " << mGraphFilePathToLoad << endl;
-          messagePrinted = true;
-        }
-        mGraphTexture.resize(4, 4);
-        // Will try again on next frame...
-      } else {
-        //                         cout << "loaded image size: " <<
-        //                         imageData.width << ", " << imageData.height
-        //                         << endl;
 
-        mGraphTexture.resize(img.width(), img.height());
-        mGraphTexture.submit(img.pixels(), GL_RGBA, GL_UNSIGNED_BYTE);
-
-        mGraphTexture.filter(Texture::LINEAR_MIPMAP_LINEAR);
-        mGraphFilePath = mGraphFilePathToLoad;
-        mGraphFilePathToLoad = "";
-      }
-    }
-    mGraphTextureLock.unlock();
-  }
   g.depthTesting(true);
   g.quad(mGraphTexture, -1.2f, 0.9f, 2.4f, -1.8f);
   // Draw label

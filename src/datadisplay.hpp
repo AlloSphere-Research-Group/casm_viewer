@@ -425,10 +425,10 @@ class DataDisplay : public DataDisplayParameters {
 
   void drawGraph(Graphics &g);
 
-  void loadGraphTexture(std::string graphFilePath) {
-    std::unique_lock<std::mutex> lk(mGraphTextureLock);
-    mGraphFilePathToLoad = graphFilePath;
-  }
+  //  void loadGraphTexture(std::string graphFilePath) {
+  //    std::unique_lock<std::mutex> lk(mGraphTextureLock);
+  //    mGraphFilePathToLoad = graphFilePath;
+  //  }
 
   void updateParameterText() {
     mParamText = "";
@@ -502,10 +502,10 @@ class DataDisplay : public DataDisplayParameters {
   VAOMesh mGridMesh;
 
   // Graph
-  std::mutex mGraphTextureLock;
+  //  std::mutex mGraphTextureLock;
   Texture mGraphTexture;
-  std::string mGraphFilePathToLoad;
-  std::string mGraphFilePath;
+  //  std::string mGraphFilePathToLoad;
+  //  std::string mGraphFilePath;
 
   Font mLabelFont;
 

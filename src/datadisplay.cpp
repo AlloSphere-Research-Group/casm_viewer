@@ -555,6 +555,47 @@ void DataDisplay::dumpImages(string dumpPrefix) {
     }
   }
   allPositionsFile.close();
+
+  auto between_planes = [&](Vec3f &point, Vec3f &plane_point,
+                            Vec3f &plane_normal, float &second_plane_distance) {
+    Vec3f difference = point - plane_point;
+    float proj = plane_normal.dot(difference);
+    if (proj >= 0 && proj <= second_plane_distance) {
+      return true;
+    } else {
+      return false;
+    }
+  };
+
+  auto plane_point = mSlicingPlanePoint.get();
+  auto plane_normal = mSlicingPlaneNormal.get().normalized();
+  auto second_plane_distance = mSlicingPlaneThickness.get();
+  auto slicePositions = *mDatasetManager.positionBuffers.get(false);
+  File slicePositionsFile(
+      File::conformPathToOS(dumpDirectory + "/" + dumpPrefix +
+                            "_slice_positions.csv"),
+      "w", true);
+  std::string slicePositionsHeader = "element,x,y,z\n";
+  slicePositionsFile.write(slicePositionsHeader);
+
+  auto selectedElements = mShowAtoms.getSelectedElements();
+  for (auto atom : selectedElements) {
+    for (size_t i = 0; i < slicePositions[atom].size(); i += 4) {
+      auto x = slicePositions[atom][i];
+      auto y = slicePositions[atom][i + 1];
+      auto z = slicePositions[atom][i + 2];
+      Vec3f pos(x, y, z);
+      if (between_planes(pos, plane_point, plane_normal,
+                         second_plane_distance)) {
+        std::string line = atom + ",";
+        line += std::to_string(x) + ",";
+        line += std::to_string(y) + ",";
+        line += std::to_string(z) + "\n";
+        slicePositionsFile.write(line);
+      }
+    }
+  }
+  slicePositionsFile.close();
 }
 
 void DataDisplay::updateDisplayBuffers() {
@@ -689,7 +730,8 @@ void DataDisplay::updateDisplayBuffers() {
     }
     for (auto atomProps : atomPropertiesProj) {
       colors.push_back(atomProps.color);
-      mAtomData.push_back({elementCounts[atomProps.name], atomProps.drawScale});
+      mAtomData.push_back(
+          {elementCounts[atomProps.name], atomProps.drawScale, atomProps.name});
     }
     float hue = 0.0f;
 

@@ -596,6 +596,32 @@ void DataDisplay::dumpImages(string dumpPrefix) {
     }
   }
   slicePositionsFile.close();
+
+  json metadata;
+  metadata["dataset"]["path"] = mDatasetManager.currentDataset();
+  metadata["dataset"]["subdir"] = mDatasetManager.getSubDir();
+  metadata["dataset"]["rootpath"] = mDatasetManager.buildRootPath();
+  std::string condition = std::to_string(
+      mDatasetManager.mParameterSpaces[mDatasetManager.mConditionsParameter]
+          ->getCurrentIndex());
+  metadata["dataset"]["condition"] = condition;
+  for (auto space : mDatasetManager.mParameterSpaces) {
+    if (space.second && space.second->size() > 0) {
+      metadata["parameters"][space.first] = space.second->getAllCurrentIds()[0];
+    }
+  }
+
+  metadata["SlicingPlanePoint"] = {mSlicingPlanePoint.get().x,
+                                   mSlicingPlanePoint.get().y,
+                                   mSlicingPlanePoint.get().z};
+  metadata["SliceNormal"] = {mSlicingPlaneNormal.get().x,
+                             mSlicingPlaneNormal.get().y,
+                             mSlicingPlaneNormal.get().z};
+
+  metadata["SliceThickness"] = mSlicingPlaneThickness.get();
+  std::ofstream metadatafile(dumpDirectory + "/" + dumpPrefix +
+                             "_metadata.json");
+  metadatafile << std::setw(4) << metadata;
 }
 
 void DataDisplay::updateDisplayBuffers() {

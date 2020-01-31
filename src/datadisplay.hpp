@@ -201,7 +201,7 @@ class AtomProperties {
   string name;
   float drawScale;
   Color color;
-  Graphics::PolygonMode polygonMode{Graphics::FILL};
+  //  gl::PolygonMode polygonMode{Mesh::FILL};
 };
 
 struct ElementData {
@@ -407,7 +407,7 @@ class DataDisplay : public DataDisplayParameters {
   void drawHistory(Graphics &g) {
     g.pushMatrix();
     g.meshColor();
-    g.polygonMode(Graphics::FILL);
+    gl::polygonFill();
     if (mIndividualTrajectory.get() != 0.0f) {
       g.draw(mHistoryMesh);
     }

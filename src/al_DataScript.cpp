@@ -1,24 +1,24 @@
 
-#include <utility> // For pair
-#include <thread>
+#include <array>
 #include <atomic>
-#include <mutex>
-#include <iostream>
-#include <fstream>
 #include <cstdio>
 #include <ctime>
-#include <iomanip> // setprecision
-#include <array>
+#include <fstream>
+#include <iomanip>  // setprecision
+#include <iostream>
+#include <mutex>
+#include <thread>
+#include <utility>  // For pair
 
 #include "al_DataScript.hpp"
 
 #if defined(AL_OSX) || defined(AL_LINUX) || defined(AL_EMSCRIPTEN)
-#include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/types.h>
 #include <unistd.h>
 #elif defined(AL_WINDOWS)
 #include <Windows.h>
-#include <direct.h> // for _chdir() and _getcwd()
+#include <direct.h>  // for _chdir() and _getcwd()
 #define chdir _chdir
 #define getcwd _getcwd
 
@@ -31,7 +31,8 @@ using namespace al;
 
 constexpr auto DATASCRIPT_META_FORMAT_VERSION = 0;
 
-PushDirectory::PushDirectory(std::string directory, bool verbose) : mVerbose(verbose) {
+PushDirectory::PushDirectory(std::string directory, bool verbose)
+    : mVerbose(verbose) {
   mDirectoryLock.lock();
   getcwd(previousDirectory, 512);
   chdir(directory.c_str());
@@ -43,19 +44,20 @@ PushDirectory::PushDirectory(std::string directory, bool verbose) : mVerbose(ver
 PushDirectory::~PushDirectory() {
   chdir(previousDirectory);
   if (mVerbose) {
-    std::cout << "Setting directory back to: " << previousDirectory << std::endl;
+    std::cout << "Setting directory back to: " << previousDirectory
+              << std::endl;
   }
   mDirectoryLock.unlock();
 }
 
-
 // --------------------------------------------------
 
-
 std::string DataScript::scriptFile(bool fullPath) {
-  std::string scriptName = mScriptName; // Set to this by default. Will be overriden if a flag has been set for FLAG_SCRIPT
+  std::string scriptName =
+      mScriptName;  // Set to this by default. Will be overriden if a flag has
+                    // been set for FLAG_SCRIPT
   std::string scriptPath = mRunningDirectory;
-  for (auto &flag: mFlags) {
+  for (auto &flag : mFlags) {
     if (flag.type == FLAG_SCRIPT && scriptName == "") {
       scriptName = flag.flagText;
     } else if (flag.type == FLAG_INPUT_DIR && scriptPath == "" && fullPath) {
@@ -71,7 +73,7 @@ std::string DataScript::scriptFile(bool fullPath) {
 std::string DataScript::inputFile(bool fullPath, int index) {
   std::string inputName;
   std::string inputPath;
-  for (auto &flag: mFlags) {
+  for (auto &flag : mFlags) {
     if (flag.type == FLAG_INPUT_NAME) {
       if (index == 0) {
         inputName = flag.flagText;
@@ -101,7 +103,7 @@ std::string DataScript::outputFile(bool fullPath, int index) {
 
 void DataScript::configure() {
   bool hasOutputFlag = false;
-  for (auto &flag: mFlags) {
+  for (auto &flag : mFlags) {
     if (flag.type == FLAG_OUTPUT_NAME) {
       hasOutputFlag = true;
       break;
@@ -125,7 +127,8 @@ bool DataScript::process(bool forceRecompute) {
     }
   } else {
     if (mVerbose) {
-      std::cout << "No need to update cache according to " << metaFilename() << std::endl;
+      std::cout << "No need to update cache according to " << metaFilename()
+                << std::endl;
     }
   }
   if (mDoneCallback) {
@@ -134,10 +137,14 @@ bool DataScript::process(bool forceRecompute) {
   return ok;
 }
 
-bool DataScript::process(std::map<std::string, std::string> options, bool forceRecompute, std::string outputDir, std::string outputName, std::string inputDir, std::string inputName) {
+bool DataScript::process(std::map<std::string, std::string> options,
+                         bool forceRecompute, std::string outputDir,
+                         std::string outputName, std::string inputDir,
+                         std::string inputName) {
   std::unique_lock<std::mutex> lk(mProcessingLock);
   if (mScriptName == "" || mScriptCommand == "") {
-    std::cout << "ERROR: process() missing script name or script command." << std::endl;
+    std::cout << "ERROR: process() missing script name or script command."
+              << std::endl;
     return false;
   }
   // Using the flags structure to store the data
@@ -172,11 +179,12 @@ bool DataScript::process(std::map<std::string, std::string> options, bool forceR
   j["__output_name"] = outputFile(false);
   j["__input_dir"] = inputDir;
   j["__input_name"] = inputFile(false);
-  for (auto &option: options) {
+  for (auto &option : options) {
     j[option.first] = option.second;
   }
 
-  std::string jsonFilename = "_" + sanitizeName(mRunningDirectory) + std::to_string(long(this)) + "_config.json";
+  std::string jsonFilename = "_" + sanitizeName(mRunningDirectory) +
+                             std::to_string(long(this)) + "_config.json";
   if (mVerbose) {
     std::cout << "Writing json: " << jsonFilename << std::endl;
   }
@@ -187,25 +195,27 @@ bool DataScript::process(std::map<std::string, std::string> options, bool forceR
       of << j.dump(4);
       of.close();
       if (!of.good()) {
-        std::cout << "Error writing json file." <<std::endl;
+        std::cout << "Error writing json file." << std::endl;
         return false;
       }
     } else {
-      std::cout << "Error writing json file." <<std::endl;
+      std::cout << "Error writing json file." << std::endl;
       return false;
     }
   }
 
   bool ok = true;
   if (needsRecompute() || forceRecompute) {
-    std::string command = mScriptCommand + " \"" + mScriptName + "\" \"" + jsonFilename + "\"";
+    std::string command =
+        mScriptCommand + " \"" + mScriptName + "\" \"" + jsonFilename + "\"";
     ok = runCommand(command);
     if (ok) {
       writeMeta();
     }
   } else {
     if (mVerbose) {
-      std::cout << "No need to update cache according to " << metaFilename() << std::endl;
+      std::cout << "No need to update cache according to " << metaFilename()
+                << std::endl;
     }
   }
   if (mDoneCallback) {
@@ -222,7 +232,8 @@ std::string DataScript::sanitizeName(std::string output_name) {
   return output_name;
 }
 
-bool DataScript::processAsync(bool noWait, std::function<void (bool)> doneCallback) {
+bool DataScript::processAsync(bool noWait,
+                              std::function<void(bool)> doneCallback) {
   std::lock_guard<std::mutex> lk(mProcessingLock);
   configure();
   if (needsRecompute()) {
@@ -230,7 +241,7 @@ bool DataScript::processAsync(bool noWait, std::function<void (bool)> doneCallba
     while (mNumAsyncProcesses.fetch_add(1) > mMaxAsyncProcesses) {
       mNumAsyncProcesses--;
       if (noWait) {
-        return false; // Async process not started
+        return false;  // Async process not started
       }
       std::unique_lock<std::mutex> lk2(mAsyncDoneTriggerLock);
       std::cout << "Async waiting 2 " << mNumAsyncProcesses << std::endl;
@@ -238,8 +249,7 @@ bool DataScript::processAsync(bool noWait, std::function<void (bool)> doneCallba
       std::cout << "Async done waiting 2 " << mNumAsyncProcesses << std::endl;
     }
     //            std::cout << "Async " << mNumAsyncProcesses << std::endl;
-    mAsyncThreads.emplace_back(
-          std::thread([this, command, doneCallback]() {
+    mAsyncThreads.emplace_back(std::thread([this, command, doneCallback]() {
       bool ok = runCommand(command);
 
       if (doneCallback) {
@@ -247,10 +257,9 @@ bool DataScript::processAsync(bool noWait, std::function<void (bool)> doneCallba
       }
       mNumAsyncProcesses--;
       mAsyncDoneTrigger.notify_all();
-      //                std::cout << "Async runner done" << mNumAsyncProcesses << std::endl;
-    }
-    )
-          );
+      //                std::cout << "Async runner done" << mNumAsyncProcesses
+      //                << std::endl;
+    }));
 
     PushDirectory p(mRunningDirectory, mVerbose);
     writeMeta();
@@ -258,22 +267,25 @@ bool DataScript::processAsync(bool noWait, std::function<void (bool)> doneCallba
     if (doneCallback) {
       doneCallback(true);
     }
-
   }
   return true;
 }
 
-bool DataScript::processAsync(std::map<std::string, std::string> options, bool noWait, std::function<void (bool)> doneCallback) {
+bool DataScript::processAsync(std::map<std::string, std::string> options,
+                              bool noWait,
+                              std::function<void(bool)> doneCallback) {
   std::unique_lock<std::mutex> lk(mProcessingLock);
   configure();
   if (needsRecompute()) {
-    std::string jsonFilename = "_" + sanitizeName(mRunningDirectory) + "_config.json";
-    std::string command = mScriptCommand + " " + mScriptName + " " + jsonFilename + "";
+    std::string jsonFilename =
+        "_" + sanitizeName(mRunningDirectory) + "_config.json";
+    std::string command =
+        mScriptCommand + " " + mScriptName + " " + jsonFilename + "";
     lk.unlock();
     while (mNumAsyncProcesses.fetch_add(1) > mMaxAsyncProcesses) {
       mNumAsyncProcesses--;
       if (noWait) {
-        return false; // Async process not started
+        return false;  // Async process not started
       }
       std::unique_lock<std::mutex> lk2(mAsyncDoneTriggerLock);
       std::cout << "Async waiting " << mNumAsyncProcesses << std::endl;
@@ -286,19 +298,20 @@ bool DataScript::processAsync(std::map<std::string, std::string> options, bool n
       std::cout << "Starting asyc thread" << std::endl;
     }
     mAsyncThreads.emplace_back(
-          std::thread([this, options, command, doneCallback]() {
-      bool ok = process(options, true);
+        std::thread([this, options, command, doneCallback]() {
+          bool ok = process(options, true);
 
-      PushDirectory p(mRunningDirectory, mVerbose);
-      writeMeta();
+          PushDirectory p(mRunningDirectory, mVerbose);
+          writeMeta();
 
-      if (doneCallback) {
-        doneCallback(ok);
-      }
-      mNumAsyncProcesses--;
-      mAsyncDoneTrigger.notify_all();
-      //                std::cout << "Async runner done" << mNumAsyncProcesses << std::endl;
-    } ) );
+          if (doneCallback) {
+            doneCallback(ok);
+          }
+          mNumAsyncProcesses--;
+          mAsyncDoneTrigger.notify_all();
+          //                std::cout << "Async runner done" <<
+          //                mNumAsyncProcesses << std::endl;
+        }));
   } else {
     doneCallback(true);
   }
@@ -315,7 +328,7 @@ bool DataScript::runningAsync() {
 
 bool DataScript::waitForAsyncDone() {
   bool ok = true;
-  for (auto &t: mAsyncThreads) {
+  for (auto &t : mAsyncThreads) {
     t.join();
   }
   return ok;
@@ -332,7 +345,7 @@ void DataScript::appendFlag(std::string flagText, al::FlagType type) {
 
 std::string DataScript::makeCommandLine() {
   std::string commandLine = mScriptCommand + " ";
-  for (auto flag: mFlags) {
+  for (auto flag : mFlags) {
     commandLine += flag.flagText + " ";
   }
   return commandLine;
@@ -350,7 +363,6 @@ bool DataScript::runCommand(const std::string &command) {
   if (!pipe) throw std::runtime_error("popen() failed!");
   while (!feof(pipe)) {
     if (fgets(buffer.data(), 128, pipe) != nullptr) {
-
       output += buffer.data();
       if (mVerbose) {
         std::cout << buffer.data() << std::endl;
@@ -359,9 +371,9 @@ bool DataScript::runCommand(const std::string &command) {
   }
 
   int returnValue = 0;
-  //TODO: Put back return value checking. Currently crashing
+  // TODO: Put back return value checking. Currently crashing
   //        int returnValue = -1;
-  if (!ferror(pipe) ) {
+  if (!ferror(pipe)) {
     returnValue = pclose(pipe);
   } else {
     returnValue = -1;
@@ -377,17 +389,19 @@ bool DataScript::runCommand(const std::string &command) {
 void DataScript::writeMeta() {
   std::ofstream metaFileStream;
 
-  metaFileStream.open (metaFilename(), std::ofstream::out);
+  metaFileStream.open(metaFilename(), std::ofstream::out);
 
   metaFileStream << DATASCRIPT_META_FORMAT_VERSION << std::endl;
-  for (auto &flag: mFlags) {
+  for (auto &flag : mFlags) {
     FlagType type = flag.type;
     if (type == FLAG_INPUT_NAME) {
-      metaFileStream << (int) flag.type << std::endl;
-      metaFileStream << std::setprecision(12) << modified(inputFile().c_str()) << std::endl;
+      metaFileStream << (int)flag.type << std::endl;
+      metaFileStream << std::setprecision(12) << modified(inputFile().c_str())
+                     << std::endl;
     } else if (type == FLAG_SCRIPT) {
-      metaFileStream << (int) flag.type << std::endl;
-      metaFileStream << std::setprecision(12) << modified(scriptFile().c_str()) << std::endl;
+      metaFileStream << (int)flag.type << std::endl;
+      metaFileStream << std::setprecision(12) << modified(scriptFile().c_str())
+                     << std::endl;
     }
   }
 
@@ -399,22 +413,22 @@ void DataScript::writeMeta() {
 
 al_sec DataScript::modified(const char *path) const {
   struct stat s;
-  if(::stat(path, &s) == 0){
-    //const auto& t = s.st_mtim;
-    //return t.tv_sec + t.tv_usec/1e9;
+  if (::stat(path, &s) == 0) {
+    // const auto& t = s.st_mtim;
+    // return t.tv_sec + t.tv_usec/1e9;
     return s.st_mtime;
   }
   return 0.;
 }
 
 bool DataScript::needsRecompute() {
-
   std::ifstream metaFileStream;
   metaFileStream.open(metaFilename(), std::ofstream::in);
 
   if (metaFileStream.fail()) {
     if (mVerbose) {
-      std::cout << "Failed to open metadata: Recomputing. " << metaFilename() << std::endl;
+      std::cout << "Failed to open metadata: Recomputing. " << metaFilename()
+                << std::endl;
     }
     return true;
   }
@@ -432,7 +446,7 @@ bool DataScript::needsRecompute() {
     FlagType type;
     int typeInt;
     std::istringstream(line) >> typeInt;
-    type = (FlagType) typeInt;
+    type = (FlagType)typeInt;
     if (type == FLAG_INPUT_NAME) {
       al_sec time;
       std::getline(metaFileStream, line);
@@ -452,7 +466,6 @@ bool DataScript::needsRecompute() {
         return true;
       }
     }
-
   }
   metaFileStream.close();
   if (!File::exists(outputFile())) {
@@ -462,20 +475,22 @@ bool DataScript::needsRecompute() {
 }
 
 std::string DataScript::metaFilename() {
-
   std::string outPath;
   std::string outName;
-  for (auto &flag: mFlags) {
+  for (auto &flag : mFlags) {
     if (flag.type == FLAG_OUTPUT_DIR) {
       outPath = flag.flagText;
-
     }
     if (flag.type == FLAG_OUTPUT_NAME) {
       outName = flag.flagText;
     }
   }
+  if (outName == "") {
+    outName = outputFile(false);
+  }
   if (outPath == "") {
     outPath = outputDirectory();
   }
-  return File::conformPathToOS(outPath) + outName + ".meta";
+  std::string metafilename = File::conformPathToOS(outPath) + outName + ".meta";
+  return metafilename;
 }

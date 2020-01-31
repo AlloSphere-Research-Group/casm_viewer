@@ -82,7 +82,6 @@ void DatasetManager::initRoot() {
   mLoadedDataset = fullDatasetPath;
 
   if (mRunProcessors) {
-
     cacheManager.setOutputDirectory(fullDatasetPath + "/cached_output");
     cacheManager.setRunningDirectory(fullDatasetPath);
 
@@ -220,9 +219,9 @@ void DatasetManager::analyzeDataset() {
     return;
   }
   std::string datasetId = mCurrentDataset.get();
-  ; // mCurrentDataset might be more current than the internal parameter value
-    // as this might be called from the parameter change callback, when the
-    // internal value has not yet been updated
+  ;  // mCurrentDataset might be more current than the internal parameter value
+     // as this might be called from the parameter change callback, when the
+     // internal value has not yet been updated
 
   mDataRanges.clear();
   mAvailableAtomsJson.clear();
@@ -284,7 +283,7 @@ void DatasetManager::analyzeDataset() {
         std::string labelString = label;
         if (labelString == "Va") {
           isVacancy = true;
-          continue; // The next label should be the atom name
+          continue;  // The next label should be the atom name
         }
         mAvailableAtomsJson.push_back(labelString);
         //                  if (mDataRanges.find(labelString) ==
@@ -387,7 +386,6 @@ std::string DatasetManager::getSubDir() {
 }
 
 void DatasetManager::processTemplatePositions() {
-
   //  std::unique_lock<std::mutex> lk(mDataLock);
   auto templatePoscarName = labelProcessor.outputFile();
 
@@ -432,15 +430,19 @@ bool DatasetManager::loadDiff(int timeIndex) {
           std::string label;
           for (auto &positions : mTemplatePositions) {
             if (positions.first !=
-                this_diff_labels[change]) { // Look only for changes
+                this_diff_labels[change]) {  // Look only for changes
               for (int curIndex = 0; curIndex < positions.second.size();
                    curIndex += 4) {
-//                  float distance = (pos - Vec3f(positions.second[curIndex],
-//                                 positions.second[curIndex + 1],
-//                                                positions.second[curIndex + 2])).mag();
+                //                  float distance = (pos -
+                //                  Vec3f(positions.second[curIndex],
+                //                                 positions.second[curIndex +
+                //                                 1],
+                //                                                positions.second[curIndex
+                //                                                + 2])).mag();
                 if ((pos - Vec3f(positions.second[curIndex],
                                  positions.second[curIndex + 1],
-                                   positions.second[curIndex + 2])).mag() < 0.001f ) {
+                                 positions.second[curIndex + 2]))
+                        .mag() < 0.001f) {
                   label = positions.first;
                   index = curIndex;
 
@@ -456,10 +458,11 @@ bool DatasetManager::loadDiff(int timeIndex) {
             }
           }
           if (label == "") {
-              std::cout << "ERROR: Label not found for index " << timeIndex  << " label " << this_diff_labels[change] << std::endl;
+            std::cout << "ERROR: Label not found for index " << timeIndex
+                      << " label " << this_diff_labels[change] << std::endl;
             return false;
           }
-          if (this_diff_labels[change] == "Va") { // Remove atom
+          if (this_diff_labels[change] == "Va") {  // Remove atom
             historyPoint.first = pos;
             //                std::cout << "remove index " << index <<
             //                std::endl;
@@ -471,7 +474,7 @@ bool DatasetManager::loadDiff(int timeIndex) {
             mTemplatePositions[label].erase(
                 mTemplatePositions[label].begin() + index,
                 mTemplatePositions[label].begin() + index + 4);
-          } else { // Add Atom
+          } else {  // Add Atom
             historyPoint.second = pos;
             //                std::cout << "add index " << index << std::endl;
             mTemplatePositions[this_diff_labels[change]].push_back(pos.x);
@@ -492,7 +495,6 @@ bool DatasetManager::loadDiff(int timeIndex) {
     }
     diffLoaded = true;
   } else if (timeIndex > targetIndex) {
-
   }
   return diffLoaded;
 }
@@ -539,10 +541,9 @@ void DatasetManager::loadFromPOSCAR() {
 }
 
 void DatasetManager::getAtomPositions() {
-
   if (mConditionsParameter == "") {
     return;
-  } // FIXME hack to avoid crashes
+  }  // FIXME hack to avoid crashes
   std::unique_lock<std::mutex> lk(mDataLock);
 
   std::string id = getSubDir();
@@ -576,7 +577,6 @@ void DatasetManager::getAtomPositions() {
       std::ifstream f(fullconditionPath + "time_diffs.json");
       std::string str;
       if (!f.fail()) {
-
         f.seekg(0, std::ios::end);
         str.reserve(f.tellg());
         f.seekg(0, std::ios::beg);
@@ -602,7 +602,6 @@ void DatasetManager::getAtomPositions() {
 
     bool diffLoaded = loadDiff(timeIndex);
     if (diffLoaded) {
-
       auto positions = positionBuffers.getWritable();
       *positions = mTemplatePositions;
 
@@ -610,8 +609,8 @@ void DatasetManager::getAtomPositions() {
     } else {
       loadFromPOSCAR();
     }
-  } else { // Generate POSCAR file from template if no time space and no cached
-           // diffs
+  } else {  // Generate POSCAR file from template if no time space and no cached
+            // diffs
     loadFromPOSCAR();
   }
 }
@@ -639,7 +638,6 @@ void DatasetManager::generateGraph(std::string xData, std::string yData,
 
       if (resultsJson.find(yData) != resultsJson.end()) {
         try {
-
           datay.reserve(resultsJson[yData].size());
           datay.insert(datay.begin(), resultsJson[yData].begin(),
                        resultsJson[yData].end());
@@ -711,6 +709,7 @@ void DatasetManager::generateGraph(std::string xData, std::string yData,
           graphGenerator.configuration(), true, [this](bool runOk) {
             if (runOk && graphProcessing && mRunProcessors) {
               currentGraphName.set(graphGenerator.outputFile());
+              std::cout << graphGenerator.outputFile() << std::endl;
               graphProcessing = false;
             }
           });
@@ -738,7 +737,6 @@ DatasetManager::SpeciesLabelMap DatasetManager::getAvailableSpecies() {
 std::string DatasetManager::findJsonFile(std::string datasetId,
                                          std::string subDir,
                                          std::string fileName) {
-
   std::vector<std::string> paths = {
       buildRootPath() + "/" + datasetId + "/" + subDir + "/",
       buildRootPath() + "/" + datasetId + "/", buildRootPath() + "/"};

@@ -177,6 +177,10 @@ class MyApp : public DistributedAppWithState<State> {
     // disable nav control mouse drag to look
     navControl().useMouse(false);
 
+    fps(60);
+    title("Casm Viewer");
+    dimensions(1200, 800);
+
     // Create and configure displays
     int numDisplays = 2;  // 2 is a good number. Usually need one, but some
                           // times need to compare 2
@@ -681,8 +685,7 @@ class MyApp : public DistributedAppWithState<State> {
     g.popMatrix();
 
     // draw controller rays
-    g.blendOn();
-    g.blendModeTrans();
+    gl::blendTrans();
     auto r1 = openVRDomain->mOpenVR.RightController.ray();
     //    auto r2 = mOpenVR.LeftController.ray();
     Mesh rays;
@@ -1641,9 +1644,6 @@ class MyApp : public DistributedAppWithState<State> {
 
 int main() {
   std::unique_ptr<MyApp> app = std::make_unique<MyApp>();
-  app->fps(60);
-  app->title("Casm Viewer");
-  app->dimensions(1200, 800);
   //  app->stereo(true);
   //  app->displayMode(app->displayMode() | Window::STEREO_BUF);
   //  app.print();

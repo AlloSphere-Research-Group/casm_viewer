@@ -128,6 +128,7 @@ void DataDisplay::init() {
                   << parameterSpace.second->idAt(
                          parameterSpace.second->getIndexForValue(value));
         mDatasetManager.getAtomPositions();
+        updateText();
       }
     });
   }
@@ -339,6 +340,48 @@ void DataDisplay::initRootDirectory() {
 
   mPlotXAxis.setElements(parameterSpaceNames);
   mPlotYAxis.set(0);
+
+  updateText();
+}
+
+void DataDisplay::updateText() {
+  // Meta data texts
+  metaText = "Global Root: " + mDatasetManager.mGlobalRoot + "\n";
+
+  metaText += "Root: " + mDatasetManager.mRootPath.get() + "\n";
+  metaText += "Dataset: " + mDatasetManager.mCurrentDataset.get() + "\n";
+
+  metaText += " ----- Parameters -----\n";
+  for (auto param : mDatasetManager.mParameterSpaces) {
+    if (param.second->size() > 0) {
+      metaText += param.first + " : " + param.second->getCurrentId() + "\n";
+    }
+  }
+  metaText += " ----- Data -----\n";
+  for (auto compData : mDatasetManager.getCurrentCompositions()) {
+    metaText += compData.first + " = " + std::to_string(compData.second) + "\n";
+  }
+
+  // Parameter text
+  auto subDir = mDatasetManager.getSubDir();
+  auto temperatureId =
+      mDatasetManager.mParameterSpaces["temperature"]->getCurrentId();
+  std::string timeId;
+  if (mDatasetManager.mParameterSpaces["time"]->size() > 0) {
+    timeId = mDatasetManager.mParameterSpaces["time"]->getCurrentId();
+  }
+  if (subDir.size() > 0) {
+    mParamText = subDir;
+  }
+  if (temperatureId.size() > 0) {
+    mParamText += " temp:" + temperatureId + " ";
+  }
+  if (timeId.size() > 0) {
+    mParamText += " time:" + timeId;
+  }
+  if (mParamText.size() == 0) {
+    mParamText = "Dataset unavailable";
+  }
 }
 
 void DataDisplay::prepare(Graphics &g, Matrix4f &transformMatrix) {

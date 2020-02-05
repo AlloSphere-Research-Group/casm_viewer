@@ -282,6 +282,8 @@ class DataDisplay : public DataDisplayParameters {
 
   std::map<std::string, ElementData> elementData;
 
+  std::string metaText;
+
   DatasetManager mDatasetManager;
 
   bool mRunComputation{true};
@@ -309,6 +311,7 @@ class DataDisplay : public DataDisplayParameters {
 
   void initRootDirectory();
 
+  void updateText();
   // Prepare elements before draw call
   void prepare(Graphics &g, Matrix4f &transformMatrix);
 
@@ -427,29 +430,9 @@ class DataDisplay : public DataDisplayParameters {
   void drawGraph(Graphics &g);
 
   void updateParameterText() {
-    mParamText = "";
     if (mNeedsProcessing.load()) {
       mParamText = "Processing ...";
     } else {
-      auto subDir = mDatasetManager.getSubDir();
-      auto temperatureId =
-          mDatasetManager.mParameterSpaces["temperature"]->getCurrentId();
-      std::string timeId;
-      if (mDatasetManager.mParameterSpaces["time"]->size() > 0) {
-        timeId = mDatasetManager.mParameterSpaces["time"]->getCurrentId();
-      }
-      if (subDir.size() > 0) {
-        mParamText = subDir;
-      }
-      if (temperatureId.size() > 0) {
-        mParamText += " temp:" + temperatureId + " ";
-      }
-      if (timeId.size() > 0) {
-        mParamText += " time:" + timeId;
-      }
-      if (mParamText.size() == 0) {
-        mParamText = "Dataset unavailable";
-      }
     }
   }
 

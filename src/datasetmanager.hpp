@@ -162,11 +162,19 @@ class DatasetManager {
         std::string key = it.key();
         //                // Look for available comp_n atom names
         if (key.compare(0, comp_prefix.size(), comp_prefix) == 0) {
-          ;
-          compositions.push_back(
-              {key, it.value()[mParameterSpaces[mConditionsParameter]
-                                   ->getCurrentIndex()]
-                        .get<float>()});
+          if (mConditionsParameter != "") {
+            auto index =
+                mParameterSpaces[mConditionsParameter]->getCurrentIndex();
+            if (it.value().size() > index) {
+              compositions.push_back({key, it.value()[index].get<float>()});
+            } else {
+              std::cerr
+                  << "Warning: conditions parameter index out of range in "
+                     "json results"
+                  << std::endl;
+            }
+          } else {
+          }
         }
       }
     }

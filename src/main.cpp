@@ -813,6 +813,35 @@ class MyApp : public DistributedAppWithState<State> {
       ParameterGUI::drawTrigger(&mSaveGraphics);
       ImGui::SameLine();
       ParameterGUI::drawParameterMeta(&ResetSlicing);
+      std::string metaText =
+          "Global Root: " +
+          dataDisplays[vdvBundle.currentBundle()]->mDatasetManager.mGlobalRoot +
+          "\n";
+
+      metaText += "Root: " +
+                  dataDisplays[vdvBundle.currentBundle()]
+                      ->mDatasetManager.mRootPath.get() +
+                  "\n";
+      metaText += "Dataset: " +
+                  dataDisplays[vdvBundle.currentBundle()]
+                      ->mDatasetManager.mCurrentDataset.get() +
+                  "\n";
+
+      metaText += " ----- Parameters -----\n";
+      for (auto param : dataDisplays[vdvBundle.currentBundle()]
+                            ->mDatasetManager.mParameterSpaces) {
+        if (param.second->size() > 0) {
+          metaText += param.first + " : " + param.second->getCurrentId() + "\n";
+        }
+      }
+      metaText += " ----- Data -----\n";
+      for (auto compData : dataDisplays[vdvBundle.currentBundle()]
+                               ->mDatasetManager.getCurrentCompositions()) {
+        metaText +=
+            compData.first + " = " + std::to_string(compData.second) + "\n";
+      }
+
+      ImGui::Text("%s", metaText.c_str());
 
       if (ImGui::CollapsingHeader("Slicing")) {
         ImGui::Indent(20.0);

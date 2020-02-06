@@ -7,11 +7,10 @@
 #undef DELETE
 #endif
 
-#include "datadisplay.hpp"
-
-#include "imgui.h"
-
 #include <condition_variable>
+
+#include "datadisplay.hpp"
+#include "imgui.h"
 
 void DataDisplay::init() {
 #ifdef AL_BUILD_MPI
@@ -353,8 +352,11 @@ void DataDisplay::updateText() {
 
   metaText += " ----- Parameters -----\n";
   for (auto param : mDatasetManager.mParameterSpaces) {
-    if (param.second->size() > 0) {
+    if (param.second->size() > 2) {
       metaText += param.first + " : " + param.second->getCurrentId() + "\n";
+    } else if (param.second->size() == 1) {
+      metaText += param.first + " : " +
+                  std::to_string(param.second->getCurrentValue()) + "\n";
     }
   }
   metaText += " ----- Data -----\n";

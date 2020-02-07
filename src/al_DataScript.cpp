@@ -31,6 +31,8 @@ using namespace al;
 
 constexpr auto DATASCRIPT_META_FORMAT_VERSION = 0;
 
+std::mutex PushDirectory::mDirectoryLock;
+
 PushDirectory::PushDirectory(std::string directory, bool verbose)
     : mVerbose(verbose) {
   mDirectoryLock.lock();

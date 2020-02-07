@@ -350,17 +350,31 @@ void DataDisplay::updateText() {
 
   metaText += "Root: " + mDatasetManager.mRootPath.get() + "\n";
   metaText += "Dataset: " + mDatasetManager.mCurrentDataset.get() + "\n";
+  metaText += "Subdir: " + mDatasetManager.getSubDir() + "\n";
+  metaText +=
+      "Condition Param: " + mDatasetManager.mConditionsParameter +
+      " condition: " +
+      std::to_string(mDatasetManager
+                         .mParameterSpaces[mDatasetManager.mConditionsParameter]
+                         ->getCurrentIndex()) +
+      "\n";
 
   metaText += " ----- Parameters -----\n";
   for (auto param : mDatasetManager.mParameterSpaces) {
-    if (param.second->size() > 0) {
+    if (param.second->size() > 1) {
       metaText += param.first + " : " + param.second->getCurrentId() + "\n";
+    } else if (param.second->size() == 1) {
+      // For spaces with a single value, the id will be ./ so show the value
+      metaText += param.first + " : " +
+                  std::to_string(param.second->getCurrentValue()) + "\n";
     }
   }
   metaText += " ----- Data -----\n";
   for (auto compData : mDatasetManager.getCurrentCompositions()) {
     metaText += compData.first + " = " + std::to_string(compData.second) + "\n";
   }
+  metaText += "Current POSCAR :";
+  metaText += mDatasetManager.labelProcessor.outputFile();
 
   // Parameter text
   auto subDir = mDatasetManager.getSubDir();

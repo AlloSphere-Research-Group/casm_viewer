@@ -18,10 +18,10 @@ namespace al {
 
 enum FlagType {
   FLAG_GENERIC = 0,
-  FLAG_SCRIPT, // The script to be run
+  FLAG_SCRIPT,  // The script to be run
   FLAG_INPUT_DIR,
-  FLAG_INPUT_NAME, // Should be relative to input dir. If file has changed, this
-                   // forces recompute
+  FLAG_INPUT_NAME,  // Should be relative to input dir. If file has changed,
+                    // this forces recompute
   FLAG_OUTPUT_DIR,
   FLAG_OUTPUT_NAME
 };
@@ -31,24 +31,23 @@ struct Flag {
   FlagType type{FLAG_GENERIC};
 };
 
-static std::mutex mDirectoryLock; // Protects all instances of PushDirectory
-
 class PushDirectory {
-public:
+ public:
   PushDirectory(std::string directory, bool verbose = false);
 
   ~PushDirectory();
 
-private:
+ private:
   char previousDirectory[512];
   bool mVerbose;
+
+  static std::mutex mDirectoryLock;  // Protects all instances of PushDirectory
 };
 
 class Processor {
-public:
+ public:
   /**
    * @brief Set the directory for output files
-   * @param outputDirectory
    */
   void setOutputDirectory(std::string outputDirectory) {
     mOutputDirectory = File::conformPathToOS(outputDirectory);
@@ -63,7 +62,6 @@ public:
 
   /**
    * @brief Set the current directory for process to run in.
-   * @param directory
    */
   void setRunningDirectory(std::string directory) {
     mRunningDirectory = File::conformPathToOS(directory);
@@ -78,12 +76,11 @@ public:
 
   /**
    * @brief Set the names of output file
-   * @param list of output file names.
+   * @param outputFiles list of output file names.
    */
   void setOutputFileNames(std::vector<std::string> outputFiles) {
     mOutputFileNames.clear();
     for (auto fileName : outputFiles) {
-
       auto name = File::conformPathToOS(fileName);
       std::replace(mOutputDirectory.begin(), mOutputDirectory.end(), '\\', '/');
       // FIXME this is not being used everywhere it should be....
@@ -91,7 +88,7 @@ public:
     }
   }
 
-protected:
+ protected:
   std::string mRunningDirectory;
   std::string mOutputDirectory{"cached_output/"};
   std::vector<std::string> mOutputFileNames;
@@ -155,7 +152,7 @@ protected:
  * This provides the greatest flexibility and extensibility.
  */
 class DataScript : public Processor {
-public:
+ public:
   DataScript(std::string outputDirectory = "cached_output/") {
     setOutputDirectory(outputDirectory);
   }
@@ -274,13 +271,13 @@ public:
     return *this;
   }
 
-protected:
+ protected:
   // These need to be accessible by the subclass
   std::vector<Flag> mFlags;
   std::vector<Parameter *> mParameters;
   ParameterServer *mParamServer;
 
-private:
+ private:
   std::string mScriptCommand{"/usr/bin/python3"};
   std::string mScriptName;
 
@@ -309,7 +306,7 @@ private:
 };
 
 class CacheManager {
-public:
+ public:
   void registerProcessor(Processor &processor) {
     mProcessors.push_back(&processor);
   }
@@ -331,12 +328,12 @@ public:
     // TODO implement clear cache
   }
 
-private:
+ private:
   std::vector<Processor *> mProcessors;
 };
 
 class ParallelProcessor : public DataScript {
-public:
+ public:
   // TODO is this worth finishing?
 
   void processSpace(const std::vector<std::vector<std::string>> &allVecs,
@@ -382,16 +379,16 @@ public:
 
   void stop() {}
 
-private:
+ private:
   std::shared_ptr<std::thread> mParallelProcess;
   std::atomic<bool> mRunning;
 };
 
-} // namespace al
+}  // namespace al
 
 #ifdef AL_WINDOWS
 #undef popen
 #undef pclose
 #endif
 
-#endif // INCLUDE_AL_DATASCRIPT
+#endif  // INCLUDE_AL_DATASCRIPT

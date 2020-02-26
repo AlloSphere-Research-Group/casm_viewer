@@ -171,6 +171,35 @@ void DatasetManager::initRoot() {
       mConditionsParameter = "temperature";
     }
 
+    std::string resultsFile =
+        File::conformPathToOS(buildRootPath() +
+                              File::conformPathToOS(mCurrentDataset.get())) +
+        "/" + File::conformPathToOS(getSubDir()) + "results.json";
+    std::ifstream results(resultsFile);
+    results.seekg(0, std::ios::end);
+    str.reserve(results.tellg());
+    results.seekg(0, std::ios::beg);
+
+    str.assign((std::istreambuf_iterator<char>(results)),
+               std::istreambuf_iterator<char>());
+    json resultsJson = json::parse(str);
+
+    std::string conditionInJson = mConditionsParameter;
+    for (auto mapEntry : parameterNameMap) {
+      if (mapEntry.second == mConditionsParameter) {
+        conditionInJson = mapEntry.first;
+        break;
+      }
+    }
+
+    auto conditionValues = resultsJson[conditionInJson];
+    if (conditionValues.is_array()) {
+      mParameterSpaces[mConditionsParameter]->clear();
+      for (auto value : conditionValues) {
+        mParameterSpaces[mConditionsParameter]->push_back(value.get<float>());
+      }
+    }
+
     for (json::iterator it = j["internal_states"].begin();
          it != j["internal_states"].end(); ++it) {
       std::string key = it.key();

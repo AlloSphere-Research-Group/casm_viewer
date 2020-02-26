@@ -46,23 +46,12 @@ void DataDisplay::init() {
                                     Quatf().fromEuler(-d * M_DEG2RAD, 0, 0));
   });
 
-  mMarkerScale = 0.01f;
-
   // Initialization of graphics objects
   // #INSTANCED_RENDERING: init
-  {
-    addSphere(instancing_mesh0.mesh, 1, 12, 6);
-    instancing_mesh0.mesh.update();
-    instancing_mesh0.init(instancing_vert, instancing_frag,
-                          1,          // location
-                          4,          // num elements
-                          GL_FLOAT);  // type
-
-    instancing_shader.compile(instancing_vert, instancing_frag);
-
-    addSphere(orthoMesh0);
-    orthoMesh0.update();
-  }
+  //  {
+  //    addSphere(orthoMesh0);
+  //    orthoMesh0.update();
+  //  }
 
   EasyFBOSetting setting;
   setting.mUseMipmap = true;
@@ -150,37 +139,15 @@ void DataDisplay::init() {
     }
   });
 
-  mSliceRotationPitch.registerChangeCallback([this](float value) {
-    mSlicingPlaneNormal.setNoCalls(Vec3f(sin(mSliceRotationRoll),
-                                         cos(mSliceRotationRoll) * sin(value),
-                                         cos(value))
-                                       .normalize());
-  });
-
-  mSliceRotationRoll.registerChangeCallback([this](float value) {
-    mSlicingPlaneNormal.setNoCalls(Vec3f(sin(value),
-                                         cos(value) * sin(mSliceRotationPitch),
-                                         cos(mSliceRotationPitch))
-                                       .normalize());
-  });
-
-  mSlicingPlaneNormal.registerChangeCallback([this](Vec3f value) {
-    value = value.normalized();
-    float pitch = std::atan(value.y / value.z);
-    float roll = std::atan(value.x / value.z);
-    mSliceRotationPitch.setNoCalls(pitch);
-    mSliceRotationRoll.setNoCalls(roll);
-  });
-
-  slicePickable.pose.registerChangeCallback([this](Pose pose) {
-    mSlicingPlanePoint.setNoCalls(pose.pos());
-    // mSlicingPlaneNormal.setNoCalls();
-  });
-
-  mSlicingPlaneThickness.registerChangeCallback([this](float v) {
+  vasprender.mSlicingPlaneThickness.registerChangeCallback([this](float v) {
     auto m = slicePickable.bb.max;
     m.z = v;
     slicePickable.bb.set(slicePickable.bb.min, m);
+  });
+
+  slicePickable.pose.registerChangeCallback([this](Pose pose) {
+    vasprender.mSlicingPlanePoint.setNoCalls(pose.pos());
+    // mSlicingPlaneNormal.setNoCalls();
   });
 
   backgroundColor.setHint("showAlpha", 1.0);
@@ -257,22 +224,23 @@ void DataDisplay::init() {
   bundle << mDatasetManager.mParameterSpaces["chempotA"]->parameter()
          << mDatasetManager.mParameterSpaces["chempotB"]->parameter();
   bundle << mDatasetManager.mParameterSpaces["time"]->parameter();
-  bundle << mAtomMarkerSize;
+  bundle << vasprender.mAtomMarkerSize;
 
   bundle << mShowAtoms;
   bundle << mPlotXAxis;
   bundle << mPlotYAxis;
   bundle << mShowGraph << mShowParallel << mShowPerspective;
 
-  bundle << mLayerSeparation;
   bundle << mPerspectiveRotY;
-  bundle << mSlicingPlaneNormal;
-  bundle << mSliceRotationPitch << mSliceRotationRoll;
-  bundle << mSlicingPlanePoint << mSlicingPlaneThickness << mLayerScaling;
+  bundle << vasprender.mLayerSeparation;
+  bundle << vasprender.mSlicingPlaneNormal;
+  bundle << vasprender.mSliceRotationPitch << vasprender.mSliceRotationRoll;
+  bundle << vasprender.mSlicingPlanePoint << vasprender.mSlicingPlaneThickness
+         << mLayerScaling;
   bundle << mShowGrid << mGridType << mGridSpacing << mGridXOffset
          << mGridYOffset;
 
-  bundle << mShowRadius;
+  bundle << vasprender.mShowRadius;
   bundle << mCumulativeTrajectory << mIndividualTrajectory;
   bundle << mBillboarding;
   bundle << mSmallLabel;
@@ -481,8 +449,9 @@ void DataDisplay::prepare(Graphics &g, Matrix4f &transformMatrix) {
                                 c.b);
     c.a = 0.8f;
     unsigned int previousSize = mTrajectoryMesh.vertices().size();
-    if (thisMovement.mag() > fabs(mDataBoundaries.maxx - mDataBoundaries.minx) /
-                                 2.0f) {  // Atom is wrapping around
+    if (thisMovement.mag() >
+        fabs(mDataBoundaries.max.x - mDataBoundaries.min.x) /
+            2.0f) {  // Atom is wrapping around
       //              c = Color(0.8f, 0.8f, 0.8f, 1.0f);
       thisMovement = -thisMovement;
       thisMovement.normalize(previousMag);
@@ -623,9 +592,9 @@ void DataDisplay::dumpImages(string dumpPrefix) {
     }
   };
 
-  auto plane_point = mSlicingPlanePoint.get();
-  auto plane_normal = mSlicingPlaneNormal.get().normalized();
-  auto second_plane_distance = mSlicingPlaneThickness.get();
+  auto plane_point = vasprender.mSlicingPlanePoint.get();
+  auto plane_normal = vasprender.mSlicingPlaneNormal.get().normalized();
+  auto second_plane_distance = vasprender.mSlicingPlaneThickness.get();
   auto slicePositions = *mDatasetManager.positionBuffers.get(false);
   File slicePositionsFile(
       File::conformPathToOS(dumpDirectory + "/" + dumpPrefix +
@@ -667,14 +636,10 @@ void DataDisplay::dumpImages(string dumpPrefix) {
     }
   }
 
-  metadata["SlicingPlanePoint"] = {mSlicingPlanePoint.get().x,
-                                   mSlicingPlanePoint.get().y,
-                                   mSlicingPlanePoint.get().z};
-  metadata["SliceNormal"] = {mSlicingPlaneNormal.get().x,
-                             mSlicingPlaneNormal.get().y,
-                             mSlicingPlaneNormal.get().z};
+  metadata["SlicingPlanePoint"] = {plane_point.x, plane_point.y, plane_point.z};
+  metadata["SliceNormal"] = {plane_normal.x, plane_normal.y, plane_normal.z};
 
-  metadata["SliceThickness"] = mSlicingPlaneThickness.get();
+  metadata["SliceThickness"] = vasprender.mSlicingPlaneThickness.get();
   std::ofstream metadatafile(dumpDirectory + "/" + dumpPrefix +
                              "_metadata.json");
   metadatafile << std::setw(4) << metadata;
@@ -710,7 +675,7 @@ void DataDisplay::updateDisplayBuffers() {
       totalSize += elems->size();
     }
 
-    mDataBoundaries.reset();
+    mDataBoundaries.resetInv();
     mAligned4fData.resize(totalSize * 4);
     auto outit = mAligned4fData.begin();
     // now fill the
@@ -727,25 +692,18 @@ void DataDisplay::updateDisplayBuffers() {
         *outit++ = y;
         *outit++ = z;
         *outit++ = w;
-        mDataBoundaries.addPoint(vec);
+        mDataBoundaries.includePoint(vec);
       }
     }
 
     if (mAligned4fData.size() > 0) {
       auto &b = mDataBoundaries;
-      perspectivePickable.bb.set(Vec3f(b.minx, b.miny, b.minz),
-                                 Vec3f(b.maxx, b.maxy, b.maxz));
-      slicePickable.bb.set(Vec3f(b.minx, b.miny, b.minz),
-                           Vec3f(b.maxx, b.maxy, (b.maxz - b.minz) * 0.5f));
+      perspectivePickable.bb.set(Vec3f(b.min.x, b.min.y, b.min.z),
+                                 Vec3f(b.max.x, b.max.y, b.max.z));
+      slicePickable.bb.set(Vec3f(b.min.x, b.min.y, b.min.z),
+                           Vec3f(b.max.x, b.max.y, (b.max.z - b.min.z) * 0.5f));
       // rh.pose.pos().set(perspectivePickable.bb.cen);
-      mSlicingPlanePoint.setHint("maxx", b.maxx);
-      mSlicingPlanePoint.setHint("minx", b.minx - (b.maxx));
-      mSlicingPlanePoint.setHint("maxy", b.maxy);
-      mSlicingPlanePoint.setHint("miny", b.miny - (b.maxy));
-      mSlicingPlanePoint.setHint("maxz", b.maxz);
-      mSlicingPlanePoint.setHint("minz", b.minz - (b.maxz));
-      mSlicingPlaneThickness.min(0.0);
-      mSlicingPlaneThickness.max(mDataBoundaries.maxz - mDataBoundaries.minz);
+      vasprender.setDataBoundaries(b);
     }
 
     // Set active atoms and colors
@@ -860,10 +818,10 @@ void DataDisplay::prepareParallelProjection(Graphics &g,
 
   float ar = float(fbo_iso.width()) / fbo_iso.height();
   //        float rangeSizeZ = mDataBoundaries.maxz - mDataBoundaries.minz;
-  float centerX = (mDataBoundaries.maxx + mDataBoundaries.minx) / 2.0f;
-  float centerY = (mDataBoundaries.maxy + mDataBoundaries.miny) / 2.0f;
-  float rangeSizeX = mDataBoundaries.maxx - mDataBoundaries.minx;
-  float rangeSizeY = mDataBoundaries.maxy - mDataBoundaries.miny;
+  float centerX = (mDataBoundaries.max.x + mDataBoundaries.min.x) / 2.0f;
+  float centerY = (mDataBoundaries.max.y + mDataBoundaries.min.y) / 2.0f;
+  float rangeSizeX = mDataBoundaries.max.x - mDataBoundaries.min.x;
+  float rangeSizeY = mDataBoundaries.max.y - mDataBoundaries.min.y;
   float maxrange = std::max(rangeSizeX, rangeSizeY);
   float padding = maxrange * 0.05f;
   float left = centerX - 0.5f * maxrange * mLayerScaling - padding;
@@ -875,11 +833,11 @@ void DataDisplay::prepareParallelProjection(Graphics &g,
   //        rangeSizeZ); float minxy = std::min(mDataBoundaries.minx,
   //        mDataBoundaries.miny);
   g.projMatrix(Matrix4f::ortho(ar * left, ar * right, bottom, top,
-                               mDataBoundaries.minz - 100,
-                               mDataBoundaries.maxz + 100));
+                               mDataBoundaries.min.z - 100,
+                               mDataBoundaries.max.z + 100));
 
   bool mAlignData = true;
-  double scalingFactor = 1.0 / (mDataBoundaries.maxy - mDataBoundaries.miny);
+  double scalingFactor = 1.0 / (mDataBoundaries.max.y - mDataBoundaries.min.y);
 
   // std::cout << near << "..." << farClip <<std::endl;
 
@@ -900,10 +858,11 @@ void DataDisplay::prepareParallelProjection(Graphics &g,
     //            g.viewMatrix(getLookAt({ 0.0f, 0.0f, cameraZ },
     //            { 0.0f, 0.0f, 0.0f },
     //            { 0.0f, 1.0f, 0.0f }));
-    g.viewMatrix(getLookAt(
-        mSlicingPlanePoint,
-        mSlicingPlanePoint.get() - mSlicingPlaneNormal.get().normalized(),
-        {0.0f, 1.0f, 0.0f}));
+    g.viewMatrix(
+        getLookAt(vasprender.mSlicingPlanePoint,
+                  vasprender.mSlicingPlanePoint.get() -
+                      vasprender.mSlicingPlaneNormal.get().normalized(),
+                  {0.0f, 1.0f, 0.0f}));
 
     gl::blending(false);
     gl::depthTesting(true);
@@ -975,7 +934,7 @@ void DataDisplay::prepareParallelProjection(Graphics &g,
           //            );
           int count = data.counts;
           assert((int)mAligned4fData.size() >= (cumulativeCount + count) * 4);
-          instancing_mesh0.attrib_data(
+          vasprender.instancing_mesh0.attrib_data(
               count * 4 * sizeof(float),
               mAligned4fData.data() + (cumulativeCount * 4), count);
           cumulativeCount += count;
@@ -990,30 +949,33 @@ void DataDisplay::prepareParallelProjection(Graphics &g,
           //            );
         }
         // now draw data with custom shader
-        g.shader(instancing_mesh0.shader);
+        g.shader(vasprender.instancing_mesh0.shader);
         g.update();  // sends modelview and projection matrices
         g.shader().uniform("dataScale", scalingFactor);
         g.shader().uniform("layerSeparation", 1.0);
         // A scaling value of 4.0 found empirically...
-        if (mShowRadius == 1.0f) {
-          g.shader().uniform("markerScale",
-                             data.radius * mAtomMarkerSize * mMarkerScale);
+        if (vasprender.mShowRadius == 1.0f) {
+          g.shader().uniform("markerScale", data.radius *
+                                                vasprender.mAtomMarkerSize *
+                                                vasprender.mMarkerScale);
         } else {
-          g.shader().uniform("markerScale", mAtomMarkerSize * mMarkerScale);
+          g.shader().uniform("markerScale", vasprender.mAtomMarkerSize *
+                                                vasprender.mMarkerScale);
         }
         g.shader().uniform("is_line", 0.0f);
         g.shader().uniform("is_omni", 0.0f);
 
-        g.shader().uniform("plane_point", mSlicingPlanePoint.get());
+        g.shader().uniform("plane_point", vasprender.mSlicingPlanePoint.get());
         g.shader().uniform("plane_normal",
-                           mSlicingPlaneNormal.get().normalized());
-        g.shader().uniform("second_plane_distance", mSlicingPlaneThickness);
+                           vasprender.mSlicingPlaneNormal.get().normalized());
+        g.shader().uniform("second_plane_distance",
+                           vasprender.mSlicingPlaneThickness);
 
         //                    g.shader().uniform("far_clip", farClip);
         //                    g.shader().uniform("near_clip", near);
         g.shader().uniform("clipped_mult", 0.0);
 
-        instancing_mesh0.draw();
+        vasprender.instancing_mesh0.draw();
       }
     }
 
@@ -1043,27 +1005,29 @@ void DataDisplay::prepareParallelProjection(Graphics &g,
 
       if (atomPropertiesProj.size() > 0) {
         // now draw data with custom shader
-        g.shader(instancing_mesh0.shader);
+        g.shader(vasprender.instancing_mesh0.shader);
         g.update();  // sends modelview and projection matrices
         g.shader().uniform("dataScale", scalingFactor);
         g.shader().uniform("layerSeparation", 1.0);
 
-        if (mShowRadius == 1.0f) {
-          g.shader().uniform("markerScale", mAtomMarkerSize * mMarkerScale);
+        if (vasprender.mShowRadius == 1.0f) {
+          g.shader().uniform("markerScale", vasprender.mAtomMarkerSize *
+                                                vasprender.mMarkerScale);
         } else {
-          g.shader().uniform("markerScale", mMarkerScale);
+          g.shader().uniform("markerScale", vasprender.mMarkerScale);
         }
         g.shader().uniform("is_line", 0.0f);
         g.shader().uniform("is_omni", 0.0f);
 
-        g.shader().uniform("plane_point", mSlicingPlanePoint.get());
+        g.shader().uniform("plane_point", vasprender.mSlicingPlanePoint.get());
         g.shader().uniform("plane_normal",
-                           mSlicingPlaneNormal.get().normalized());
-        g.shader().uniform("second_plane_distance", mSlicingPlaneThickness);
+                           vasprender.mSlicingPlaneNormal.get().normalized());
+        g.shader().uniform("second_plane_distance",
+                           vasprender.mSlicingPlaneThickness);
         //                    g.shader().uniform("far_clip", farClip);
         //                    g.shader().uniform("near_clip", near);
         g.shader().uniform("clipped_mult", 0.0);
-        instancing_mesh0.draw();
+        vasprender.instancing_mesh0.draw();
       }
 
       g.popViewMatrix();
@@ -1089,25 +1053,27 @@ void DataDisplay::prepareParallelProjection(Graphics &g,
 
       if (atomPropertiesProj.size() > 0) {
         // now draw data with custom shader
-        g.shader(instancing_mesh0.shader);
+        g.shader(vasprender.instancing_mesh0.shader);
         g.update();  // sends modelview and projection matrices
         g.shader().uniform("dataScale", scalingFactor);
-        if (mShowRadius == 1.0f) {
-          g.shader().uniform("markerScale", mAtomMarkerSize * mMarkerScale);
+        if (vasprender.mShowRadius == 1.0f) {
+          g.shader().uniform("markerScale", vasprender.mAtomMarkerSize *
+                                                vasprender.mMarkerScale);
         } else {
-          g.shader().uniform("markerScale", mMarkerScale);
+          g.shader().uniform("markerScale", vasprender.mMarkerScale);
         }
         g.shader().uniform("is_line", 0.0f);
         g.shader().uniform("is_omni", 0.0f);
 
-        g.shader().uniform("plane_point", mSlicingPlanePoint.get());
+        g.shader().uniform("plane_point", vasprender.mSlicingPlanePoint.get());
         g.shader().uniform("plane_normal",
-                           mSlicingPlaneNormal.get().normalized());
-        g.shader().uniform("second_plane_distance", mSlicingPlaneThickness);
+                           vasprender.mSlicingPlaneNormal.get().normalized());
+        g.shader().uniform("second_plane_distance",
+                           vasprender.mSlicingPlaneThickness);
         //                    g.shader().uniform("far_clip", farClip);
         //                    g.shader().uniform("near_clip", near);
         g.shader().uniform("clipped_mult", 0.0);
-        instancing_mesh0.draw();
+        vasprender.instancing_mesh0.draw();
       }
 
       g.popViewMatrix();
@@ -1134,24 +1100,26 @@ void DataDisplay::prepareParallelProjection(Graphics &g,
 
       if (atomPropertiesProj.size() > 0) {
         // now draw data with custom shader
-        g.shader(instancing_mesh0.shader);
+        g.shader(vasprender.instancing_mesh0.shader);
         g.update();  // sends modelview and projection matrices
         g.shader().uniform("dataScale", scalingFactor);
-        if (mShowRadius == 1.0f) {
-          g.shader().uniform("markerScale", mAtomMarkerSize * mMarkerScale);
+        if (vasprender.mShowRadius == 1.0f) {
+          g.shader().uniform("markerScale", vasprender.mAtomMarkerSize *
+                                                vasprender.mMarkerScale);
         } else {
-          g.shader().uniform("markerScale", mMarkerScale);
+          g.shader().uniform("markerScale", vasprender.mMarkerScale);
         }
         g.shader().uniform("is_line", 0.0f);
         g.shader().uniform("is_omni", 0.0f);
-        g.shader().uniform("plane_point", mSlicingPlanePoint.get());
+        g.shader().uniform("plane_point", vasprender.mSlicingPlanePoint.get());
         g.shader().uniform("plane_normal",
-                           mSlicingPlaneNormal.get().normalized());
-        g.shader().uniform("second_plane_distance", mSlicingPlaneThickness);
+                           vasprender.mSlicingPlaneNormal.get().normalized());
+        g.shader().uniform("second_plane_distance",
+                           vasprender.mSlicingPlaneThickness);
         //                    g.shader().uniform("far_clip", farClip);
         //                    g.shader().uniform("near_clip", near);
         g.shader().uniform("clipped_mult", 0.0);
-        instancing_mesh0.draw();
+        vasprender.instancing_mesh0.draw();
       }
 
       g.popViewMatrix();
@@ -1178,24 +1146,26 @@ void DataDisplay::prepareParallelProjection(Graphics &g,
 
       if (atomPropertiesProj.size() > 0) {
         // now draw data with custom shader
-        g.shader(instancing_mesh0.shader);
+        g.shader(vasprender.instancing_mesh0.shader);
         g.update();  // sends modelview and projection matrices
         g.shader().uniform("dataScale", scalingFactor);
-        if (mShowRadius == 1.0f) {
-          g.shader().uniform("markerScale", mAtomMarkerSize * mMarkerScale);
+        if (vasprender.mShowRadius == 1.0f) {
+          g.shader().uniform("markerScale", vasprender.mAtomMarkerSize *
+                                                vasprender.mMarkerScale);
         } else {
-          g.shader().uniform("markerScale", mMarkerScale);
+          g.shader().uniform("markerScale", vasprender.mMarkerScale);
         }
         g.shader().uniform("is_line", 0.0f);
         g.shader().uniform("is_omni", 0.0f);
-        g.shader().uniform("plane_point", mSlicingPlanePoint.get());
+        g.shader().uniform("plane_point", vasprender.mSlicingPlanePoint.get());
         g.shader().uniform("plane_normal",
-                           mSlicingPlaneNormal.get().normalized());
-        g.shader().uniform("second_plane_distance", mSlicingPlaneThickness);
+                           vasprender.mSlicingPlaneNormal.get().normalized());
+        g.shader().uniform("second_plane_distance",
+                           vasprender.mSlicingPlaneThickness);
         //                    g.shader().uniform("far_clip", farClip);
         //                    g.shader().uniform("near_clip", near);
         g.shader().uniform("clipped_mult", 0.0);
-        instancing_mesh0.draw();
+        vasprender.instancing_mesh0.draw();
       }
 
       g.popViewMatrix();
@@ -1257,53 +1227,7 @@ void DataDisplay::drawPerspective(Graphics &g) {
   //        mDataBoundaries.minz + (mFarClip * (mDataBoundaries.maxz-
   //        mDataBoundaries.minz));
 
-  int cumulativeCount = 0;
-  // now draw data with custom shaderg.shader(instancing_mesh0.shader);
-  g.shader(instancing_mesh0.shader);
-  g.shader().uniform("dataScale",
-                     1.0f / ((mDataBoundaries.maxy - mDataBoundaries.miny) *
-                             perspectivePickable.scale));
-  g.shader().uniform("layerSeparation", mLayerSeparation);
-  g.shader().uniform("is_omni", 1.0f);
-  g.shader().uniform("eye_sep", perspectivePickable.scale * g.lens().eyeSep() *
-                                    g.eye() / 2.0f);
-  // g.shader().uniform("eye_sep", g.lens().eyeSep() * g.eye() / 2.0f);
-  g.shader().uniform("foc_len", g.lens().focalLength());
-
-  g.shader().uniform("plane_point", mSlicingPlanePoint.get());
-  g.shader().uniform("plane_normal", mSlicingPlaneNormal.get().normalized());
-  g.shader().uniform("second_plane_distance", mSlicingPlaneThickness);
-  //        g.shader().uniform("near_clip", near);
-  //        g.shader().uniform("far_clip", farClip);
-  g.shader().uniform("clipped_mult", 0.45);
-  g.update();
-
-  for (auto data : mAtomData) {
-    if (mShowRadius == 1.0f) {
-      g.shader().uniform("markerScale", data.radius * mAtomMarkerSize *
-                                            mMarkerScale /
-                                            perspectivePickable.scale);
-      //                std::cout << data.radius << std::endl;
-    } else {
-      g.shader().uniform("markerScale", mAtomMarkerSize * mMarkerScale /
-                                            perspectivePickable.scale);
-    }
-    int count = data.counts;
-    assert((int)mAligned4fData.size() >= (cumulativeCount + count) * 4);
-    instancing_mesh0.attrib_data(count * 4 * sizeof(float),
-                                 mAligned4fData.data() + (cumulativeCount * 4),
-                                 count);
-    cumulativeCount += count;
-
-    gl::polygonFill();
-    g.shader().uniform("is_line", 0.0f);
-    instancing_mesh0.draw();
-
-    //            g.shader().uniform("is_line", 1.0f);
-    //            g.polygonMode(Graphics::LINE);
-    //            instancing_mesh0.draw();
-    //            g.polygonMode(Graphics::FILL);
-  }
+  vasprender.drawVASP(g, perspectivePickable.scale, mAtomData, mAligned4fData);
 
   gl::depthTesting(true);
   gl::blending(true);
@@ -1323,10 +1247,10 @@ void DataDisplay::drawPerspective(Graphics &g) {
   //        float D =  -mSlicingPlanePoint.get().dot(mSlicingPlaneNormal);
   // Line Equation
 
-  const float x[2] = {mDataBoundaries.maxx, mDataBoundaries.minx};
-  const float y[2] = {mDataBoundaries.maxy, mDataBoundaries.miny};
+  const float x[2] = {mDataBoundaries.max.x, mDataBoundaries.min.x};
+  const float y[2] = {mDataBoundaries.max.y, mDataBoundaries.min.y};
 
-  const float z[2] = {0.0, (mSlicingPlaneThickness)};
+  const float z[2] = {0.0, (vasprender.mSlicingPlaneThickness)};
 
   for (int k = 0; k <= 1; k++) {
     for (int j = 0; j <= 1; j++) {
@@ -1350,10 +1274,10 @@ void DataDisplay::drawPerspective(Graphics &g) {
   glLineWidth(5);
   gl::polygonLine();
   g.color(0.8f, 0.8f, 1.0f, 0.9f);
-  g.scale(1.0, 1.0, 1.0f + mLayerSeparation);
-  g.translate(mSlicingPlanePoint.get());
-  g.rotate(mSliceRotationPitch * 360.0f / (M_2PI), 1.0, 0.0, 0.0);
-  g.rotate(mSliceRotationRoll * 360.0f / (M_2PI), 0.0, -1.0, 0.0);
+  g.scale(1.0, 1.0, 1.0f + vasprender.mLayerSeparation);
+  g.translate(vasprender.mSlicingPlanePoint.get());
+  g.rotate(vasprender.mSliceRotationPitch * 360.0f / (M_2PI), 1.0, 0.0, 0.0);
+  g.rotate(vasprender.mSliceRotationRoll * 360.0f / (M_2PI), 0.0, -1.0, 0.0);
   g.draw(boxMesh);
   gl::polygonFill();
   glLineWidth(1);

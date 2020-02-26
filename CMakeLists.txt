@@ -17,6 +17,7 @@ add_executable(${APP_NAME}
 
   src/al_DataScript.hpp
   src/al_VASPReader.hpp
+  src/al_VASPRender.hpp
   src/datadisplay.hpp
   src/datasetmanager.hpp
   src/processors.hpp

@@ -16,10 +16,8 @@
 #include "al/ui/al_Pickable.hpp"
 #include "al/ui/al_PresetHandler.hpp"
 #include "al/ui/al_SequenceRecorder.hpp"
-
 #include "al_DeferredComputation.hpp"
 #include "al_PeriodicTask.hpp"
-
 #include "al_ext/openvr/al_OpenVRDomain.hpp"
 
 #undef AL_BUILD_MPI
@@ -789,7 +787,8 @@ class MyApp : public DistributedAppWithState<State> {
         }
       }
       ParameterGUI::drawParameterMeta(
-          &this->dataDisplays[vdvBundle.currentBundle()]->mAtomMarkerSize);
+          &this->dataDisplays[vdvBundle.currentBundle()]
+               ->vasprender.mAtomMarkerSize);
       if (this->dataDisplays[vdvBundle.currentBundle()]
               ->mDatasetManager.mParameterSpaces["time"]
               ->size() > 0) {
@@ -819,10 +818,11 @@ class MyApp : public DistributedAppWithState<State> {
 
       if (ImGui::CollapsingHeader("Slicing")) {
         ImGui::Indent(20.0);
+        ParameterGUI::drawParameterMeta(&dataDisplays[vdvBundle.currentBundle()]
+                                             ->vasprender.mSlicingPlaneNormal);
         ParameterGUI::drawParameterMeta(
-            &dataDisplays[vdvBundle.currentBundle()]->mSlicingPlaneNormal);
-        ParameterGUI::drawParameterMeta(
-            &dataDisplays[vdvBundle.currentBundle()]->mSlicingPlaneThickness);
+            &dataDisplays[vdvBundle.currentBundle()]
+                 ->vasprender.mSlicingPlaneThickness);
 
         ParameterGUI::drawParameterMeta(&mJumpLayerNeg);
         ImGui::SameLine();
@@ -1402,69 +1402,69 @@ class MyApp : public DistributedAppWithState<State> {
       });
       stepPitchAngleNeg.registerChangeCallback([this](float value) {
         if (vdvBundle.bundleGlobal()) {
-          float newAngle =
-              dataDisplays[vdvBundle.currentBundle()]->mSliceRotationPitch;
+          float newAngle = dataDisplays[vdvBundle.currentBundle()]
+                               ->vasprender.mSliceRotationPitch;
           newAngle -= pitchAngleStep * M_2PI / 360.0;
           for (auto *display : dataDisplays) {
-            display->mSliceRotationPitch = newAngle;
+            display->vasprender.mSliceRotationPitch = newAngle;
           }
 
         } else {
-          float newAngle =
-              dataDisplays[vdvBundle.currentBundle()]->mSliceRotationPitch;
+          float newAngle = dataDisplays[vdvBundle.currentBundle()]
+                               ->vasprender.mSliceRotationPitch;
           newAngle -= pitchAngleStep * M_2PI / 360.0;
-          dataDisplays[vdvBundle.currentBundle()]->mSliceRotationPitch =
-              newAngle;
+          dataDisplays[vdvBundle.currentBundle()]
+              ->vasprender.mSliceRotationPitch = newAngle;
         }
       });
       stepPitchAnglePos.registerChangeCallback([this](float value) {
         if (vdvBundle.bundleGlobal()) {
-          float newAngle =
-              dataDisplays[vdvBundle.currentBundle()]->mSliceRotationPitch;
+          float newAngle = dataDisplays[vdvBundle.currentBundle()]
+                               ->vasprender.mSliceRotationPitch;
           newAngle += pitchAngleStep * M_2PI / 360.0;
           newAngle -= pitchAngleStep * M_2PI / 360.0;
           for (auto *display : dataDisplays) {
-            display->mSliceRotationPitch = newAngle;
+            display->vasprender.mSliceRotationPitch = newAngle;
           }
 
         } else {
-          float newAngle =
-              dataDisplays[vdvBundle.currentBundle()]->mSliceRotationPitch;
+          float newAngle = dataDisplays[vdvBundle.currentBundle()]
+                               ->vasprender.mSliceRotationPitch;
           newAngle += pitchAngleStep * M_2PI / 360.0;
-          dataDisplays[vdvBundle.currentBundle()]->mSliceRotationPitch =
-              newAngle;
+          dataDisplays[vdvBundle.currentBundle()]
+              ->vasprender.mSliceRotationPitch = newAngle;
         }
       });
       stepRollAngleNeg.registerChangeCallback([this](float value) {
         if (vdvBundle.bundleGlobal()) {
-          float newAngle =
-              dataDisplays[vdvBundle.currentBundle()]->mSliceRotationRoll;
+          float newAngle = dataDisplays[vdvBundle.currentBundle()]
+                               ->vasprender.mSliceRotationRoll;
           newAngle -= rollAngleStep * M_2PI / 360.0;
           for (auto *display : dataDisplays) {
-            display->mSliceRotationRoll = newAngle;
+            display->vasprender.mSliceRotationRoll = newAngle;
           }
         } else {
-          float newAngle =
-              dataDisplays[vdvBundle.currentBundle()]->mSliceRotationRoll;
+          float newAngle = dataDisplays[vdvBundle.currentBundle()]
+                               ->vasprender.mSliceRotationRoll;
           newAngle -= rollAngleStep * M_2PI / 360.0;
-          dataDisplays[vdvBundle.currentBundle()]->mSliceRotationRoll =
-              newAngle;
+          dataDisplays[vdvBundle.currentBundle()]
+              ->vasprender.mSliceRotationRoll = newAngle;
         }
       });
       stepRollAnglePos.registerChangeCallback([this](float value) {
         if (vdvBundle.bundleGlobal()) {
-          float newAngle =
-              dataDisplays[vdvBundle.currentBundle()]->mSliceRotationRoll;
+          float newAngle = dataDisplays[vdvBundle.currentBundle()]
+                               ->vasprender.mSliceRotationRoll;
           newAngle += rollAngleStep * M_2PI / 360.0;
           for (auto *display : dataDisplays) {
-            display->mSliceRotationRoll = newAngle;
+            display->vasprender.mSliceRotationRoll = newAngle;
           }
         } else {
-          float newAngle =
-              dataDisplays[vdvBundle.currentBundle()]->mSliceRotationRoll;
+          float newAngle = dataDisplays[vdvBundle.currentBundle()]
+                               ->vasprender.mSliceRotationRoll;
           newAngle += rollAngleStep * M_2PI / 360.0;
-          dataDisplays[vdvBundle.currentBundle()]->mSliceRotationRoll =
-              newAngle;
+          dataDisplays[vdvBundle.currentBundle()]
+              ->vasprender.mSliceRotationRoll = newAngle;
         }
       });
 

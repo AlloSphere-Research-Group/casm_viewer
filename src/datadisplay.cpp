@@ -70,7 +70,7 @@ void DataDisplay::init() {
   // x
   num_verts_added = addCube(axis);
   transform.setIdentity();
-  transform *= Matrix4f::rotation(M_PI / 2, 2, 0);  // rotate from z to x
+  transform *= Matrix4f::rotation(M_PI / 2, 2, 0); // rotate from z to x
   transform *= Matrix4f::translation(0, 0, 0.3);
   transform *= Matrix4f::scaling(0.02, 0.02, 1);
   axis.transform(transform, axis.vertices().size() - num_verts_added);
@@ -81,7 +81,7 @@ void DataDisplay::init() {
   // y
   num_verts_added = addCube(axis);
   transform.setIdentity();
-  transform *= Matrix4f::rotation(M_PI / 2, 2, 1);  // rotate from z to y
+  transform *= Matrix4f::rotation(M_PI / 2, 2, 1); // rotate from z to y
   transform *= Matrix4f::translation(0, 0, 0.3);
   transform *= Matrix4f::scaling(0.02, 0.02, 1);
   axis.transform(transform, axis.vertices().size() - num_verts_added);
@@ -106,11 +106,11 @@ void DataDisplay::init() {
     parameterSpace.second->parameter().registerChangeCallback([&](float value) {
       if (parameterSpace.second->getCurrentId() !=
           parameterSpace.second->idAt(parameterSpace.second->getIndexForValue(
-              value))) {  // Only reload if id has changed
+              value))) { // Only reload if id has changed
 
         parameterSpace.second->parameter().setNoCalls(
-            value);  // To have the internal value already changed for the
-                     // following functions.
+            value); // To have the internal value already changed for the
+                    // following functions.
         std::cout << value << " : " << parameterSpace.second->getCurrentId()
                   << "..."
                   << parameterSpace.second->idAt(
@@ -451,7 +451,7 @@ void DataDisplay::prepare(Graphics &g, Matrix4f &transformMatrix) {
     unsigned int previousSize = mTrajectoryMesh.vertices().size();
     if (thisMovement.mag() >
         fabs(mDataBoundaries.max.x - mDataBoundaries.min.x) /
-            2.0f) {  // Atom is wrapping around
+            2.0f) { // Atom is wrapping around
       //              c = Color(0.8f, 0.8f, 0.8f, 1.0f);
       thisMovement = -thisMovement;
       thisMovement.normalize(previousMag);
@@ -482,8 +482,8 @@ void DataDisplay::prepare(Graphics &g, Matrix4f &transformMatrix) {
   //        g.scale(1.0/(mDataBoundaries.maxy - mDataBoundaries.miny));
 }
 
-void DataDisplay::draw(Graphics &g) {  // Load data after drawing frame to allow
-                                       // showing "in process" state
+void DataDisplay::draw(Graphics &g) { // Load data after drawing frame to allow
+                                      // showing "in process" state
   if (mVisible == 0.0f) {
     return;
   }
@@ -575,7 +575,7 @@ void DataDisplay::dumpImages(string dumpPrefix) {
       line += std::to_string(*positionIt++) + ",";
       line += std::to_string(*positionIt++) + ",";
       line += std::to_string(*positionIt++) + "\n";
-      positionIt++;  // Ignore label?
+      positionIt++; // Ignore label?
       allPositionsFile.write(line);
     }
   }
@@ -596,10 +596,10 @@ void DataDisplay::dumpImages(string dumpPrefix) {
   auto plane_normal = vasprender.mSlicingPlaneNormal.get().normalized();
   auto second_plane_distance = vasprender.mSlicingPlaneThickness.get();
   auto slicePositions = *mDatasetManager.positionBuffers.get(false);
-  File slicePositionsFile(
-      File::conformPathToOS(dumpDirectory + "/" + dumpPrefix +
-                            "_slice_positions.csv"),
-      "w", true);
+  File slicePositionsFile(File::conformPathToOS(dumpDirectory + "/" +
+                                                dumpPrefix +
+                                                "_slice_positions.csv"),
+                          "w", true);
   std::string slicePositionsHeader = "element,x,y,z\n";
   slicePositionsFile.write(slicePositionsHeader);
 
@@ -743,7 +743,7 @@ void DataDisplay::updateDisplayBuffers() {
 
           atomPropertiesPersp.push_back(AtomProperties{
               atom, elementData[atom].radius, elementData[atom].color});
-        } else {  // Use defaults
+        } else { // Use defaults
           atomPropertiesProj.push_back(
               AtomProperties{atom, 1.0f, *colorListIt});
 
@@ -847,7 +847,7 @@ void DataDisplay::prepareParallelProjection(Graphics &g,
   int w = fbo_iso.width() / 2;
   int h = fbo_iso.height() / 2;
   gl::polygonFill();
-  gl::depthMask(true);  // for axis rendering
+  gl::depthMask(true); // for axis rendering
 
   if (mSingleProjection.get() == 1.0f) {
     g.pushViewport(0, 0, 2 * w, 2 * h);
@@ -892,7 +892,7 @@ void DataDisplay::prepareParallelProjection(Graphics &g,
           g.draw(mGridMesh);
           g.popMatrix();
         } else if (mGridType.getCurrent() == "triangle") {
-          float spacing = 0.86602540378f * mGridSpacing;  // sin(60)
+          float spacing = 0.86602540378f * mGridSpacing; // sin(60)
           g.pushMatrix();
           g.translate(mGridXOffset, mGridYOffset + spacing * i, 0);
           g.scale(maxrange * mLayerScaling);
@@ -950,7 +950,7 @@ void DataDisplay::prepareParallelProjection(Graphics &g,
         }
         // now draw data with custom shader
         g.shader(vasprender.instancing_mesh0.shader);
-        g.update();  // sends modelview and projection matrices
+        g.update(); // sends modelview and projection matrices
         g.shader().uniform("dataScale", scalingFactor);
         g.shader().uniform("layerSeparation", 1.0);
         // A scaling value of 4.0 found empirically...
@@ -1006,7 +1006,7 @@ void DataDisplay::prepareParallelProjection(Graphics &g,
       if (atomPropertiesProj.size() > 0) {
         // now draw data with custom shader
         g.shader(vasprender.instancing_mesh0.shader);
-        g.update();  // sends modelview and projection matrices
+        g.update(); // sends modelview and projection matrices
         g.shader().uniform("dataScale", scalingFactor);
         g.shader().uniform("layerSeparation", 1.0);
 
@@ -1054,7 +1054,7 @@ void DataDisplay::prepareParallelProjection(Graphics &g,
       if (atomPropertiesProj.size() > 0) {
         // now draw data with custom shader
         g.shader(vasprender.instancing_mesh0.shader);
-        g.update();  // sends modelview and projection matrices
+        g.update(); // sends modelview and projection matrices
         g.shader().uniform("dataScale", scalingFactor);
         if (vasprender.mShowRadius == 1.0f) {
           g.shader().uniform("markerScale", vasprender.mAtomMarkerSize *
@@ -1101,7 +1101,7 @@ void DataDisplay::prepareParallelProjection(Graphics &g,
       if (atomPropertiesProj.size() > 0) {
         // now draw data with custom shader
         g.shader(vasprender.instancing_mesh0.shader);
-        g.update();  // sends modelview and projection matrices
+        g.update(); // sends modelview and projection matrices
         g.shader().uniform("dataScale", scalingFactor);
         if (vasprender.mShowRadius == 1.0f) {
           g.shader().uniform("markerScale", vasprender.mAtomMarkerSize *
@@ -1147,7 +1147,7 @@ void DataDisplay::prepareParallelProjection(Graphics &g,
       if (atomPropertiesProj.size() > 0) {
         // now draw data with custom shader
         g.shader(vasprender.instancing_mesh0.shader);
-        g.update();  // sends modelview and projection matrices
+        g.update(); // sends modelview and projection matrices
         g.shader().uniform("dataScale", scalingFactor);
         if (vasprender.mShowRadius == 1.0f) {
           g.shader().uniform("markerScale", vasprender.mAtomMarkerSize *
@@ -1197,7 +1197,7 @@ void DataDisplay::drawPerspective(Graphics &g) {
   //        Vec3d normVector = reader.getNormalizingVector();
   //        Vec3d centeringVector = reader.getCenteringVector();
   if (mAligned4fData.size() == 0) {
-    return;  // No data has been loaded
+    return; // No data has been loaded
   }
 
   g.lens().far(2000);
@@ -1267,9 +1267,9 @@ void DataDisplay::drawPerspective(Graphics &g) {
   g.shader().uniform("eye_sep", perspectivePickable.scale * g.lens().eyeSep() *
                                     g.eye() / 2.0f);
 
-  g.shader().uniform(
-      "eye_sep",
-      /*perspectivePickable.scale * */ g.lens().eyeSep() * g.eye() / 2.0f);
+  g.shader().uniform("eye_sep",
+                     /*perspectivePickable.scale * */ g.lens().eyeSep() *
+                         g.eye() / 2.0f);
 
   glLineWidth(5);
   gl::polygonLine();
@@ -1288,7 +1288,7 @@ void DataDisplay::drawPerspective(Graphics &g) {
 
   drawHistory(g);
 
-  g.popMatrix();  // pickable
+  g.popMatrix(); // pickable
 
   gl::depthTesting(false);
   gl::blendAdd();
@@ -1307,7 +1307,7 @@ void DataDisplay::drawPerspective(Graphics &g) {
     } else {
       //            g.scale(dist * 0.5);
     }
-    g.translate(0.0, -1.5, 0);  // Push the text down a bit
+    g.translate(0.0, -1.5, 0); // Push the text down a bit
 
     // Draw label
     Mesh mesh;
@@ -1340,7 +1340,7 @@ void DataDisplay::drawParallelProjection(Graphics &g) {
   Mesh m;
   addTexQuad(m, w, h);
   iso_scene().filter(Texture::LINEAR_MIPMAP_LINEAR);
-  iso_scene().generateMipmap();  // XXX this works.. confusing api needs help..
+  iso_scene().generateMipmap(); // XXX this works.. confusing api needs help..
   iso_scene().bind();
   parallelPickable.pushMatrix(g);
   // g.pushMatrix();

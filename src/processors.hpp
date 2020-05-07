@@ -4,10 +4,11 @@
 #include <vector>
 
 #include "al/io/al_File.hpp"
-#include "al_DataScript.hpp"
-#include "al_DeferredComputation.hpp"
+#include "tinc/DataScript.hpp"
+#include "tinc/DeferredComputation.hpp"
 
 using namespace al;
+using namespace tinc;
 
 class AtomLabelProcessor : public DataScript {
 public:

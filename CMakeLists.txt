@@ -8,36 +8,29 @@ project(${APP_NAME})
 # path to main source file
 add_executable(${APP_NAME}
   src/main.cpp
-  src/parameterspace.cpp
   src/datadisplay.cpp
   src/datasetmanager.cpp
   src/slice.cpp
-  src/al_DataScript.cpp
-  src/al_VASPReader.cpp
 
-  src/al_DataScript.hpp
-  src/al_VASPReader.hpp
-  src/al_VASPRender.hpp
   src/datadisplay.hpp
   src/datasetmanager.hpp
   src/processors.hpp
-  src/parameterspace.hpp
   src/instanced_mesh.hpp
-  src/json.hpp
   src/slice.hpp)
 
 # add allolib as a subdirectory to the project
-add_subdirectory(allolib)
+add_subdirectory(external/tinc)
 
 # link allolib to project
-target_link_libraries(${APP_NAME} PRIVATE al)
+#target_link_libraries(${APP_NAME} PRIVATE al)
+target_link_libraries(${APP_NAME} PRIVATE tinc al)
 
-if (EXISTS ${CMAKE_CURRENT_LIST_DIR}/al_ext)
-  message("Buiding extensions in al_ext")
-  add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/al_ext)
-  get_target_property(AL_EXT_LIBRARIES al_ext AL_EXT_LIBRARIES)
-  target_link_libraries(${APP_NAME} PRIVATE ${AL_EXT_LIBRARIES})
-endif()
+#if (EXISTS ${CMAKE_CURRENT_LIST_DIR}/al_ext)
+#  message("Buiding extensions in al_ext")
+#  add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/al_ext)
+#  get_target_property(AL_EXT_LIBRARIES al_ext AL_EXT_LIBRARIES)
+#  target_link_libraries(${APP_NAME} PRIVATE ${AL_EXT_LIBRARIES})
+#endif()
 
 # compile flags
 if(${CMAKE_SYSTEM_NAME} MATCHES "Windows")

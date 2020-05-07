@@ -5,21 +5,21 @@
 #include <string>
 #include <vector>
 
-#include "al_VASPReader.hpp"
+#include "tinc/VASPReader.hpp"
 
 #include "al/ui/al_Parameter.hpp"
 
-#include "parameterspace.hpp"
+#include "tinc/ParameterSpace.hpp"
 
 #include "processors.hpp"
 #include "slice.hpp"
 
-#include "json.hpp"
+#include "nlohmann/json.hpp"
 
 using json = nlohmann::json;
 
 class BoundingBox_ {
- public:
+public:
   float minx, miny, minz;
   float maxx, maxy, maxz;
   inline void reset() {
@@ -50,7 +50,7 @@ class BoundingBox_ {
 };
 
 class DatasetManager {
- public:
+public:
   bool mRunProcessors{false};
 
   VASPReader reader;
@@ -58,15 +58,15 @@ class DatasetManager {
 
   // Dataset metadata
   std::vector<std::string>
-      mAvailableAtomsJson;  // Atoms in result.json <comp(XX)> field
+      mAvailableAtomsJson; // Atoms in result.json <comp(XX)> field
   std::vector<std::string>
-      mVacancyAtoms;  // Vacancy atoms from prim.json or prim_labels.json
+      mVacancyAtoms; // Vacancy atoms from prim.json or prim_labels.json
   std::vector<std::string>
-      mShowAtomElements;  // Labels from prim.json or prim_labels.json
+      mShowAtomElements; // Labels from prim.json or prim_labels.json
 
   // Dataset metadata
   std::map<std::string, std::pair<float, float>>
-      mDataRanges;  // Ranges of the data across all the dataset
+      mDataRanges; // Ranges of the data across all the dataset
 
   std::string mGlobalRoot;
   std::string mLoadedDataset;
@@ -81,7 +81,7 @@ class DatasetManager {
   json mDiffs;
 
   std::vector<std::pair<Vec3f, Vec3f>>
-      mHistory;  // From ->to (first, second) of pair
+      mHistory; // From ->to (first, second) of pair
 
   // External Processors
   CacheManager cacheManager;
@@ -97,18 +97,18 @@ class DatasetManager {
   // These are internal parameters to propagate data and triggering computation,
   // not for direct user control
   ParameterString mRootPath{"rootPath"};
-  ParameterString mCurrentDataset{"currentDataset"};  // sub directory
+  ParameterString mCurrentDataset{"currentDataset"}; // sub directory
   ParameterString currentGraphName{"currentGraphName", "internal", ""};
   ParameterString currentPoscarName{"currentPoscarName", "internal", ""};
   ParameterBool processing{"processing", "internal", false};
 
   std::map<std::string, bool>
-      mParameterIsVariable;  // Parameter space has changes
+      mParameterIsVariable; // Parameter space has changes
 
   std::string
-      mConditionsParameter;  // Parameter that maps to conditions.X directories
+      mConditionsParameter; // Parameter that maps to conditions.X directories
   std::vector<std::string>
-      mParameterForSubDir;  // Parameter value determines the subdirectory
+      mParameterForSubDir; // Parameter value determines the subdirectory
   std::map<std::string, ParameterSpace *> mParameterSpaces;
 
   // Functions --------------
@@ -191,13 +191,41 @@ class DatasetManager {
     return layerDir;
   }
 
- protected:
+protected:
   // Look in the inner directory, then go up to the data root to try to find
   std::string findJsonFile(std::string datasetId, std::string subDir,
                            std::string fileName);
 
   inline std::string readJsonFile(std::string datasetId, std::string subDir,
-                                  std::vector<std::string> fileNames);
+                                  std::vector<std::string> fileNames) {
+    std::string str;
+
+    std::string foundFileName;
+    for (auto name : fileNames) {
+      if ((foundFileName = findJsonFile(datasetId, subDir, name)).size() > 0) {
+        break;
+      }
+    }
+
+    if (foundFileName.size() == 0) {
+      return "";
+    }
+
+    std::ifstream f(foundFileName);
+
+    if (f.fail()) {
+      return "";
+    }
+
+    f.seekg(0, std::ios::end);
+    str.reserve(f.tellg());
+    f.seekg(0, std::ios::beg);
+
+    str.assign((std::istreambuf_iterator<char>(f)),
+               std::istreambuf_iterator<char>());
+
+    return str;
+  }
 
   std::string readJsonResultsFile(std::string datasetId, std::string subDir) {
     return readJsonFile(datasetId, subDir, {"results.json"});
@@ -208,7 +236,7 @@ class DatasetManager {
     return readJsonFile(datasetId, subDir, {"prim_labels.json", "prim.json"});
   }
 
- private:
+private:
 };
 
-#endif  // INCLUDE_DATASETMANAGER_HPP
+#endif // INCLUDE_DATASETMANAGER_HPP

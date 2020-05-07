@@ -34,7 +34,7 @@ else
 
 fi
 
-"${CMAKE_BINARY}" --build . --config Release --target casm_viewer
+"${CMAKE_BINARY}" --build . --config Release --target casm_viewer -- -j7
 
 if [ $? == 0 ]; then
     cd bin

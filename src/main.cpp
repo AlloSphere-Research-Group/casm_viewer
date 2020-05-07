@@ -16,10 +16,11 @@
 #include "al/ui/al_Pickable.hpp"
 #include "al/ui/al_PresetHandler.hpp"
 #include "al/ui/al_SequenceRecorder.hpp"
-#include "al_DeferredComputation.hpp"
-#include "al_PeriodicTask.hpp"
+
 #include "al_ext/openvr/al_OpenVRDomain.hpp"
 
+#include "tinc/DeferredComputation.hpp"
+#include "tinc/PeriodicTask.hpp"
 #undef AL_BUILD_MPI
 
 //#define STB_IMAGE_WRITE_STATIC
@@ -29,7 +30,7 @@
 #include "datadisplay.hpp"
 
 #ifdef AL_WINDOWS
-#include <direct.h>  // for _chdir() and _getcwd()
+#include <direct.h> // for _chdir() and _getcwd()
 #define chdir _chdir
 #define getcwd _getcwd
 #undef rank
@@ -80,7 +81,7 @@ struct ObjectTransformHandler : WindowEventHandler {
 };
 
 class MyApp : public DistributedAppWithState<State> {
- public:
+public:
   // Parameters and triggers for interaction commands
   Trigger resetView{"resetView"};
   Trigger stepXpos{"stepXpos"};
@@ -180,8 +181,8 @@ class MyApp : public DistributedAppWithState<State> {
     dimensions(1200, 800);
 
     // Create and configure displays
-    int numDisplays = 2;  // 2 is a good number. Usually need one, but some
-                          // times need to compare 2
+    int numDisplays = 2; // 2 is a good number. Usually need one, but some
+                         // times need to compare 2
 
     for (int i = 0; i < numDisplays; i++) {
       dataDisplays.push_back(new DataDisplay);
@@ -225,7 +226,7 @@ class MyApp : public DistributedAppWithState<State> {
         vdvBundle << display->bundle;
       }
       // Add parameters that are not part of the bundle
-      *presetHandler << Z << X;  //
+      *presetHandler << Z << X; //
 
       if (presetServer) {
         *presetServer << *presetHandler;
@@ -234,9 +235,9 @@ class MyApp : public DistributedAppWithState<State> {
       *recorder << *presetHandler;
       parameterServer().notifyAll();
       backgroundColor.set(
-          backgroundColor.get());  // Set current value to update on renderers
+          backgroundColor.get()); // Set current value to update on renderers
       sliceBackground.set(
-          sliceBackground.get());  // Set current value to update on renderers
+          sliceBackground.get()); // Set current value to update on renderers
     }
 
     // use object control for model matrix
@@ -275,7 +276,7 @@ class MyApp : public DistributedAppWithState<State> {
     //      }
     //    }
     if (al_get_hostname() ==
-        "moxi") {  // Fullscreen to two monitors on MOXI machine
+        "moxi") { // Fullscreen to two monitors on MOXI machine
       std::cout << "On MOXI! --------------------------------------"
                 << std::endl;
       int width, height;
@@ -419,67 +420,67 @@ class MyApp : public DistributedAppWithState<State> {
 
         int index;
         switch (k.key()) {
-          case ' ':
-            showGui = !showGui;
-            break;
-          case 'b':
-            dataDisplays[vdvBundle.currentBundle()]->mPerspectiveRotY =
-                dataDisplays[vdvBundle.currentBundle()]->mPerspectiveRotY + 5;
-            break;
-          case 'v':
-            dataDisplays[vdvBundle.currentBundle()]->mPerspectiveRotY =
-                dataDisplays[vdvBundle.currentBundle()]->mPerspectiveRotY - 5;
-            break;
-          case '[':
-            dataDisplays[vdvBundle.currentBundle()]->mLayerScaling =
-                dataDisplays[vdvBundle.currentBundle()]->mLayerScaling + 0.05f;
-            break;
-          case ']':
-            dataDisplays[vdvBundle.currentBundle()]->mLayerScaling =
-                dataDisplays[vdvBundle.currentBundle()]->mLayerScaling - 0.05f;
-            break;
-          case '-':
-            mJumpLayerNeg.trigger();  // This will trigger a change
-            break;
-          case '=':
-            mJumpLayerPos.trigger();  // This will trigger a change
-            break;
-          case 'o':
-            stepTempNeg.trigger();  // This will trigger a change
-            break;
-          case 'p':
-            stepTempPos.trigger();  // This will trigger a change
-            break;
-          case 'l':
-            stepChempotNeg.trigger();  // This will trigger a change
-            break;
-          case ';':
-            stepChempotPos.trigger();  // This will trigger a change
-            break;
-          case '.':
-            stepChempot2Neg.trigger();  // This will trigger a change
-            stepTimeNeg.trigger();
-            break;
-          case '/':
-            stepChempot2Pos.trigger();  // This will trigger a change
-            stepTimePos.trigger();
-            break;
-          case 'q':
-            index = presetHandler->getCurrentPresetIndex() - 1;
-            if (index >= 0) {
-              presetHandler->recallPreset(index);
-            }
-            break;
-          case 'w':
-            index = presetHandler->getCurrentPresetIndex() + 1;
+        case ' ':
+          showGui = !showGui;
+          break;
+        case 'b':
+          dataDisplays[vdvBundle.currentBundle()]->mPerspectiveRotY =
+              dataDisplays[vdvBundle.currentBundle()]->mPerspectiveRotY + 5;
+          break;
+        case 'v':
+          dataDisplays[vdvBundle.currentBundle()]->mPerspectiveRotY =
+              dataDisplays[vdvBundle.currentBundle()]->mPerspectiveRotY - 5;
+          break;
+        case '[':
+          dataDisplays[vdvBundle.currentBundle()]->mLayerScaling =
+              dataDisplays[vdvBundle.currentBundle()]->mLayerScaling + 0.05f;
+          break;
+        case ']':
+          dataDisplays[vdvBundle.currentBundle()]->mLayerScaling =
+              dataDisplays[vdvBundle.currentBundle()]->mLayerScaling - 0.05f;
+          break;
+        case '-':
+          mJumpLayerNeg.trigger(); // This will trigger a change
+          break;
+        case '=':
+          mJumpLayerPos.trigger(); // This will trigger a change
+          break;
+        case 'o':
+          stepTempNeg.trigger(); // This will trigger a change
+          break;
+        case 'p':
+          stepTempPos.trigger(); // This will trigger a change
+          break;
+        case 'l':
+          stepChempotNeg.trigger(); // This will trigger a change
+          break;
+        case ';':
+          stepChempotPos.trigger(); // This will trigger a change
+          break;
+        case '.':
+          stepChempot2Neg.trigger(); // This will trigger a change
+          stepTimeNeg.trigger();
+          break;
+        case '/':
+          stepChempot2Pos.trigger(); // This will trigger a change
+          stepTimePos.trigger();
+          break;
+        case 'q':
+          index = presetHandler->getCurrentPresetIndex() - 1;
+          if (index >= 0) {
             presetHandler->recallPreset(index);
-            break;
+          }
+          break;
+        case 'w':
+          index = presetHandler->getCurrentPresetIndex() + 1;
+          presetHandler->recallPreset(index);
+          break;
 
-          case 'z':
-            mAlignTemperatures.trigger();
-            break;
-          default:
-            break;
+        case 'z':
+          mAlignTemperatures.trigger();
+          break;
+        default:
+          break;
         }
       }
     }
@@ -531,7 +532,7 @@ class MyApp : public DistributedAppWithState<State> {
       for (auto *display : dataDisplays) {
         if (display->mVisible != 0.0f) {
           display->mPickableManager.event(
-              PickEvent(Drag, r, v));  // id, button, v);
+              PickEvent(Drag, r, v)); // id, button, v);
         }
       }
     } else if ("/rotate" == m.addressPattern()) {
@@ -571,7 +572,7 @@ class MyApp : public DistributedAppWithState<State> {
       for (auto *display : dataDisplays) {
         if (display->mVisible != 0.0f) {
           display->mPickableManager.event(
-              PickEvent(Unpick, r));  //, id, button);
+              PickEvent(Unpick, r)); //, id, button);
         }
       }
     }
@@ -607,7 +608,8 @@ class MyApp : public DistributedAppWithState<State> {
 
   bool onMouseDrag(const Mouse &m) override {
     if (isPrimary()) {
-      if (showGui && ParameterGUI::usingInput()) return true;
+      if (showGui && ParameterGUI::usingInput())
+        return true;
       for (auto *display : dataDisplays) {
         if (display->mVisible != 0.0f) {
           display->mPickableManager.onMouseDrag(graphics(), m, width(),
@@ -617,7 +619,7 @@ class MyApp : public DistributedAppWithState<State> {
     }
     return true;
   }
-  virtual bool onMouseUp(const Mouse &m) {
+  bool onMouseUp(const Mouse &m) override {
     if (isPrimary()) {
       for (auto *display : dataDisplays) {
         if (display->mVisible != 0.0f) {
@@ -731,7 +733,7 @@ class MyApp : public DistributedAppWithState<State> {
         mDataRootPath.setElements(elements);
         auto current = mDataRootPath.get();
         if (current < 0 && elements.size() > 0) {
-          mDataRootPath.set(current);  // Force calling callbacks.
+          mDataRootPath.set(current); // Force calling callbacks.
         }
       }
       ParameterGUI::draw(&mAvailableDatasets);
@@ -1025,7 +1027,7 @@ class MyApp : public DistributedAppWithState<State> {
     configLoader2.writeFile();
 
     std::string scriptPath = configLoader2.gets("pythonScriptsPath");
-    if (scriptPath.substr(0, 2) == "..") {  // Make path absolute
+    if (scriptPath.substr(0, 2) == "..") { // Make path absolute
       char cwd[256];
       getcwd(cwd, sizeof(cwd));
       std::string cwdString = cwd;
@@ -1110,7 +1112,7 @@ class MyApp : public DistributedAppWithState<State> {
         std::stringstream ss(line);
         std::string field;
         while (field.size() == 0) {
-          std::getline(ss, field, ' ');  // atom number
+          std::getline(ss, field, ' '); // atom number
         }
         field = "";
         while (field.size() == 0) {
@@ -1124,11 +1126,11 @@ class MyApp : public DistributedAppWithState<State> {
         float radius = stof(field);
         field = "";
         while (field.size() == 0) {
-          std::getline(ss, field, ' ');  // Ignore VdW radius
+          std::getline(ss, field, ' '); // Ignore VdW radius
         }
         field = "";
         while (field.size() == 0) {
-          std::getline(ss, field, ' ');  // Ignore Ionic radius
+          std::getline(ss, field, ' '); // Ignore Ionic radius
         }
         field = "";
         while (field.size() == 0) {
@@ -1159,7 +1161,7 @@ class MyApp : public DistributedAppWithState<State> {
 
   void processScreenshot() {
     std::unique_lock<std::mutex> lk(mScreenshotMutex);
-    if (mScreenshotPrefix.size() > 0) {  // Take screenshot
+    if (mScreenshotPrefix.size() > 0) { // Take screenshot
       std::vector<unsigned char> mPixels;
       mPixels.resize(width() * height() * 3);
       unsigned char *pixs = &mPixels[0];
@@ -1203,7 +1205,7 @@ class MyApp : public DistributedAppWithState<State> {
                         << std::endl;
             }
             updateTitle();
-            mAutoAdvance = 0.0;  // Turn off auto advance
+            mAutoAdvance = 0.0; // Turn off auto advance
           });
     }
 
@@ -1630,13 +1632,12 @@ class MyApp : public DistributedAppWithState<State> {
   }
 
   Rayd rayTransformAllosphere(Rayd r) {
-    double t =
-        r.intersectAllosphere();  // get t on surface of allosphere screen
+    double t = r.intersectAllosphere(); // get t on surface of allosphere screen
     Vec3f pos =
-        nav().quat().rotate(r(t));  // rotate point on allosphere to match
-                                    // current nav orientation (check this)
-    Rayd ray(nav().pos(), pos);  // ray from sphere center (camera location) to
-                                 // intersected location
+        nav().quat().rotate(r(t)); // rotate point on allosphere to match
+                                   // current nav orientation (check this)
+    Rayd ray(nav().pos(), pos); // ray from sphere center (camera location) to
+                                // intersected location
     return ray;
   }
 

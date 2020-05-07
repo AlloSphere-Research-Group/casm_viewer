@@ -30,9 +30,11 @@
 #include "al/ui/al_Pickable.hpp"
 #include "al/ui/al_PickableManager.hpp"
 #include "al/ui/al_PickableRotateHandle.hpp"
-#include "al_DataScript.hpp"
-#include "al_VASPReader.hpp"
-#include "al_VASPRender.hpp"
+
+#include "tinc/DataScript.hpp"
+#include "tinc/VASPReader.hpp"
+#include "tinc/VASPRender.hpp"
+
 #include "datasetmanager.hpp"
 #include "instanced_mesh.hpp"
 #include "processors.hpp"
@@ -70,7 +72,7 @@ inline HSV rgb2hsv(RGB c) {
 }
 
 class AtomProperties {
- public:
+public:
   string name;
   float drawScale;
   Color color;
@@ -83,8 +85,8 @@ struct ElementData {
 };
 
 class DataDisplayParameters {
- public:
-  ParameterVec3 layerDir{"LayerDir", ""};  // Direction of layers in data
+public:
+  ParameterVec3 layerDir{"LayerDir", ""}; // Direction of layers in data
 
   ParameterMenu mAtomOfInterest{"AtomOfInterest", "", 0};
   ParameterChoice mShowAtoms{"ShowAtoms"};
@@ -112,7 +114,7 @@ class DataDisplayParameters {
                           1.0,
                           "",
                           0,
-                          3};  // Increase layer size in projection view
+                          3}; // Increase layer size in projection view
 
   Parameter mPerspectiveRotY{"perspectiveRotY", "", -75, "", -90, 90};
 
@@ -129,7 +131,7 @@ class DataDisplayParameters {
 // -----------------------------------------------------------------
 
 class DataDisplay : public DataDisplayParameters {
- public:
+public:
   vector<AtomProperties> atomPropertiesProj;
 
   std::map<std::string, ElementData> elementData;
@@ -244,7 +246,7 @@ class DataDisplay : public DataDisplayParameters {
     //      std::cout << mSlicingPlaneThickness.get() <<std::endl;
   }
 
- protected:
+protected:
   Texture &iso_scene() { return fbo_iso.tex(); }
 
   // This function should be called whenever there is new atom position data
@@ -318,7 +320,7 @@ class DataDisplay : public DataDisplayParameters {
   //        g.popViewMatrix();
   //    }
 
- private:
+private:
   VAOMesh axis;
   VAOMesh orthoMesh;
   VAOMesh graphlinesMesh;
@@ -344,4 +346,4 @@ class DataDisplay : public DataDisplayParameters {
   BoundingBoxData mDataBoundaries;
 };
 
-#endif  // DATASETDISPLAY_HPP
+#endif // DATASETDISPLAY_HPP

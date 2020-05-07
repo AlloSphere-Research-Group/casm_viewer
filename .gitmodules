@@ -4,9 +4,3 @@
 [submodule "vdv_group_python"]
 	path = vdv_group_python
 	url = arg@nonce.mat.ucsb.edu:vdv_group_python.git
-[submodule "allolib"]
-	path = allolib
-	url = https://github.com/AlloSphere-Research-Group/allolib.git
-[submodule "al_ext"]
-	path = al_ext
-	url = https://github.com/AlloSphere-Research-Group/al_ext

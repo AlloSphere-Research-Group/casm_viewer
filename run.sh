@@ -34,9 +34,9 @@ else
 
 fi
 
-"${CMAKE_BINARY}" --build . --config Release --target casm_viewer_run
+"${CMAKE_BINARY}" --build . --config Release --target casm_viewer
 
-# if [ $? == 0 ]; then
-#     cd ../bin
-#     ./casm_viewer
-# fi
+if [ $? == 0 ]; then
+    cd bin
+    ./casm_viewer
+fi

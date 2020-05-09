@@ -139,14 +139,14 @@ void DataDisplay::init() {
     }
   });
 
-  vasprender.mSlicingPlaneThickness.registerChangeCallback([this](float v) {
+  atomrender.mSlicingPlaneThickness.registerChangeCallback([this](float v) {
     auto m = slicePickable.bb.max;
     m.z = v;
     slicePickable.bb.set(slicePickable.bb.min, m);
   });
 
   slicePickable.pose.registerChangeCallback([this](Pose pose) {
-    vasprender.mSlicingPlanePoint.setNoCalls(pose.pos());
+    atomrender.mSlicingPlanePoint.setNoCalls(pose.pos());
     // mSlicingPlaneNormal.setNoCalls();
   });
 
@@ -224,7 +224,7 @@ void DataDisplay::init() {
   bundle << mDatasetManager.mParameterSpaces["chempotA"]->parameter()
          << mDatasetManager.mParameterSpaces["chempotB"]->parameter();
   bundle << mDatasetManager.mParameterSpaces["time"]->parameter();
-  bundle << vasprender.mAtomMarkerSize;
+  bundle << atomrender.mAtomMarkerSize;
 
   bundle << mShowAtoms;
   bundle << mPlotXAxis;
@@ -232,15 +232,15 @@ void DataDisplay::init() {
   bundle << mShowGraph << mShowParallel << mShowPerspective;
 
   bundle << mPerspectiveRotY;
-  bundle << vasprender.mLayerSeparation;
-  bundle << vasprender.mSlicingPlaneNormal;
-  bundle << vasprender.mSliceRotationPitch << vasprender.mSliceRotationRoll;
-  bundle << vasprender.mSlicingPlanePoint << vasprender.mSlicingPlaneThickness
+  bundle << atomrender.mLayerSeparation;
+  bundle << atomrender.mSlicingPlaneNormal;
+  bundle << atomrender.mSliceRotationPitch << atomrender.mSliceRotationRoll;
+  bundle << atomrender.mSlicingPlanePoint << atomrender.mSlicingPlaneThickness
          << mLayerScaling;
   bundle << mShowGrid << mGridType << mGridSpacing << mGridXOffset
          << mGridYOffset;
 
-  bundle << vasprender.mShowRadius;
+  bundle << atomrender.mShowRadius;
   bundle << mCumulativeTrajectory << mIndividualTrajectory;
   bundle << mBillboarding;
   bundle << mSmallLabel;
@@ -592,9 +592,9 @@ void DataDisplay::dumpImages(string dumpPrefix) {
     }
   };
 
-  auto plane_point = vasprender.mSlicingPlanePoint.get();
-  auto plane_normal = vasprender.mSlicingPlaneNormal.get().normalized();
-  auto second_plane_distance = vasprender.mSlicingPlaneThickness.get();
+  auto plane_point = atomrender.mSlicingPlanePoint.get();
+  auto plane_normal = atomrender.mSlicingPlaneNormal.get().normalized();
+  auto second_plane_distance = atomrender.mSlicingPlaneThickness.get();
   auto slicePositions = *mDatasetManager.positionBuffers.get(false);
   File slicePositionsFile(File::conformPathToOS(dumpDirectory + "/" +
                                                 dumpPrefix +
@@ -639,7 +639,7 @@ void DataDisplay::dumpImages(string dumpPrefix) {
   metadata["SlicingPlanePoint"] = {plane_point.x, plane_point.y, plane_point.z};
   metadata["SliceNormal"] = {plane_normal.x, plane_normal.y, plane_normal.z};
 
-  metadata["SliceThickness"] = vasprender.mSlicingPlaneThickness.get();
+  metadata["SliceThickness"] = atomrender.mSlicingPlaneThickness.get();
   std::ofstream metadatafile(dumpDirectory + "/" + dumpPrefix +
                              "_metadata.json");
   metadatafile << std::setw(4) << metadata;
@@ -703,7 +703,7 @@ void DataDisplay::updateDisplayBuffers() {
       slicePickable.bb.set(Vec3f(b.min.x, b.min.y, b.min.z),
                            Vec3f(b.max.x, b.max.y, (b.max.z - b.min.z) * 0.5f));
       // rh.pose.pos().set(perspectivePickable.bb.cen);
-      vasprender.setDataBoundaries(b);
+      atomrender.setDataBoundaries(b);
     }
 
     // Set active atoms and colors
@@ -859,9 +859,9 @@ void DataDisplay::prepareParallelProjection(Graphics &g,
     //            { 0.0f, 0.0f, 0.0f },
     //            { 0.0f, 1.0f, 0.0f }));
     g.viewMatrix(
-        getLookAt(vasprender.mSlicingPlanePoint,
-                  vasprender.mSlicingPlanePoint.get() -
-                      vasprender.mSlicingPlaneNormal.get().normalized(),
+        getLookAt(atomrender.mSlicingPlanePoint,
+                  atomrender.mSlicingPlanePoint.get() -
+                      atomrender.mSlicingPlaneNormal.get().normalized(),
                   {0.0f, 1.0f, 0.0f}));
 
     gl::blending(false);
@@ -934,7 +934,7 @@ void DataDisplay::prepareParallelProjection(Graphics &g,
           //            );
           int count = data.counts;
           assert((int)mAligned4fData.size() >= (cumulativeCount + count) * 4);
-          vasprender.instancing_mesh0.attrib_data(
+          atomrender.instancing_mesh0.attrib_data(
               count * 4 * sizeof(float),
               mAligned4fData.data() + (cumulativeCount * 4), count);
           cumulativeCount += count;
@@ -949,33 +949,33 @@ void DataDisplay::prepareParallelProjection(Graphics &g,
           //            );
         }
         // now draw data with custom shader
-        g.shader(vasprender.instancing_mesh0.shader);
+        g.shader(atomrender.instancing_mesh0.shader);
         g.update(); // sends modelview and projection matrices
         g.shader().uniform("dataScale", scalingFactor);
         g.shader().uniform("layerSeparation", 1.0);
         // A scaling value of 4.0 found empirically...
-        if (vasprender.mShowRadius == 1.0f) {
+        if (atomrender.mShowRadius == 1.0f) {
           g.shader().uniform("markerScale", data.radius *
-                                                vasprender.mAtomMarkerSize *
-                                                vasprender.mMarkerScale);
+                                                atomrender.mAtomMarkerSize *
+                                                atomrender.mMarkerScale);
         } else {
-          g.shader().uniform("markerScale", vasprender.mAtomMarkerSize *
-                                                vasprender.mMarkerScale);
+          g.shader().uniform("markerScale", atomrender.mAtomMarkerSize *
+                                                atomrender.mMarkerScale);
         }
         g.shader().uniform("is_line", 0.0f);
         g.shader().uniform("is_omni", 0.0f);
 
-        g.shader().uniform("plane_point", vasprender.mSlicingPlanePoint.get());
+        g.shader().uniform("plane_point", atomrender.mSlicingPlanePoint.get());
         g.shader().uniform("plane_normal",
-                           vasprender.mSlicingPlaneNormal.get().normalized());
+                           atomrender.mSlicingPlaneNormal.get().normalized());
         g.shader().uniform("second_plane_distance",
-                           vasprender.mSlicingPlaneThickness);
+                           atomrender.mSlicingPlaneThickness);
 
         //                    g.shader().uniform("far_clip", farClip);
         //                    g.shader().uniform("near_clip", near);
         g.shader().uniform("clipped_mult", 0.0);
 
-        vasprender.instancing_mesh0.draw();
+        atomrender.instancing_mesh0.draw();
       }
     }
 
@@ -1005,29 +1005,29 @@ void DataDisplay::prepareParallelProjection(Graphics &g,
 
       if (atomPropertiesProj.size() > 0) {
         // now draw data with custom shader
-        g.shader(vasprender.instancing_mesh0.shader);
+        g.shader(atomrender.instancing_mesh0.shader);
         g.update(); // sends modelview and projection matrices
         g.shader().uniform("dataScale", scalingFactor);
         g.shader().uniform("layerSeparation", 1.0);
 
-        if (vasprender.mShowRadius == 1.0f) {
-          g.shader().uniform("markerScale", vasprender.mAtomMarkerSize *
-                                                vasprender.mMarkerScale);
+        if (atomrender.mShowRadius == 1.0f) {
+          g.shader().uniform("markerScale", atomrender.mAtomMarkerSize *
+                                                atomrender.mMarkerScale);
         } else {
-          g.shader().uniform("markerScale", vasprender.mMarkerScale);
+          g.shader().uniform("markerScale", atomrender.mMarkerScale);
         }
         g.shader().uniform("is_line", 0.0f);
         g.shader().uniform("is_omni", 0.0f);
 
-        g.shader().uniform("plane_point", vasprender.mSlicingPlanePoint.get());
+        g.shader().uniform("plane_point", atomrender.mSlicingPlanePoint.get());
         g.shader().uniform("plane_normal",
-                           vasprender.mSlicingPlaneNormal.get().normalized());
+                           atomrender.mSlicingPlaneNormal.get().normalized());
         g.shader().uniform("second_plane_distance",
-                           vasprender.mSlicingPlaneThickness);
+                           atomrender.mSlicingPlaneThickness);
         //                    g.shader().uniform("far_clip", farClip);
         //                    g.shader().uniform("near_clip", near);
         g.shader().uniform("clipped_mult", 0.0);
-        vasprender.instancing_mesh0.draw();
+        atomrender.instancing_mesh0.draw();
       }
 
       g.popViewMatrix();
@@ -1053,27 +1053,27 @@ void DataDisplay::prepareParallelProjection(Graphics &g,
 
       if (atomPropertiesProj.size() > 0) {
         // now draw data with custom shader
-        g.shader(vasprender.instancing_mesh0.shader);
+        g.shader(atomrender.instancing_mesh0.shader);
         g.update(); // sends modelview and projection matrices
         g.shader().uniform("dataScale", scalingFactor);
-        if (vasprender.mShowRadius == 1.0f) {
-          g.shader().uniform("markerScale", vasprender.mAtomMarkerSize *
-                                                vasprender.mMarkerScale);
+        if (atomrender.mShowRadius == 1.0f) {
+          g.shader().uniform("markerScale", atomrender.mAtomMarkerSize *
+                                                atomrender.mMarkerScale);
         } else {
-          g.shader().uniform("markerScale", vasprender.mMarkerScale);
+          g.shader().uniform("markerScale", atomrender.mMarkerScale);
         }
         g.shader().uniform("is_line", 0.0f);
         g.shader().uniform("is_omni", 0.0f);
 
-        g.shader().uniform("plane_point", vasprender.mSlicingPlanePoint.get());
+        g.shader().uniform("plane_point", atomrender.mSlicingPlanePoint.get());
         g.shader().uniform("plane_normal",
-                           vasprender.mSlicingPlaneNormal.get().normalized());
+                           atomrender.mSlicingPlaneNormal.get().normalized());
         g.shader().uniform("second_plane_distance",
-                           vasprender.mSlicingPlaneThickness);
+                           atomrender.mSlicingPlaneThickness);
         //                    g.shader().uniform("far_clip", farClip);
         //                    g.shader().uniform("near_clip", near);
         g.shader().uniform("clipped_mult", 0.0);
-        vasprender.instancing_mesh0.draw();
+        atomrender.instancing_mesh0.draw();
       }
 
       g.popViewMatrix();
@@ -1100,26 +1100,26 @@ void DataDisplay::prepareParallelProjection(Graphics &g,
 
       if (atomPropertiesProj.size() > 0) {
         // now draw data with custom shader
-        g.shader(vasprender.instancing_mesh0.shader);
+        g.shader(atomrender.instancing_mesh0.shader);
         g.update(); // sends modelview and projection matrices
         g.shader().uniform("dataScale", scalingFactor);
-        if (vasprender.mShowRadius == 1.0f) {
-          g.shader().uniform("markerScale", vasprender.mAtomMarkerSize *
-                                                vasprender.mMarkerScale);
+        if (atomrender.mShowRadius == 1.0f) {
+          g.shader().uniform("markerScale", atomrender.mAtomMarkerSize *
+                                                atomrender.mMarkerScale);
         } else {
-          g.shader().uniform("markerScale", vasprender.mMarkerScale);
+          g.shader().uniform("markerScale", atomrender.mMarkerScale);
         }
         g.shader().uniform("is_line", 0.0f);
         g.shader().uniform("is_omni", 0.0f);
-        g.shader().uniform("plane_point", vasprender.mSlicingPlanePoint.get());
+        g.shader().uniform("plane_point", atomrender.mSlicingPlanePoint.get());
         g.shader().uniform("plane_normal",
-                           vasprender.mSlicingPlaneNormal.get().normalized());
+                           atomrender.mSlicingPlaneNormal.get().normalized());
         g.shader().uniform("second_plane_distance",
-                           vasprender.mSlicingPlaneThickness);
+                           atomrender.mSlicingPlaneThickness);
         //                    g.shader().uniform("far_clip", farClip);
         //                    g.shader().uniform("near_clip", near);
         g.shader().uniform("clipped_mult", 0.0);
-        vasprender.instancing_mesh0.draw();
+        atomrender.instancing_mesh0.draw();
       }
 
       g.popViewMatrix();
@@ -1146,26 +1146,26 @@ void DataDisplay::prepareParallelProjection(Graphics &g,
 
       if (atomPropertiesProj.size() > 0) {
         // now draw data with custom shader
-        g.shader(vasprender.instancing_mesh0.shader);
+        g.shader(atomrender.instancing_mesh0.shader);
         g.update(); // sends modelview and projection matrices
         g.shader().uniform("dataScale", scalingFactor);
-        if (vasprender.mShowRadius == 1.0f) {
-          g.shader().uniform("markerScale", vasprender.mAtomMarkerSize *
-                                                vasprender.mMarkerScale);
+        if (atomrender.mShowRadius == 1.0f) {
+          g.shader().uniform("markerScale", atomrender.mAtomMarkerSize *
+                                                atomrender.mMarkerScale);
         } else {
-          g.shader().uniform("markerScale", vasprender.mMarkerScale);
+          g.shader().uniform("markerScale", atomrender.mMarkerScale);
         }
         g.shader().uniform("is_line", 0.0f);
         g.shader().uniform("is_omni", 0.0f);
-        g.shader().uniform("plane_point", vasprender.mSlicingPlanePoint.get());
+        g.shader().uniform("plane_point", atomrender.mSlicingPlanePoint.get());
         g.shader().uniform("plane_normal",
-                           vasprender.mSlicingPlaneNormal.get().normalized());
+                           atomrender.mSlicingPlaneNormal.get().normalized());
         g.shader().uniform("second_plane_distance",
-                           vasprender.mSlicingPlaneThickness);
+                           atomrender.mSlicingPlaneThickness);
         //                    g.shader().uniform("far_clip", farClip);
         //                    g.shader().uniform("near_clip", near);
         g.shader().uniform("clipped_mult", 0.0);
-        vasprender.instancing_mesh0.draw();
+        atomrender.instancing_mesh0.draw();
       }
 
       g.popViewMatrix();
@@ -1227,7 +1227,7 @@ void DataDisplay::drawPerspective(Graphics &g) {
   //        mDataBoundaries.minz + (mFarClip * (mDataBoundaries.maxz-
   //        mDataBoundaries.minz));
 
-  vasprender.drawVASP(g, perspectivePickable.scale, mAtomData, mAligned4fData);
+  atomrender.draw(g, perspectivePickable.scale, mAtomData, mAligned4fData);
 
   gl::depthTesting(true);
   gl::blending(true);
@@ -1250,7 +1250,7 @@ void DataDisplay::drawPerspective(Graphics &g) {
   const float x[2] = {mDataBoundaries.max.x, mDataBoundaries.min.x};
   const float y[2] = {mDataBoundaries.max.y, mDataBoundaries.min.y};
 
-  const float z[2] = {0.0, (vasprender.mSlicingPlaneThickness)};
+  const float z[2] = {0.0, (atomrender.mSlicingPlaneThickness)};
 
   for (int k = 0; k <= 1; k++) {
     for (int j = 0; j <= 1; j++) {
@@ -1274,10 +1274,10 @@ void DataDisplay::drawPerspective(Graphics &g) {
   glLineWidth(5);
   gl::polygonLine();
   g.color(0.8f, 0.8f, 1.0f, 0.9f);
-  g.scale(1.0, 1.0, 1.0f + vasprender.mLayerSeparation);
-  g.translate(vasprender.mSlicingPlanePoint.get());
-  g.rotate(vasprender.mSliceRotationPitch * 360.0f / (M_2PI), 1.0, 0.0, 0.0);
-  g.rotate(vasprender.mSliceRotationRoll * 360.0f / (M_2PI), 0.0, -1.0, 0.0);
+  g.scale(1.0, 1.0, 1.0f + atomrender.mLayerSeparation);
+  g.translate(atomrender.mSlicingPlanePoint.get());
+  g.rotate(atomrender.mSliceRotationPitch * 360.0f / (M_2PI), 1.0, 0.0, 0.0);
+  g.rotate(atomrender.mSliceRotationRoll * 360.0f / (M_2PI), 0.0, -1.0, 0.0);
   g.draw(boxMesh);
   gl::polygonFill();
   glLineWidth(1);

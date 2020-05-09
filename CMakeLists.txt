@@ -15,7 +15,6 @@ add_executable(${APP_NAME}
   src/datadisplay.hpp
   src/datasetmanager.hpp
   src/processors.hpp
-  src/instanced_mesh.hpp
   src/slice.hpp)
 
 # add allolib as a subdirectory to the project

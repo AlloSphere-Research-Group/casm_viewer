@@ -1,6 +1,0 @@
-font = "C:\\Windows\\Fonts\\arial.ttf"
-dataRootPaths = ["e:\\NaxCoO2"]
-pythonScriptsPath = "../vdv_group_python"
-pythonBinary = "python3"
-fontSize = 32
-preprocess = false

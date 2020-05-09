@@ -31,12 +31,11 @@
 #include "al/ui/al_PickableManager.hpp"
 #include "al/ui/al_PickableRotateHandle.hpp"
 
+#include "tinc/AtomRenderer.hpp"
 #include "tinc/DataScript.hpp"
 #include "tinc/VASPReader.hpp"
-#include "tinc/VASPRender.hpp"
 
 #include "datasetmanager.hpp"
-#include "instanced_mesh.hpp"
 #include "processors.hpp"
 #include "slice.hpp"
 
@@ -159,7 +158,7 @@ public:
 
   std::mutex mDrawLock;
 
-  VASPRender vasprender;
+  SlicingAtomRenderer atomrender;
 
   void init();
 
@@ -207,9 +206,9 @@ public:
     mDatasetManager.mParameterSpaces["time"]->stepDecrease();
   }
 
-  void nextLayer() { vasprender.nextLayer(); }
+  void nextLayer() { atomrender.nextLayer(); }
 
-  void previousLayer() { vasprender.previousLayer(); }
+  void previousLayer() { atomrender.previousLayer(); }
 
   //  void requestDataLoad() {
   //    mRequestLoad = true;
@@ -221,7 +220,7 @@ public:
 
   void computeSlicing() {
     if (mRunComputation) {
-      vasprender.mSlicingPlaneThickness =
+      atomrender.mSlicingPlaneThickness =
           findDistanceNormal(mAligned4fData, layerDir.get());
       std::cout << "Data Boundaries:" << std::endl;
       std::cout << "X " << mDataBoundaries.min.x << " -> "
@@ -230,19 +229,19 @@ public:
                 << mDataBoundaries.max.y << std::endl;
       std::cout << "Z " << mDataBoundaries.min.z << " -> "
                 << mDataBoundaries.max.z << std::endl;
-      Vec3f point = vasprender.mSlicingPlanePoint;
+      Vec3f point = atomrender.mSlicingPlanePoint;
       point.z = mDataBoundaries.min.z;
-      vasprender.mSlicingPlanePoint = point;
+      atomrender.mSlicingPlanePoint = point;
     }
   }
 
   void resetSlicing() {
-    vasprender.mSlicingPlanePoint.set({0, 0, mDataBoundaries.min.z});
+    atomrender.mSlicingPlanePoint.set({0, 0, mDataBoundaries.min.z});
 
-    vasprender.mSlicingPlaneThickness =
+    atomrender.mSlicingPlaneThickness =
         mDataBoundaries.max.z - mDataBoundaries.min.z;
-    vasprender.mSliceRotationRoll.set(0);
-    vasprender.mSliceRotationPitch.set(0);
+    atomrender.mSliceRotationRoll.set(0);
+    atomrender.mSliceRotationPitch.set(0);
     //      std::cout << mSlicingPlaneThickness.get() <<std::endl;
   }
 

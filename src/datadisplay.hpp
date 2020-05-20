@@ -87,7 +87,6 @@ class DataDisplayParameters {
 public:
   ParameterVec3 layerDir{"LayerDir", ""}; // Direction of layers in data
 
-  ParameterMenu mAtomOfInterest{"AtomOfInterest", "", 0};
   ParameterChoice mShowAtoms{"ShowAtoms"};
   ParameterBool mCumulativeTrajectory{"ShowCumulativeTrajectory", "", 1.0};
   ParameterBool mIndividualTrajectory{"ShowIndividualTrajectory", "", 1.0};
@@ -102,10 +101,6 @@ public:
   ParameterBool mBillboarding{"Billboarding", "", 1};
   ParameterBool mSmallLabel{"SmallLabel", "", 1};
   ParameterBool mDrawLabels{"DrawLabels", "", 1};
-
-  //    ParameterBool mMultiplot {"Multiplot", "", 0.0};
-  ParameterMenu mPlotYAxis{"PlotYAxis"};
-  ParameterMenu mPlotXAxis{"PlotXAxis"};
 
   Parameter mLayerScaling{"LayerScaling",
                           "",
@@ -137,8 +132,6 @@ public:
   std::string metaText;
 
   DatasetManager mDatasetManager;
-
-  bool mRunComputation{true};
 
   Mesh mHistoryMesh;
   Mesh mTrajectoryMesh;
@@ -213,7 +206,7 @@ public:
   void dumpImages(std::string dumpPrefix);
 
   void computeSlicing() {
-    if (mRunComputation) {
+    if (mDatasetManager.mRunProcessors) {
       atomrender.mSlicingPlaneThickness =
           findDistanceNormal(mAligned4fData, layerDir.get());
       std::cout << "Data Boundaries:" << std::endl;

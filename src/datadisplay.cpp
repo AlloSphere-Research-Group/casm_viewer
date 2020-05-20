@@ -100,27 +100,6 @@ void DataDisplay::init() {
   }
   axis.update();
 
-  // Parameters setup
-
-  for (auto &parameterSpace : mDatasetManager.mParameterSpaces) {
-    parameterSpace.second->parameter().registerChangeCallback([&](float value) {
-      if (parameterSpace.second->getCurrentId() !=
-          parameterSpace.second->idAt(parameterSpace.second->getIndexForValue(
-              value))) { // Only reload if id has changed
-
-        parameterSpace.second->parameter().setNoCalls(
-            value); // To have the internal value already changed for the
-                    // following functions.
-        std::cout << value << " : " << parameterSpace.second->getCurrentId()
-                  << "..."
-                  << parameterSpace.second->idAt(
-                         parameterSpace.second->getIndexForValue(value));
-        mDatasetManager.getAtomPositions();
-        updateText();
-      }
-    });
-  }
-
   // We need to process the callbacks for this within the graphics thread.
   mDatasetManager.mCurrentDataset.setSynchronousCallbacks();
   mDatasetManager.mCurrentDataset.registerChangeCallback(
@@ -135,7 +114,11 @@ void DataDisplay::init() {
 
   mShowAtoms.registerChangeCallback([this](uint16_t value) {
     if (mShowAtoms.get() != value) {
-      mDatasetManager.getAtomPositions();
+      // New values must be available for computeNewSample, throws away previous
+      // value
+      mShowAtoms.setNoCalls(value);
+      // TODO we should have a less heavy function to turn atoms on and off
+      mDatasetManager.computeNewSample();
     }
   });
 
@@ -145,9 +128,10 @@ void DataDisplay::init() {
     slicePickable.bb.set(slicePickable.bb.min, m);
   });
 
+  atomrender.init();
+
   slicePickable.pose.registerChangeCallback([this](Pose pose) {
     atomrender.mSlicingPlanePoint.setNoCalls(pose.pos());
-    // mSlicingPlaneNormal.setNoCalls();
   });
 
   backgroundColor.setHint("showAlpha", 1.0);
@@ -167,19 +151,6 @@ void DataDisplay::init() {
     }
   });
   mShowGrid = false;
-
-  // TODO we don't need to do a full data load here, just recompute the graph
-  mPlotYAxis.registerChangeCallback([this](float value) {
-    if (mPlotYAxis.get() != value) {
-      mDatasetManager.getAtomPositions();
-    }
-  });
-  // TODO we don't need to do a full data load here, just recompute the graph
-  mPlotXAxis.registerChangeCallback([this](float value) {
-    if (mPlotXAxis.get() != value) {
-      mDatasetManager.getAtomPositions();
-    }
-  });
 
   mDatasetManager.currentGraphName.setSynchronousCallbacks();
   mDatasetManager.currentGraphName.registerChangeCallback(
@@ -227,8 +198,8 @@ void DataDisplay::init() {
   bundle << atomrender.mAtomMarkerSize;
 
   bundle << mShowAtoms;
-  bundle << mPlotXAxis;
-  bundle << mPlotYAxis;
+  bundle << mDatasetManager.mPlotXAxis;
+  bundle << mDatasetManager.mPlotYAxis;
   bundle << mShowGraph << mShowParallel << mShowPerspective;
 
   bundle << mPerspectiveRotY;
@@ -260,7 +231,7 @@ void DataDisplay::initRootDirectory() {
   for (auto species : labelMap) {
     availableAtoms.push_back(species.first);
     if (species.first != "Va") {
-      // Vacancy atom names will be there already so wee need to skip to avoid
+      // Vacancy atom names will be there already so we need to skip to avoid
       // duplication
       atomLabels.insert(atomLabels.end(), species.second.begin(),
                         species.second.end());
@@ -269,44 +240,11 @@ void DataDisplay::initRootDirectory() {
   mShowAtoms.setNoCalls(0);
   // Only update menu and selection if it has changed
   if (atomLabels != mShowAtoms.getElements()) {
-    // Fill the atoms that can be showed
+    // Fill the atoms that can be shown
     mShowAtoms.setElements(atomLabels);
   }
-  // Only udpate available atoms menu and selections if it has changed
-  if (availableAtoms != mAtomOfInterest.getElements()) {
-    mAtomOfInterest.setElements(availableAtoms);
 
-    // Match atom of interest to atom that can fill vacancies
-    std::smatch match;
-    std::regex atomNameRegex("[A-Z][a-z]*");
-    for (auto atomName : labelMap["Va"]) {
-      // Use only first result
-      if (std::regex_search(atomName, match, atomNameRegex)) {
-        string result = match.str();
-        ptrdiff_t pos = std::distance(
-            availableAtoms.begin(),
-            find(availableAtoms.begin(), availableAtoms.end(), result));
-        if (pos < (int)availableAtoms.size()) {
-          mAtomOfInterest.set((int)pos);
-        }
-        mShowAtoms.setElementSelected(atomName);
-      }
-    }
-  }
-  auto dataNames = mDatasetManager.getDataNames();
-  mPlotYAxis.setElements(dataNames);
-  string defaultYAxis = "<comp_n(" + mAtomOfInterest.getCurrent() + ")>";
-  ptrdiff_t pos = std::find(dataNames.begin(), dataNames.end(), defaultYAxis) -
-                  dataNames.begin();
-  if (pos < (int)dataNames.size()) {
-    mPlotYAxis.set((int)pos);
-  }
-
-  std::vector<std::string> parameterSpaceNames;
-  parameterSpaceNames.push_back("temperature");
-
-  mPlotXAxis.setElements(parameterSpaceNames);
-  mPlotYAxis.set(0);
+  mShowAtoms.setElementSelected(mDatasetManager.mAtomOfInterest.getCurrent());
 
   updateText();
 }
@@ -788,15 +726,6 @@ void DataDisplay::updateDisplayBuffers() {
       }
       mAligned4fData[4 * i + 3] = hue;
     }
-  }
-
-  // Load image data ----------------------------
-
-  if (mRunComputation) {
-    std::string xData = mPlotXAxis.getCurrent();
-    std::string yData = mPlotYAxis.getCurrent();
-    mDatasetManager.generateGraph(xData, yData,
-                                  mDatasetManager.mCurrentDataset.get(), false);
   }
 }
 

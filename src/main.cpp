@@ -21,6 +21,9 @@
 
 #include "tinc/DeferredComputation.hpp"
 #include "tinc/PeriodicTask.hpp"
+
+#include "tinc/ProcessorServer.hpp"
+
 #undef AL_BUILD_MPI
 
 //#define STB_IMAGE_WRITE_STATIC
@@ -149,10 +152,12 @@ public:
   PeriodicTask mParameterPlayback;
 
   // TINC computation chains
-  ComputationChain initRootComputationChain;
+  ComputationChain initRootComputationChain{"PrepareDataset"};
 
   DataScript parameterSpaceProcessor{"ParameterSpaceProcessor"};
-  TemplateGenerator templateGen;
+  DataScript templateGen{"TemplateGenerator"};
+
+  ProcessorServer processorServer; // To expose processor chains on the network
 
   // --------
   std::vector<DataDisplay *> dataDisplays;
@@ -193,7 +198,6 @@ public:
       dataDisplays.push_back(new DataDisplay);
       dataDisplays.back()->init();
       dataDisplays.back()->mDatasetManager.mRunProcessors = rank == 0;
-      dataDisplays.back()->mRunComputation = rank == 0;
       dataDisplays.back()->mDatasetManager.mGlobalRoot = dataRoot;
     }
 
@@ -1185,6 +1189,11 @@ public:
     templateGen.verbose(true);
 
     initRootComputationChain << parameterSpaceProcessor << templateGen;
+
+    // Only the root chain needs to be
+    processorServer << initRootComputationChain
+                    << dataDisplays[0]->mDatasetManager.sampleComputationChain;
+    processorServer.exposeToNetwork(parameterServer());
   }
 
   void registerParameterCallbacks() {
@@ -1612,8 +1621,10 @@ public:
                          "cached_output/transfmat")) {
           templateGen.configuration["transfmat"] =
               Flag("cached_output/transfmat");
+        } else if (File::exists(templateGen.runningDirectory() + "transfmat")) {
+          templateGen.configuration["transfmat"] = "transfmat";
         } else {
-          templateGen.configuration["transfmat"] = Flag("../transfmat");
+          templateGen.configuration["transfmat"] = "../transfmat";
         }
 
         bool ok = initRootComputationChain.process();

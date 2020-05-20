@@ -17,38 +17,9 @@
 
 #include "nlohmann/json.hpp"
 
-using json = nlohmann::json;
+#include "tinc/ImageDiskBuffer.hpp"
 
-class BoundingBox_ {
-public:
-  float minx, miny, minz;
-  float maxx, maxy, maxz;
-  inline void reset() {
-    minx = FLT_MAX;
-    maxx = -FLT_MAX;
-    miny = FLT_MAX;
-    maxy = -FLT_MAX;
-    minz = FLT_MAX;
-    maxz = -FLT_MAX;
-  }
-  inline void addPoint(al::Vec3f &pos) {
-    if (pos.x > maxx) {
-      maxx = pos.x;
-    } else if (pos.x < minx) {
-      minx = pos.x;
-    }
-    if (pos.y > maxy) {
-      maxy = pos.y;
-    } else if (pos.y < miny) {
-      miny = pos.y;
-    }
-    if (pos.z > maxz) {
-      maxz = pos.z;
-    } else if (pos.z < minz) {
-      minz = pos.z;
-    }
-  }
-};
+using json = nlohmann::json;
 
 class DatasetManager {
 public:
@@ -56,6 +27,8 @@ public:
 
   VASPReader reader;
   std::mutex mDataLock;
+
+  bool mRunComputation{true};
 
   // Dataset metadata
   std::vector<std::string>
@@ -84,20 +57,23 @@ public:
   std::vector<std::pair<Vec3f, Vec3f>>
       mHistory; // From ->to (first, second) of pair
 
-  // External Processors
+  // TINC Computation
   CacheManager cacheManager;
-  AtomLabelProcessor labelProcessor;
-  GraphGenerator graphGenerator;
-  DiffGenerator diffGen;
 
-  ComputationChain sampleComputationChain{ComputationChain::PROCESS_ASYNC};
+  ComputationChain sampleComputationChain{ComputationChain::PROCESS_ASYNC,
+                                          "SampleComputation"};
 
+  DataScript labelProcessor{"AtomLabelProcessor"};
+  DataScript graphGenerator{"GraphGenerator"};
+  DiffGenerator diffGen /*{"ComputeDiffs"}*/;
+
+  // TINC Buffers.
   BufferManager<std::map<std::string, std::vector<float>>> positionBuffers{8};
 
-  bool graphProcessing{false};
+  // ----------------
 
-  // These are internal parameters to propagate data and triggering computation,
-  // not for direct user control
+  // These are internal parameters to propagate data and triggering
+  // computation, not for direct user control
   ParameterString mRootPath{"rootPath"};
   ParameterString mCurrentDataset{"currentDataset"}; // sub directory
   ParameterString currentGraphName{"currentGraphName", "internal", ""};
@@ -113,13 +89,16 @@ public:
       mParameterForSubDir; // Parameter value determines the subdirectory
   std::map<std::string, ParameterSpace *> mParameterSpaces;
 
+  // Plot axes
+  ParameterMenu mPlotYAxis{"PlotYAxis"};
+  ParameterMenu mPlotXAxis{"PlotXAxis"};
+
+  ParameterMenu mAtomOfInterest{"AtomOfInterest", "", 0};
+
   // Functions --------------
   DatasetManager();
 
-  void setupComputation() {
-
-    sampleComputationChain << labelProcessor << graphGenerator;
-  }
+  void initializeComputation();
 
   void setPythonBinary(std::string pythonBinaryPath);
 
@@ -144,13 +123,12 @@ public:
   // Processing functions for atom positions
   bool loadDiff(int timeIndex);
   void processTemplatePositions();
-  void loadFromPOSCAR();
-  void getAtomPositions();
+  //  void loadFromPOSCAR();
+  void computeNewSample();
 
   std::vector<std::string> getDataNames();
 
-  void generateGraph(std::string xData, std::string yData,
-                     std::string datasetId, bool multi);
+  void prepareGraphGeneration();
 
   typedef std::map<std::string, std::vector<std::string>> SpeciesLabelMap;
 

@@ -5,6 +5,7 @@
 #include <string>
 #include <vector>
 
+#include "tinc/ComputationChain.hpp"
 #include "tinc/VASPReader.hpp"
 
 #include "al/ui/al_Parameter.hpp"
@@ -87,8 +88,9 @@ public:
   CacheManager cacheManager;
   AtomLabelProcessor labelProcessor;
   GraphGenerator graphGenerator;
-  TemplateGenerator templateGen;
   DiffGenerator diffGen;
+
+  ComputationChain sampleComputationChain{ComputationChain::PROCESS_ASYNC};
 
   BufferManager<std::map<std::string, std::vector<float>>> positionBuffers{8};
 
@@ -113,6 +115,11 @@ public:
 
   // Functions --------------
   DatasetManager();
+
+  void setupComputation() {
+
+    sampleComputationChain << labelProcessor << graphGenerator;
+  }
 
   void setPythonBinary(std::string pythonBinaryPath);
 
@@ -190,6 +197,8 @@ public:
     //        std::cout << "Layer Direction " << layerDir.get()<< std::endl;
     return layerDir;
   }
+
+  void readParameterSpace();
 
 protected:
   // Look in the inner directory, then go up to the data root to try to find

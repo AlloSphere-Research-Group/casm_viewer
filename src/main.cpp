@@ -148,8 +148,13 @@ public:
 
   PeriodicTask mParameterPlayback;
 
-  ParameterSpaceProcessor parameterSpaceProcessor;
+  // TINC computation chains
+  ComputationChain initRootComputationChain;
 
+  DataScript parameterSpaceProcessor{"ParameterSpaceProcessor"};
+  TemplateGenerator templateGen;
+
+  // --------
   std::vector<DataDisplay *> dataDisplays;
 
   ObjectTransformHandler object_transform;
@@ -161,7 +166,7 @@ public:
   VAOMesh mControllerMesh;
 #endif
 
-  // ------------- Application calbacks
+  // ------------- Application callbacks
 
   void onInit() override {
     presetHandler = std::make_unique<PresetHandler>();
@@ -214,8 +219,11 @@ public:
     // ----------
     registerParameterCallbacks();
     loadConfiguration();
+    initializeComputation();
     setupParameterServer();
     readElementsIni();
+
+    mDataRootPath.set(0); // Force loading available
 
     if (isPrimary()) {
       for (auto *display : dataDisplays) {
@@ -260,21 +268,6 @@ public:
       parameterServer().requestAllParameters(simulatorIp, 9010);
     }
 
-    //    // Configure host dependent display options
-    //    if (hasCapability(CAP_OMNIRENDERING)) {
-
-    //      if (group == 1) {
-    //        std::cout << "Setting up display for group 1: SPHERE" <<
-    //        std::endl;
-    //        // this function loads config files if hostname suggests that the
-    //        app
-    //        // is running in sphere renderer. If not it loads fake
-    //        configuration to
-    //        // show cubemap view
-    //        load_perprojection_configuration();
-    //        cursorHide(true);
-    //      }
-    //    }
     if (al_get_hostname() ==
         "moxi") { // Fullscreen to two monitors on MOXI machine
       std::cout << "On MOXI! --------------------------------------"
@@ -1052,23 +1045,17 @@ public:
 
     std::string joinedRootPaths;
     auto paths = configLoader2.getVector<string>("dataRootPaths");
-    if (rank == 0) {
-      //      for (auto path: paths) {
-      //        processParameterSpace(path);
-      //      }
-    }
+    //    if (rank == 0) {
+    //      //      for (auto path: paths) {
+    //      //        processParameterSpace(path);
+    //      //      }
+    //    }
     mDataRootPath.setElements(paths);
-    mDataRootPath.registerChangeCallback([&](int index) {
-      if (this->rank == 0) {
-        processParameterSpace(mDataRootPath.getElements()[index]);
-      }
-    });
 
     std::string fontPath = configLoader2.gets("font");
     std::replace(fontPath.begin(), fontPath.end(), '\\', '/');
     font.set(fontPath);
     fontSize = configLoader2.getd("fontSize");
-    mDataRootPath.set(0);
   }
 
   void storeConfiguration() {
@@ -1181,6 +1168,23 @@ public:
 
       mScreenshotPrefix = "";
     }
+  }
+
+  void initializeComputation() {
+    parameterSpaceProcessor.setCommand(pythonBinary);
+    parameterSpaceProcessor.setScriptName(pythonScriptPath.get() +
+                                          "/analyze_parameter_space.py");
+
+    parameterSpaceProcessor.setOutputFileNames({"_parameter_space.json"});
+    parameterSpaceProcessor.verbose(true);
+
+    templateGen.setCommand(pythonBinary);
+    templateGen.setScriptName(pythonScriptPath.get() +
+                              "/reassign_occs/template_creator.py");
+    templateGen.setOutputFileNames({"template_POSCAR"});
+    templateGen.verbose(true);
+
+    initRootComputationChain << parameterSpaceProcessor << templateGen;
   }
 
   void registerParameterCallbacks() {
@@ -1490,7 +1494,7 @@ public:
           if (mAvailableDatasets.getCurrent() != "") {
             cleanParameterSpace(
                 File::conformPathToOS(mDataRootPath.getCurrent()));
-            processParameterSpace(
+            processNewDataRoot(
                 File::conformPathToOS(mDataRootPath.getCurrent()));
           }
         }
@@ -1550,6 +1554,12 @@ public:
         }
       }
     });
+
+    mDataRootPath.registerChangeCallback([&](int index) {
+      if (this->rank == 0) {
+        processNewDataRoot(mDataRootPath.getElements()[index]);
+      }
+    });
   }
 
   void cleanParameterSpace(string datasetPath) {
@@ -1585,31 +1595,38 @@ public:
     }
   }
 
-  void processParameterSpace(string rootPath) {
-    parameterSpaceProcessor.verbose(true);
-
+  void processNewDataRoot(string rootPath) {
     auto filelist = itemListInDir(dataRoot + rootPath);
     for (FilePath &element : filelist) {
       if (File::isDirectory(element.filepath())) {
         // Attempt to generate data space for all directories in root dir.
-        parameterSpaceProcessor.setCommand(pythonBinary);
-        parameterSpaceProcessor.setScriptName(pythonScriptPath.get() +
-                                              "/analyze_parameter_space.py");
+
         parameterSpaceProcessor.setRunningDirectory(element.filepath());
         parameterSpaceProcessor.setOutputDirectory(element.filepath() +
                                                    "/cached_output");
-        auto currentElement = element;
-        parameterSpaceProcessor.processAsync(
-            false, [element, rootPath, this](bool ok) {
-              std::cout << "Process parameter space asyc for "
-                        << element.filepath() << std::endl;
-              if (ok && File::exists(File::conformPathToOS(element.filepath()) +
-                                     "cached_output/_parameter_space.json")) {
-                updateAvailableDatasets(this->dataRoot + rootPath);
-              } else {
-                Dir::removeRecursively(element.filepath() + "/cached_output");
-              }
-            });
+
+        templateGen.setRunningDirectory(element.filepath());
+        templateGen.setOutputDirectory(element.filepath() + "/cached_output");
+
+        if (File::exists(templateGen.runningDirectory() +
+                         "cached_output/transfmat")) {
+          templateGen.configuration["transfmat"] =
+              Flag("cached_output/transfmat");
+        } else {
+          templateGen.configuration["transfmat"] = Flag("../transfmat");
+        }
+
+        bool ok = initRootComputationChain.process();
+
+        std::cout << "Process parameter space asyc for " << element.filepath()
+                  << std::endl;
+        if (ok && File::exists(File::conformPathToOS(element.filepath()) +
+                               "cached_output/_parameter_space.json")) {
+          updateAvailableDatasets(this->dataRoot + rootPath);
+        } else {
+          //                Dir::removeRecursively(element.filepath() +
+          //                "/cached_output");
+        }
       }
     }
   }

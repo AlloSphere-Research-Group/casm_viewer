@@ -98,7 +98,6 @@ public:
   ParameterBool mShowGraph{"ShowGraph", "", 1};
   ParameterBool mShowParallel{"ShowParallel", "", 1};
   ParameterBool mShowPerspective{"ShowPerspective", "", 1};
-  ParameterBool mSingleProjection{"SingleProjection", "", 1};
 
   ParameterBool mBillboarding{"Billboarding", "", 1};
   ParameterBool mSmallLabel{"SmallLabel", "", 1};
@@ -141,8 +140,6 @@ public:
 
   bool mRunComputation{true};
 
-  // #INSTANCED_RENDERING: declare
-  //  VAOMesh orthoMesh0;
   Mesh mHistoryMesh;
   Mesh mTrajectoryMesh;
 
@@ -167,6 +164,9 @@ public:
   void updateText();
   // Prepare elements before draw call
   void prepare(Graphics &g, Matrix4f &transformMatrix);
+
+  void prepareHistoryMesh();
+  void prepareParallelProjection(Graphics &g, Matrix4f &transformMatrix);
 
   // Draw function
   void draw(Graphics &g);
@@ -210,12 +210,6 @@ public:
 
   void previousLayer() { atomrender.previousLayer(); }
 
-  //  void requestDataLoad() {
-  //    mRequestLoad = true;
-  //  }
-
-  //  void requestInitDataset() { mRequestInit = true; }
-
   void dumpImages(std::string dumpPrefix);
 
   void computeSlicing() {
@@ -251,8 +245,6 @@ protected:
   // This function should be called whenever there is new atom position data
   void updateDisplayBuffers();
 
-  void prepareParallelProjection(Graphics &g, Matrix4f &transformMatrix);
-
   void drawHistory(Graphics &g) {
     g.pushMatrix();
     g.meshColor();
@@ -275,50 +267,6 @@ protected:
 
   void drawGraph(Graphics &g);
 
-  void updateParameterText() {
-    if (mNeedsProcessing.load()) {
-      mParamText = "Processing ...";
-    } else {
-    }
-  }
-
-  //    void drawLabel(Graphics &g) {
-
-  //        std::string title = mDatasetManager.currentDataset();
-  //        std::string text = getParameterText();
-
-  //        g.depthTesting(false);
-  //        g.blending(true);
-  //        g.blendModeAdd();
-  //        g.pushViewMatrix(Matrix4f::identity());
-
-  //        g.pushMatrix();
-  //        if (mSmallLabel) {
-  //            g.translate(0.3, 1.45, -6.0);
-  //            g.scale(0.2);
-  //        } else {
-  //            g.translate(-0.6, 1.2, -6.0);
-  //            g.scale(0.3);
-  //        }
-
-  //        mLabelFont.render(g, title);
-  //        g.popMatrix();
-
-  //        g.pushMatrix();
-  //        if (mSmallLabel) {
-  //            g.translate(0.3, 1.3, -6.0);
-  //            g.scale(0.2);
-  //        } else {
-  //            g.translate(-0.6, 1.0, -6.0);
-  //            g.scale(0.3);
-  //        }
-  //        mLabelFont.render(g, text);
-  //        g.popMatrix();
-
-  //        g.blending(false);
-  //        g.popViewMatrix();
-  //    }
-
 private:
   VAOMesh axis;
   VAOMesh orthoMesh;
@@ -327,16 +275,12 @@ private:
   VAOMesh mGridMesh;
 
   // Graph
-  //  std::mutex mGraphTextureLock;
   Texture mGraphTexture;
-  //  std::string mGraphFilePathToLoad;
-  //  std::string mGraphFilePath;
 
   Font mLabelFont;
 
   EasyFBO fbo_iso;
 
-  //  bool mRequestLoad {false};
   std::atomic<bool> mNeedsProcessing{false};
   bool mRequestInit{false};
 

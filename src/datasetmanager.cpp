@@ -46,7 +46,7 @@ DatasetManager::DatasetManager() {
 
   cacheManager.registerProcessor(labelProcessor);
   cacheManager.registerProcessor(graphGenerator);
-  cacheManager.registerProcessor(templateGen);
+  //  cacheManager.registerProcessor(templateGen);
 
   labelProcessor.maxAsyncProcesses(10);
 }
@@ -55,7 +55,6 @@ void DatasetManager::setPythonBinary(std::string pythonBinaryPath) {
   //      std::unique_lock<std::mutex> lk(mProcessingLock);
   graphGenerator.setCommand(pythonBinaryPath);
   labelProcessor.setCommand(pythonBinaryPath);
-  templateGen.setCommand(pythonBinaryPath);
   diffGen.setCommand(pythonBinaryPath);
 }
 
@@ -64,8 +63,6 @@ void DatasetManager::setPythonScriptPath(std::string pythonScriptPath) {
   labelProcessor.pythonScriptsPath = pythonScriptPath;
   graphGenerator.pythonScriptsPath = pythonScriptPath;
   graphGenerator.setScriptName(pythonScriptPath + "/graphing/plot.py");
-  templateGen.setScriptName(pythonScriptPath +
-                            "/reassign_occs/template_creator.py");
   diffGen.setScriptName(pythonScriptPath + "/reassign_occs/analyze_dmc.py");
 }
 
@@ -74,29 +71,7 @@ std::string DatasetManager::buildRootPath() {
                                File::conformPathToOS(mRootPath));
 }
 
-void DatasetManager::initRoot() {
-  std::unique_lock<std::mutex> lk(mDataLock);
-
-  std::string fullDatasetPath = File::conformPathToOS(
-      buildRootPath() + File::conformPathToOS(mCurrentDataset.get()));
-  mLoadedDataset = fullDatasetPath;
-
-  if (mRunProcessors) {
-    cacheManager.setOutputDirectory(fullDatasetPath + "/cached_output");
-    cacheManager.setRunningDirectory(fullDatasetPath);
-
-    labelProcessor.root_path = buildRootPath();
-
-    // FIMXE this could be moved as there is no need to recompute on every load
-    templateGen.process(templateGen.configuration(), true);
-
-    diffGen.datasetPath = fullDatasetPath;
-    diffGen.setRunningDirectory(fullDatasetPath);
-    diffGen.setOutputDirectory(fullDatasetPath);
-    //          diffGen.processAsync(templateGen.configuration(), false, [&](){
-    //          std::cout << "Computed diff for " << diffGen.datasetPath <<
-    //          std:: endl;});
-  }
+void DatasetManager::readParameterSpace() {
   std::string paramSpaceFile =
       File::conformPathToOS(buildRootPath() +
                             File::conformPathToOS(mCurrentDataset.get())) +
@@ -232,13 +207,33 @@ void DatasetManager::initRoot() {
     for (auto &paramSpace : mParameterSpaces) {
       paramSpace.second->unlock();
     }
-
   } else {
     std::cerr << "ERROR failed to find parameter space file: " << paramSpaceFile
               << std::endl;
   }
+}
+
+void DatasetManager::initRoot() {
+  std::unique_lock<std::mutex> lk(mDataLock);
+
+  std::string fullDatasetPath = File::conformPathToOS(
+      buildRootPath() + File::conformPathToOS(mCurrentDataset.get()));
+  mLoadedDataset = fullDatasetPath;
+
+  // Update processors configuration
+  cacheManager.setOutputDirectory(fullDatasetPath + "/cached_output");
+  cacheManager.setRunningDirectory(fullDatasetPath);
+
+  labelProcessor.root_path = buildRootPath();
+
+  diffGen.datasetPath = fullDatasetPath;
+  diffGen.setRunningDirectory(fullDatasetPath);
+  diffGen.setOutputDirectory(fullDatasetPath);
+
+  readParameterSpace();
   analyzeDataset();
   lk.unlock();
+  // Update data
   getAtomPositions();
 }
 
@@ -621,7 +616,7 @@ void DatasetManager::getAtomPositions() {
       //          std::string timeIndexId = mParameterSpaces["time"]->idAt(0);
       labelProcessor.setRunningDirectory(mLoadedDataset);
       labelProcessor.setParams(id, condition, mCurrentDataset, "0");
-      bool ok = labelProcessor.process(labelProcessor.configuration(), false);
+      bool ok = labelProcessor.process(false);
       if (ok) {
         processTemplatePositions();
       }

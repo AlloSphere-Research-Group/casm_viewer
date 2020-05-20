@@ -365,20 +365,7 @@ void DataDisplay::updateText() {
   }
 }
 
-void DataDisplay::prepare(Graphics &g, Matrix4f &transformMatrix) {
-  if (mNeedsProcessing) {
-    mDatasetManager.mCurrentDataset.processChange();
-    mNeedsProcessing = false;
-  }
-  if (mDatasetManager.mCurrentDataset.hasChange()) {
-    // TODO display some message here that we are computing
-    mNeedsProcessing = true;
-  }
-  updateDisplayBuffers();
-
-  // Load new graph data if needed.
-  mDatasetManager.currentGraphName.processChange();
-
+void DataDisplay::prepareHistoryMesh() {
   // History mesh displays individual movements from their actual positions
   mHistoryMesh.primitive(Mesh::TRIANGLES);
   mHistoryMesh.reset();
@@ -477,9 +464,27 @@ void DataDisplay::prepare(Graphics &g, Matrix4f &transformMatrix) {
     previousPoint = previousPoint + thisMovement;
     counter--;
   }
+}
 
+void DataDisplay::prepare(Graphics &g, Matrix4f &transformMatrix) {
+  if (mNeedsProcessing) {
+    mDatasetManager.mCurrentDataset.processChange();
+    mDatasetManager.currentGraphName.processChange();
+    mNeedsProcessing = false;
+  }
+  if (mDatasetManager.mCurrentDataset.hasChange() ||
+      mDatasetManager.currentGraphName.hasChange()) {
+    // Replace parameter text with temporary text:
+    mParamText = "Processing ...";
+    mNeedsProcessing = true;
+    // Schedule processing of changes for next pass to allow drawing one frame.
+  }
+
+  if (mDatasetManager.positionBuffers.newDataAvailable()) {
+    updateDisplayBuffers();
+  }
+  prepareHistoryMesh();
   prepareParallelProjection(g, transformMatrix);
-  //        g.scale(1.0/(mDataBoundaries.maxy - mDataBoundaries.miny));
 }
 
 void DataDisplay::draw(Graphics &g) { // Load data after drawing frame to allow
@@ -646,158 +651,153 @@ void DataDisplay::dumpImages(string dumpPrefix) {
 }
 
 void DataDisplay::updateDisplayBuffers() {
-  if (mDatasetManager.positionBuffers.newDataAvailable()) {
-    std::map<string, int> elementCounts;
+  std::map<string, int> elementCounts;
 
-    auto allPositions = mDatasetManager.positionBuffers.get();
+  auto allPositions = mDatasetManager.positionBuffers.get();
 
-    mDatasetManager.mCurrentLoadedIndeces.clear();
-    for (auto &paramSpace : mDatasetManager.mParameterSpaces) {
-      mDatasetManager.mCurrentLoadedIndeces[paramSpace.first] =
-          paramSpace.second->getCurrentIndex();
+  mDatasetManager.mCurrentLoadedIndeces.clear();
+  for (auto &paramSpace : mDatasetManager.mParameterSpaces) {
+    mDatasetManager.mCurrentLoadedIndeces[paramSpace.first] =
+        paramSpace.second->getCurrentIndex();
+  }
+
+  vector<vector<float> *> elemPositions;
+
+  // Now that the layer direction has been computed from the atom of interest,
+  // we need to generate aligned data from the visible atoms.
+  elemPositions.clear();
+  auto visibleAtoms = mShowAtoms.getSelectedElements();
+  for (auto &elementData : *allPositions) {
+    if (std::find(visibleAtoms.begin(), visibleAtoms.end(),
+                  elementData.first) != visibleAtoms.end()) {
+      elemPositions.push_back(&(elementData.second));
     }
+  }
+  // also prepare layer normal direction aligned data
+  size_t totalSize = 0;
+  for (auto *elems : elemPositions) {
+    totalSize += elems->size();
+  }
 
-    vector<vector<float> *> elemPositions;
-
-    // Now that the layer direction has been computed from the atom of interest,
-    // we need to generate aligned data from the visible atoms.
-    elemPositions.clear();
-    auto visibleAtoms = mShowAtoms.getSelectedElements();
-    for (auto &elementData : *allPositions) {
-      if (std::find(visibleAtoms.begin(), visibleAtoms.end(),
-                    elementData.first) != visibleAtoms.end()) {
-        elemPositions.push_back(&(elementData.second));
-      }
-    }
-    // also prepare layer normal direction aligned data
-    size_t totalSize = 0;
-    for (auto *elems : elemPositions) {
-      totalSize += elems->size();
-    }
-
-    mDataBoundaries.resetInv();
-    mAligned4fData.resize(totalSize * 4);
-    auto outit = mAligned4fData.begin();
-    // now fill the
-    for (auto *elems : elemPositions) {
-      auto it = elems->begin();
-      while (it != elems->end()) {
-        assert(outit != mAligned4fData.end());
-        float &x = *it++;
-        float &y = *it++;
-        float &z = *it++;
-        float &w = *it++;
-        Vec3f vec(x, y, z);
-        *outit++ = x;
-        *outit++ = y;
-        *outit++ = z;
-        *outit++ = w;
-        mDataBoundaries.includePoint(vec);
-      }
-    }
-
-    if (mAligned4fData.size() > 0) {
-      auto &b = mDataBoundaries;
-      perspectivePickable.bb.set(Vec3f(b.min.x, b.min.y, b.min.z),
-                                 Vec3f(b.max.x, b.max.y, b.max.z));
-      slicePickable.bb.set(Vec3f(b.min.x, b.min.y, b.min.z),
-                           Vec3f(b.max.x, b.max.y, (b.max.z - b.min.z) * 0.5f));
-      // rh.pose.pos().set(perspectivePickable.bb.cen);
-      atomrender.setDataBoundaries(b);
-    }
-
-    // Set active atoms and colors
-    atomPropertiesProj.clear();
-    vector<AtomProperties> atomPropertiesPersp;
-
-    // TODO these colors should be exposed as a preference
-    vector<Color> colorList = {
-        Color(0.0, 1.0, 1.0, 1.0), Color(1.0, 1.0, 0.0, 1.0),
-        Color(1.0, 0.0, 1.0, 1.0), Color(0.0, 1.0, 1.0, 1.0),
-        Color(1.0, 1.0, 0.0, 1.0), Color(1.0, 0.0, 1.0, 1.0)};
-
-    vector<Color> colorList2 = {
-        Color(0.7f, 0.0f, 0.7f, 0.4f), Color(0.7f, 0.0f, 0.7f, 1.0f),
-        Color(0.0f, 0.7f, 0.0f, 0.4f), Color(0.0f, 0.7f, 0.0f, 1.0f),
-        Color(0.0f, 0.0f, 0.7f, 0.4f), Color(0.0f, 0.0f, 0.7f, 1.0f),
-        Color(0.7f, 0.0f, 0.7f, 0.4f), Color(0.7f, 0.0f, 0.7f, 1.0f),
-        Color(0.0f, 0.7f, 0.0f, 0.4f), Color(0.0f, 0.7f, 0.0f, 1.0f),
-        Color(0.0f, 0.0f, 0.7f, 0.4f), Color(0.0f, 0.0f, 0.7f, 1.0f),
-    };
-    auto colorListIt = colorList.begin();
-    auto colorList2It = colorList2.begin();
-
-    auto selectedElements = mShowAtoms.getSelectedElements();
-    for (auto atom : mShowAtoms.getElements()) {
-      if (std::find(selectedElements.begin(), selectedElements.end(), atom) !=
-          selectedElements.end()) {
-        if (elementData.find(atom) != elementData.end()) {
-          //                    std::cout << "Color for: " << atom << ":" <<
-          //                    elementData[atom].color.r << " " <<
-          //                    elementData[atom].color.g << " "<<
-          //                    elementData[atom].color.b << " "  <<std::endl ;
-          // Atom was matched in elements.ini file, so use those colors
-
-          atomPropertiesProj.push_back(AtomProperties{
-              atom, elementData[atom].radius, elementData[atom].color});
-
-          atomPropertiesPersp.push_back(AtomProperties{
-              atom, elementData[atom].radius, elementData[atom].color});
-        } else { // Use defaults
-          atomPropertiesProj.push_back(
-              AtomProperties{atom, 1.0f, *colorListIt});
-
-          atomPropertiesPersp.push_back(
-              AtomProperties{atom, 1.0f, *colorList2It});
-        }
-      }
-      colorListIt++;
-      colorList2It++;
-      colorList2It++;
-    }
-
-    // Apply colors to aligned data -----------
-    list<Color> colors;
-    mAtomData.clear();
-    for (auto elem : *allPositions) {
-      elementCounts[elem.first] = elem.second.size() / 4;
-    }
-    for (auto atomProps : atomPropertiesProj) {
-      colors.push_back(atomProps.color);
-      mAtomData.push_back(
-          {elementCounts[atomProps.name], atomProps.drawScale, atomProps.name});
-    }
-    float hue = 0.0f;
-
-    if (colors.size() > 0) {
-      hue = rgb2hsv(colors.front().rgb()).h;
-    }
-    if (mAtomData.size() > 0) {
-      auto atomDataIt = mAtomData.begin();
-      int atomCounter = 0;
-      for (size_t i = 0; i < mAligned4fData.size() / 4; i++) {
-        //            assert(atomCountsIt != mAtomCounts.end());
-        if (atomDataIt != mAtomData.end() && --atomCounter <= 0) {
-          atomCounter = atomDataIt->counts;
-          atomDataIt++;
-          hue = rgb2hsv(colors.front().rgb()).h;
-          colors.pop_front();
-        }
-        mAligned4fData[4 * i + 3] = hue;
-      }
-    }
-
-    // Load image data ----------------------------
-
-    if (mRunComputation) {
-      std::string xData = mPlotXAxis.getCurrent();
-      std::string yData = mPlotYAxis.getCurrent();
-      mDatasetManager.generateGraph(
-          xData, yData, mDatasetManager.mCurrentDataset.get(), false);
+  mDataBoundaries.resetInv();
+  mAligned4fData.resize(totalSize * 4);
+  auto outit = mAligned4fData.begin();
+  // now fill the
+  for (auto *elems : elemPositions) {
+    auto it = elems->begin();
+    while (it != elems->end()) {
+      assert(outit != mAligned4fData.end());
+      float &x = *it++;
+      float &y = *it++;
+      float &z = *it++;
+      float &w = *it++;
+      Vec3f vec(x, y, z);
+      *outit++ = x;
+      *outit++ = y;
+      *outit++ = z;
+      *outit++ = w;
+      mDataBoundaries.includePoint(vec);
     }
   }
 
-  updateParameterText();
+  if (mAligned4fData.size() > 0) {
+    auto &b = mDataBoundaries;
+    perspectivePickable.bb.set(Vec3f(b.min.x, b.min.y, b.min.z),
+                               Vec3f(b.max.x, b.max.y, b.max.z));
+    slicePickable.bb.set(Vec3f(b.min.x, b.min.y, b.min.z),
+                         Vec3f(b.max.x, b.max.y, (b.max.z - b.min.z) * 0.5f));
+    // rh.pose.pos().set(perspectivePickable.bb.cen);
+    atomrender.setDataBoundaries(b);
+  }
+
+  // Set active atoms and colors
+  atomPropertiesProj.clear();
+  vector<AtomProperties> atomPropertiesPersp;
+
+  // TODO these colors should be exposed as a preference
+  vector<Color> colorList = {
+      Color(0.0, 1.0, 1.0, 1.0), Color(1.0, 1.0, 0.0, 1.0),
+      Color(1.0, 0.0, 1.0, 1.0), Color(0.0, 1.0, 1.0, 1.0),
+      Color(1.0, 1.0, 0.0, 1.0), Color(1.0, 0.0, 1.0, 1.0)};
+
+  vector<Color> colorList2 = {
+      Color(0.7f, 0.0f, 0.7f, 0.4f), Color(0.7f, 0.0f, 0.7f, 1.0f),
+      Color(0.0f, 0.7f, 0.0f, 0.4f), Color(0.0f, 0.7f, 0.0f, 1.0f),
+      Color(0.0f, 0.0f, 0.7f, 0.4f), Color(0.0f, 0.0f, 0.7f, 1.0f),
+      Color(0.7f, 0.0f, 0.7f, 0.4f), Color(0.7f, 0.0f, 0.7f, 1.0f),
+      Color(0.0f, 0.7f, 0.0f, 0.4f), Color(0.0f, 0.7f, 0.0f, 1.0f),
+      Color(0.0f, 0.0f, 0.7f, 0.4f), Color(0.0f, 0.0f, 0.7f, 1.0f),
+  };
+  auto colorListIt = colorList.begin();
+  auto colorList2It = colorList2.begin();
+
+  auto selectedElements = mShowAtoms.getSelectedElements();
+  for (auto atom : mShowAtoms.getElements()) {
+    if (std::find(selectedElements.begin(), selectedElements.end(), atom) !=
+        selectedElements.end()) {
+      if (elementData.find(atom) != elementData.end()) {
+        //                    std::cout << "Color for: " << atom << ":" <<
+        //                    elementData[atom].color.r << " " <<
+        //                    elementData[atom].color.g << " "<<
+        //                    elementData[atom].color.b << " "  <<std::endl ;
+        // Atom was matched in elements.ini file, so use those colors
+
+        atomPropertiesProj.push_back(AtomProperties{
+            atom, elementData[atom].radius, elementData[atom].color});
+
+        atomPropertiesPersp.push_back(AtomProperties{
+            atom, elementData[atom].radius, elementData[atom].color});
+      } else { // Use defaults
+        atomPropertiesProj.push_back(AtomProperties{atom, 1.0f, *colorListIt});
+
+        atomPropertiesPersp.push_back(
+            AtomProperties{atom, 1.0f, *colorList2It});
+      }
+    }
+    colorListIt++;
+    colorList2It++;
+    colorList2It++;
+  }
+
+  // Apply colors to aligned data -----------
+  list<Color> colors;
+  mAtomData.clear();
+  for (auto elem : *allPositions) {
+    elementCounts[elem.first] = elem.second.size() / 4;
+  }
+  for (auto atomProps : atomPropertiesProj) {
+    colors.push_back(atomProps.color);
+    mAtomData.push_back(
+        {elementCounts[atomProps.name], atomProps.drawScale, atomProps.name});
+  }
+  float hue = 0.0f;
+
+  if (colors.size() > 0) {
+    hue = rgb2hsv(colors.front().rgb()).h;
+  }
+  if (mAtomData.size() > 0) {
+    auto atomDataIt = mAtomData.begin();
+    int atomCounter = 0;
+    for (size_t i = 0; i < mAligned4fData.size() / 4; i++) {
+      //            assert(atomCountsIt != mAtomCounts.end());
+      if (atomDataIt != mAtomData.end() && --atomCounter <= 0) {
+        atomCounter = atomDataIt->counts;
+        atomDataIt++;
+        hue = rgb2hsv(colors.front().rgb()).h;
+        colors.pop_front();
+      }
+      mAligned4fData[4 * i + 3] = hue;
+    }
+  }
+
+  // Load image data ----------------------------
+
+  if (mRunComputation) {
+    std::string xData = mPlotXAxis.getCurrent();
+    std::string yData = mPlotYAxis.getCurrent();
+    mDatasetManager.generateGraph(xData, yData,
+                                  mDatasetManager.mCurrentDataset.get(), false);
+  }
 }
 
 void DataDisplay::prepareParallelProjection(Graphics &g,
@@ -849,134 +849,131 @@ void DataDisplay::prepareParallelProjection(Graphics &g,
   gl::polygonFill();
   gl::depthMask(true); // for axis rendering
 
-  if (mSingleProjection.get() == 1.0f) {
-    g.pushViewport(0, 0, 2 * w, 2 * h);
-    gl::scissorArea(0, 0, 2 * w, 2 * h);
-    g.clear(backgroundColor);
+  g.pushViewport(0, 0, 2 * w, 2 * h);
+  gl::scissorArea(0, 0, 2 * w, 2 * h);
+  g.clear(backgroundColor);
 
-    g.pushViewMatrix();
-    //            g.viewMatrix(getLookAt({ 0.0f, 0.0f, cameraZ },
-    //            { 0.0f, 0.0f, 0.0f },
-    //            { 0.0f, 1.0f, 0.0f }));
-    g.viewMatrix(
-        getLookAt(atomrender.mSlicingPlanePoint,
-                  atomrender.mSlicingPlanePoint.get() -
-                      atomrender.mSlicingPlaneNormal.get().normalized(),
-                  {0.0f, 1.0f, 0.0f}));
+  g.pushViewMatrix();
+  //            g.viewMatrix(getLookAt({ 0.0f, 0.0f, cameraZ },
+  //            { 0.0f, 0.0f, 0.0f },
+  //            { 0.0f, 1.0f, 0.0f }));
+  g.viewMatrix(getLookAt(atomrender.mSlicingPlanePoint,
+                         atomrender.mSlicingPlanePoint.get() -
+                             atomrender.mSlicingPlaneNormal.get().normalized(),
+                         {0.0f, 1.0f, 0.0f}));
 
-    gl::blending(false);
-    gl::depthTesting(true);
-    g.meshColor();
-    g.draw(axis);
+  gl::blending(false);
+  gl::depthTesting(true);
+  g.meshColor();
+  g.draw(axis);
 
-    if (mShowGrid == 1.0f) {
-      mGridMesh.reset();
-      addRect(mGridMesh, 0, -2.0, 0.1f / (maxrange * mLayerScaling), 4.0f);
-      mGridMesh.update();
-      if (backgroundColor.get().luminance() > 0.5f) {
-        g.color(0.2f);
-      } else {
-        g.color(0.7f);
-      }
-      for (int i = 0; i < 40; i++) {
-        if (mGridType.getCurrent() == "square") {
-          g.pushMatrix();
-          g.translate(mGridXOffset, mGridYOffset + mGridSpacing * i, 0);
-          g.scale(maxrange * mLayerScaling);
-          g.rotate(90, 0, 0, 1);
-          g.draw(mGridMesh);
-          g.popMatrix();
-          g.pushMatrix();
-          g.translate(mGridXOffset + mGridSpacing * i, mGridYOffset, 0);
-          g.scale(maxrange * mLayerScaling);
-          g.draw(mGridMesh);
-          g.popMatrix();
-        } else if (mGridType.getCurrent() == "triangle") {
-          float spacing = 0.86602540378f * mGridSpacing; // sin(60)
-          g.pushMatrix();
-          g.translate(mGridXOffset, mGridYOffset + spacing * i, 0);
-          g.scale(maxrange * mLayerScaling);
-          g.rotate(90, 0, 0, 1);
-          g.draw(mGridMesh);
-          g.popMatrix();
-          g.pushMatrix();
-          g.translate(mGridXOffset, mGridYOffset, 0);
-          g.rotate(30, 0, 0, 1);
-          g.translate(spacing * i, 0, 0);
-          g.scale(maxrange * mLayerScaling);
-          g.draw(mGridMesh);
-          g.popMatrix();
-          g.pushMatrix();
-          g.translate(mGridXOffset, mGridYOffset, 0);
-          g.rotate(-30, 0, 0, 1);
-          g.translate(spacing * i, 0, 0);
-          g.scale(maxrange * mLayerScaling);
-          g.draw(mGridMesh);
-          g.popMatrix();
-        }
+  if (mShowGrid == 1.0f) {
+    mGridMesh.reset();
+    addRect(mGridMesh, 0, -2.0, 0.1f / (maxrange * mLayerScaling), 4.0f);
+    mGridMesh.update();
+    if (backgroundColor.get().luminance() > 0.5f) {
+      g.color(0.2f);
+    } else {
+      g.color(0.7f);
+    }
+    for (int i = 0; i < 40; i++) {
+      if (mGridType.getCurrent() == "square") {
+        g.pushMatrix();
+        g.translate(mGridXOffset, mGridYOffset + mGridSpacing * i, 0);
+        g.scale(maxrange * mLayerScaling);
+        g.rotate(90, 0, 0, 1);
+        g.draw(mGridMesh);
+        g.popMatrix();
+        g.pushMatrix();
+        g.translate(mGridXOffset + mGridSpacing * i, mGridYOffset, 0);
+        g.scale(maxrange * mLayerScaling);
+        g.draw(mGridMesh);
+        g.popMatrix();
+      } else if (mGridType.getCurrent() == "triangle") {
+        float spacing = 0.86602540378f * mGridSpacing; // sin(60)
+        g.pushMatrix();
+        g.translate(mGridXOffset, mGridYOffset + spacing * i, 0);
+        g.scale(maxrange * mLayerScaling);
+        g.rotate(90, 0, 0, 1);
+        g.draw(mGridMesh);
+        g.popMatrix();
+        g.pushMatrix();
+        g.translate(mGridXOffset, mGridYOffset, 0);
+        g.rotate(30, 0, 0, 1);
+        g.translate(spacing * i, 0, 0);
+        g.scale(maxrange * mLayerScaling);
+        g.draw(mGridMesh);
+        g.popMatrix();
+        g.pushMatrix();
+        g.translate(mGridXOffset, mGridYOffset, 0);
+        g.rotate(-30, 0, 0, 1);
+        g.translate(spacing * i, 0, 0);
+        g.scale(maxrange * mLayerScaling);
+        g.draw(mGridMesh);
+        g.popMatrix();
       }
     }
+  }
 
-    gl::blending(true);
-    gl::blendTrans();
-    gl::depthTesting(false);
-    g.pushMatrix();
+  gl::blending(true);
+  gl::blendTrans();
+  gl::depthTesting(false);
+  g.pushMatrix();
 
-    if (atomPropertiesProj.size() > 0) {
-      // ----------------------------------------
-      int cumulativeCount = 0;
-      for (auto &data : mAtomData) {
-        if (mAlignData) {
-          //            instancing_mesh0.attrib_data(
-          //              mAligned4fData.size() * sizeof(float),
-          //              mAligned4fData.data(),
-          //              mAligned4fData.size()/4
-          //            );
-          int count = data.counts;
-          assert((int)mAligned4fData.size() >= (cumulativeCount + count) * 4);
-          atomrender.instancing_mesh0.attrib_data(
-              count * 4 * sizeof(float),
-              mAligned4fData.data() + (cumulativeCount * 4), count);
-          cumulativeCount += count;
-          //                        std::cout << "Drawing " << counts << " of "
-          //                        << cumulativeCount << std::endl;
-        } else {
-          //            auto& elemPositions = r0->getElementPositions(p0.name);
-          //            instancing_mesh0.attrib_data(
-          //              elemPositions.size() * sizeof(float),
-          //              elemPositions.data(),
-          //              elemPositions.size()/4
-          //            );
-        }
-        // now draw data with custom shader
-        g.shader(atomrender.instancing_mesh0.shader);
-        g.update(); // sends modelview and projection matrices
-        g.shader().uniform("dataScale", scalingFactor);
-        g.shader().uniform("layerSeparation", 1.0);
-        // A scaling value of 4.0 found empirically...
-        if (atomrender.mShowRadius == 1.0f) {
-          g.shader().uniform("markerScale", data.radius *
-                                                atomrender.mAtomMarkerSize *
-                                                atomrender.mMarkerScale);
-        } else {
-          g.shader().uniform("markerScale", atomrender.mAtomMarkerSize *
-                                                atomrender.mMarkerScale);
-        }
-        g.shader().uniform("is_line", 0.0f);
-        g.shader().uniform("is_omni", 0.0f);
-
-        g.shader().uniform("plane_point", atomrender.mSlicingPlanePoint.get());
-        g.shader().uniform("plane_normal",
-                           atomrender.mSlicingPlaneNormal.get().normalized());
-        g.shader().uniform("second_plane_distance",
-                           atomrender.mSlicingPlaneThickness);
-
-        //                    g.shader().uniform("far_clip", farClip);
-        //                    g.shader().uniform("near_clip", near);
-        g.shader().uniform("clipped_mult", 0.0);
-
-        atomrender.instancing_mesh0.draw();
+  if (atomPropertiesProj.size() > 0) {
+    // ----------------------------------------
+    int cumulativeCount = 0;
+    for (auto &data : mAtomData) {
+      if (mAlignData) {
+        //            instancing_mesh0.attrib_data(
+        //              mAligned4fData.size() * sizeof(float),
+        //              mAligned4fData.data(),
+        //              mAligned4fData.size()/4
+        //            );
+        int count = data.counts;
+        assert((int)mAligned4fData.size() >= (cumulativeCount + count) * 4);
+        atomrender.instancing_mesh0.attrib_data(
+            count * 4 * sizeof(float),
+            mAligned4fData.data() + (cumulativeCount * 4), count);
+        cumulativeCount += count;
+        //                        std::cout << "Drawing " << counts << " of "
+        //                        << cumulativeCount << std::endl;
+      } else {
+        //            auto& elemPositions = r0->getElementPositions(p0.name);
+        //            instancing_mesh0.attrib_data(
+        //              elemPositions.size() * sizeof(float),
+        //              elemPositions.data(),
+        //              elemPositions.size()/4
+        //            );
       }
+      // now draw data with custom shader
+      g.shader(atomrender.instancing_mesh0.shader);
+      g.update(); // sends modelview and projection matrices
+      g.shader().uniform("dataScale", scalingFactor);
+      g.shader().uniform("layerSeparation", 1.0);
+      // A scaling value of 4.0 found empirically...
+      if (atomrender.mShowRadius == 1.0f) {
+        g.shader().uniform("markerScale", data.radius *
+                                              atomrender.mAtomMarkerSize *
+                                              atomrender.mMarkerScale);
+      } else {
+        g.shader().uniform("markerScale", atomrender.mAtomMarkerSize *
+                                              atomrender.mMarkerScale);
+      }
+      g.shader().uniform("is_line", 0.0f);
+      g.shader().uniform("is_omni", 0.0f);
+
+      g.shader().uniform("plane_point", atomrender.mSlicingPlanePoint.get());
+      g.shader().uniform("plane_normal",
+                         atomrender.mSlicingPlaneNormal.get().normalized());
+      g.shader().uniform("second_plane_distance",
+                         atomrender.mSlicingPlaneThickness);
+
+      //                    g.shader().uniform("far_clip", farClip);
+      //                    g.shader().uniform("near_clip", near);
+      g.shader().uniform("clipped_mult", 0.0);
+
+      atomrender.instancing_mesh0.draw();
     }
 
     drawHistory(g);
@@ -984,193 +981,6 @@ void DataDisplay::prepareParallelProjection(Graphics &g,
     g.popMatrix();
     g.popViewMatrix();
     g.popViewport();
-  } else {
-    // (from x, y up), (right bottom)
-    {
-      g.pushViewport(w, 0, w, h);
-      gl::scissorArea(w, 0, w, h);
-      g.clear(backgroundColor);
-
-      g.pushViewMatrix();
-      g.viewMatrix(getLookAt({4, 0, 0}, {0, 0, 0}, {0, 1, 0}));
-
-      gl::blending(false);
-      gl::depthTesting(true);
-      g.meshColor();
-      g.draw(axis);
-
-      gl::blending(true);
-      gl::blendAdd();
-      gl::depthTesting(false);
-
-      if (atomPropertiesProj.size() > 0) {
-        // now draw data with custom shader
-        g.shader(atomrender.instancing_mesh0.shader);
-        g.update(); // sends modelview and projection matrices
-        g.shader().uniform("dataScale", scalingFactor);
-        g.shader().uniform("layerSeparation", 1.0);
-
-        if (atomrender.mShowRadius == 1.0f) {
-          g.shader().uniform("markerScale", atomrender.mAtomMarkerSize *
-                                                atomrender.mMarkerScale);
-        } else {
-          g.shader().uniform("markerScale", atomrender.mMarkerScale);
-        }
-        g.shader().uniform("is_line", 0.0f);
-        g.shader().uniform("is_omni", 0.0f);
-
-        g.shader().uniform("plane_point", atomrender.mSlicingPlanePoint.get());
-        g.shader().uniform("plane_normal",
-                           atomrender.mSlicingPlaneNormal.get().normalized());
-        g.shader().uniform("second_plane_distance",
-                           atomrender.mSlicingPlaneThickness);
-        //                    g.shader().uniform("far_clip", farClip);
-        //                    g.shader().uniform("near_clip", near);
-        g.shader().uniform("clipped_mult", 0.0);
-        atomrender.instancing_mesh0.draw();
-      }
-
-      g.popViewMatrix();
-      g.popViewport();
-    }
-
-    // (from y, -z up), (left top)
-    {
-      g.pushViewport(0, h, w, h);
-      gl::scissorArea(0, h, w, h);
-      g.clear(0, 0.2f, 0);
-
-      g.pushViewMatrix();
-      g.viewMatrix(getLookAt({0, 4, 0}, {0, 0, 0}, {0, 0, -1}));
-
-      gl::blending(false);
-      gl::depthTesting(true);
-      g.meshColor();
-      g.draw(axis);
-
-      gl::blendAdd();
-      gl::depthTesting(false);
-
-      if (atomPropertiesProj.size() > 0) {
-        // now draw data with custom shader
-        g.shader(atomrender.instancing_mesh0.shader);
-        g.update(); // sends modelview and projection matrices
-        g.shader().uniform("dataScale", scalingFactor);
-        if (atomrender.mShowRadius == 1.0f) {
-          g.shader().uniform("markerScale", atomrender.mAtomMarkerSize *
-                                                atomrender.mMarkerScale);
-        } else {
-          g.shader().uniform("markerScale", atomrender.mMarkerScale);
-        }
-        g.shader().uniform("is_line", 0.0f);
-        g.shader().uniform("is_omni", 0.0f);
-
-        g.shader().uniform("plane_point", atomrender.mSlicingPlanePoint.get());
-        g.shader().uniform("plane_normal",
-                           atomrender.mSlicingPlaneNormal.get().normalized());
-        g.shader().uniform("second_plane_distance",
-                           atomrender.mSlicingPlaneThickness);
-        //                    g.shader().uniform("far_clip", farClip);
-        //                    g.shader().uniform("near_clip", near);
-        g.shader().uniform("clipped_mult", 0.0);
-        atomrender.instancing_mesh0.draw();
-      }
-
-      g.popViewMatrix();
-      g.popViewport();
-    }
-
-    // (from z, y up), (left bottom)
-    {
-      g.pushViewport(0, 0, w, h);
-      gl::scissorArea(0, 0, w, h);
-      g.clear(0, 0, 0.2f);
-
-      g.pushViewMatrix();
-      g.viewMatrix(getLookAt({0, 0, 4}, {0, 0, 0}, {0, 1, 0}));
-
-      gl::blending(false);
-      gl::depthTesting(true);
-      g.meshColor();
-      g.draw(axis);
-
-      gl::blending(true);
-      gl::blendAdd();
-      gl::depthTesting(false);
-
-      if (atomPropertiesProj.size() > 0) {
-        // now draw data with custom shader
-        g.shader(atomrender.instancing_mesh0.shader);
-        g.update(); // sends modelview and projection matrices
-        g.shader().uniform("dataScale", scalingFactor);
-        if (atomrender.mShowRadius == 1.0f) {
-          g.shader().uniform("markerScale", atomrender.mAtomMarkerSize *
-                                                atomrender.mMarkerScale);
-        } else {
-          g.shader().uniform("markerScale", atomrender.mMarkerScale);
-        }
-        g.shader().uniform("is_line", 0.0f);
-        g.shader().uniform("is_omni", 0.0f);
-        g.shader().uniform("plane_point", atomrender.mSlicingPlanePoint.get());
-        g.shader().uniform("plane_normal",
-                           atomrender.mSlicingPlaneNormal.get().normalized());
-        g.shader().uniform("second_plane_distance",
-                           atomrender.mSlicingPlaneThickness);
-        //                    g.shader().uniform("far_clip", farClip);
-        //                    g.shader().uniform("near_clip", near);
-        g.shader().uniform("clipped_mult", 0.0);
-        atomrender.instancing_mesh0.draw();
-      }
-
-      g.popViewMatrix();
-      g.popViewport();
-    }
-
-    // diagonal view, right-top
-    {
-      g.pushViewport(w, h, w, h);
-      gl::scissorArea(w, h, w, h);
-      g.clear(0.2f, 0.2f, 0.2f);
-
-      g.pushViewMatrix();
-      g.viewMatrix(getLookAt({3, 3, 3}, {0, 0, 0}, {0, 1, 0}));
-
-      gl::blending(false);
-      gl::depthTesting(true);
-      g.meshColor();
-      g.draw(axis);
-
-      gl::blending(true);
-      gl::blendAdd();
-      gl::depthTesting(false);
-
-      if (atomPropertiesProj.size() > 0) {
-        // now draw data with custom shader
-        g.shader(atomrender.instancing_mesh0.shader);
-        g.update(); // sends modelview and projection matrices
-        g.shader().uniform("dataScale", scalingFactor);
-        if (atomrender.mShowRadius == 1.0f) {
-          g.shader().uniform("markerScale", atomrender.mAtomMarkerSize *
-                                                atomrender.mMarkerScale);
-        } else {
-          g.shader().uniform("markerScale", atomrender.mMarkerScale);
-        }
-        g.shader().uniform("is_line", 0.0f);
-        g.shader().uniform("is_omni", 0.0f);
-        g.shader().uniform("plane_point", atomrender.mSlicingPlanePoint.get());
-        g.shader().uniform("plane_normal",
-                           atomrender.mSlicingPlaneNormal.get().normalized());
-        g.shader().uniform("second_plane_distance",
-                           atomrender.mSlicingPlaneThickness);
-        //                    g.shader().uniform("far_clip", farClip);
-        //                    g.shader().uniform("near_clip", near);
-        g.shader().uniform("clipped_mult", 0.0);
-        atomrender.instancing_mesh0.draw();
-      }
-
-      g.popViewMatrix();
-      g.popViewport();
-    }
   }
 
   // put back scissoring

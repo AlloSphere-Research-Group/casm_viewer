@@ -12,11 +12,10 @@ using namespace tinc;
 
 class AtomLabelProcessor : public DataScript {
 public:
+  std::string id = "AtomLabelProcessor";
   std::string pythonScriptsPath;
   std::string root_path;
   std::string scriptName = "reassign_occs/reassign_occs.py";
-
-  AtomLabelProcessor() {}
 
   void setParams(std::string id, std::string condition, std::string datasetId,
                  std::string timeStep = "") {
@@ -91,18 +90,9 @@ private:
   //  std::string mTemplateMarker {"$"};
 };
 
-class ParameterSpaceProcessor : public DataScript {
-public:
-  virtual void configure() override {
-    clearFlags();
-    appendFlag(scriptFile(false), FLAG_SCRIPT);
-    appendFlag(runningDirectory(), FLAG_OUTPUT_DIR);
-    appendFlag("cached_output/_parameter_space.json", FLAG_OUTPUT_NAME);
-  }
-};
-
 class GraphGenerator : public DataScript {
 public:
+  std::string id = "GraphGenerator";
   // Parameters
   std::string pythonScriptsPath;
   std::string title;
@@ -126,8 +116,6 @@ public:
 
   bool multi{false};
 
-  GraphGenerator() {}
-
   void replaceAll(std::string &s, const std::string &search,
                   const std::string &replace) {
     for (size_t pos = 0;; pos += replace.length()) {
@@ -142,7 +130,7 @@ public:
   }
 
   std::map<std::string, std::string> configuration() {
-    mFlags.clear();
+    //    mFlags.clear();
     std::map<std::string, std::string> config;
     std::string yLabelSanitized = yLabel;
     replaceAll(yLabelSanitized, "<", "_");
@@ -150,10 +138,9 @@ public:
     replaceAll(yLabelSanitized, "(", "_");
     replaceAll(yLabelSanitized, ")", "_");
 
-    config["__output_name"] = dataset + "_" + temp_interest + "_" +
-                              sanitizeName(subdir) + "_" + yLabelSanitized +
-                              "_graph.png";
-    appendFlag(config["__output_name"], FLAG_OUTPUT_NAME);
+    setOutputFileNames({dataset + "_" + temp_interest + "_" +
+                        sanitizeName(subdir) + "_" + yLabelSanitized +
+                        "_graph.png"});
 
     config["__output_path"] = outputDirectory();
 
@@ -182,35 +169,11 @@ public:
 private:
 };
 
-class TemplateGenerator : public DataScript {
-public:
-  // Parameters
-  std::string outName = "template_POSCAR";
-
-  std::map<std::string, std::string> configuration() {
-
-    std::map<std::string, std::string> config;
-    if (File::exists(runningDirectory() + "prim.json")) {
-      config["prim_path"] = "prim.json";
-    } else {
-      config["prim_path"] = "../prim.json";
-    }
-    if (File::exists(runningDirectory() + "cached_output/transfmat")) {
-      config["transfmat"] = "cached_output/transfmat";
-    } else {
-      config["transfmat"] = "../transfmat";
-    }
-
-    config["__output_name"] = sanitizeName(outName);
-    config["__output_path"] = outputDirectory();
-
-    return config;
-  }
-};
-
 class DiffGenerator : public DataScript {
 public:
   // Parameters
+
+  std::string id = "DiffGenerator";
 
   std::string datasetPath;
   std::string condition;

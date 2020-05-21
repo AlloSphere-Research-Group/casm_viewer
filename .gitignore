@@ -13,3 +13,5 @@ build/*
 bin/cached_output
 bin/casm_viewer
 bin/casm_viewerd
+vdv_data
+vdv_data_attic

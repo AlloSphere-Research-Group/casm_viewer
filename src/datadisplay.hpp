@@ -73,7 +73,7 @@ inline HSV rgb2hsv(RGB c) {
 class AtomProperties {
 public:
   string name;
-  float drawScale;
+  float drawScale = 1.0;
   Color color;
   //  gl::PolygonMode polygonMode{Mesh::FILL};
 };
@@ -129,8 +129,6 @@ public:
 
   std::map<std::string, ElementData> elementData;
 
-  std::string metaText;
-
   DatasetManager mDatasetManager;
 
   Mesh mHistoryMesh;
@@ -154,7 +152,6 @@ public:
 
   void initRootDirectory();
 
-  void updateText();
   // Prepare elements before draw call
   void prepare(Graphics &g, Matrix4f &transformMatrix);
 

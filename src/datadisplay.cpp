@@ -237,69 +237,18 @@ void DataDisplay::initRootDirectory() {
                         species.second.end());
     }
   }
-  mShowAtoms.setNoCalls(0);
   // Only update menu and selection if it has changed
   if (atomLabels != mShowAtoms.getElements()) {
     // Fill the atoms that can be shown
     mShowAtoms.setElements(atomLabels);
+    mShowAtoms.setNoCalls(0);
   }
-
-  mShowAtoms.setElementSelected(mDatasetManager.mAtomOfInterest.getCurrent());
-
-  updateText();
-}
-
-void DataDisplay::updateText() {
-  // Meta data texts
-  metaText = "Global Root: " + mDatasetManager.mGlobalRoot + "\n";
-
-  metaText += "Root: " + mDatasetManager.mRootPath.get() + "\n";
-  metaText += "Dataset: " + mDatasetManager.mCurrentDataset.get() + "\n";
-  metaText += "Subdir: " + mDatasetManager.getSubDir() + "\n";
-  metaText +=
-      "Condition Param: " + mDatasetManager.mConditionsParameter +
-      " condition: " +
-      std::to_string(mDatasetManager
-                         .mParameterSpaces[mDatasetManager.mConditionsParameter]
-                         ->getCurrentIndex()) +
-      "\n";
-
-  metaText += " ----- Parameters -----\n";
-  for (auto param : mDatasetManager.mParameterSpaces) {
-    if (param.second->size() > 2) {
-      metaText += param.first + " : " + param.second->getCurrentId() + "\n";
-    } else if (param.second->size() == 1) {
-      // For spaces with a single value, the id will be ./ so show the value
-      metaText += param.first + " : " +
-                  std::to_string(param.second->getCurrentValue()) + "\n";
+  auto speciesOfInterest = mDatasetManager.mAtomOfInterest.getCurrent();
+  // Show atoms that begin with atom of interest e.g. Na1 if atom of interest Na
+  for (auto elementLabel : mShowAtoms.getElements()) {
+    if (elementLabel.substr(0, speciesOfInterest.size()) == speciesOfInterest) {
+      mShowAtoms.setElementSelected(elementLabel);
     }
-  }
-  metaText += " ----- Data -----\n";
-  for (auto compData : mDatasetManager.getCurrentCompositions()) {
-    metaText += compData.first + " = " + std::to_string(compData.second) + "\n";
-  }
-  metaText += "Current POSCAR :";
-  metaText += mDatasetManager.labelProcessor.outputFile();
-
-  // Parameter text
-  auto subDir = mDatasetManager.getSubDir();
-  auto temperatureId =
-      mDatasetManager.mParameterSpaces["temperature"]->getCurrentId();
-  std::string timeId;
-  if (mDatasetManager.mParameterSpaces["time"]->size() > 0) {
-    timeId = mDatasetManager.mParameterSpaces["time"]->getCurrentId();
-  }
-  if (subDir.size() > 0) {
-    mParamText = subDir;
-  }
-  if (temperatureId.size() > 0) {
-    mParamText += " temp:" + temperatureId + " ";
-  }
-  if (timeId.size() > 0) {
-    mParamText += " time:" + timeId;
-  }
-  if (mParamText.size() == 0) {
-    mParamText = "Dataset unavailable";
   }
 }
 
@@ -405,10 +354,31 @@ void DataDisplay::prepareHistoryMesh() {
 }
 
 void DataDisplay::prepare(Graphics &g, Matrix4f &transformMatrix) {
+
   if (mNeedsProcessing) {
     mDatasetManager.mCurrentDataset.processChange();
     mDatasetManager.currentGraphName.processChange();
     mNeedsProcessing = false;
+    // Parameter text
+    auto subDir = mDatasetManager.getSubDir();
+    auto temperatureId =
+        mDatasetManager.mParameterSpaces["temperature"]->getCurrentId();
+    std::string timeId;
+    if (mDatasetManager.mParameterSpaces["time"]->size() > 0) {
+      timeId = mDatasetManager.mParameterSpaces["time"]->getCurrentId();
+    }
+    if (subDir.size() > 0) {
+      mParamText = subDir;
+    }
+    if (temperatureId.size() > 0) {
+      mParamText += " temp:" + temperatureId + " ";
+    }
+    if (timeId.size() > 0) {
+      mParamText += " time:" + timeId;
+    }
+    if (mParamText.size() == 0) {
+      mParamText = "Dataset unavailable";
+    }
   }
   if (mDatasetManager.mCurrentDataset.hasChange() ||
       mDatasetManager.currentGraphName.hasChange()) {

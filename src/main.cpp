@@ -812,8 +812,8 @@ public:
       ImGui::SameLine();
       ParameterGUI::drawParameterMeta(&ResetSlicing);
 
-      ImGui::Text("%s",
-                  dataDisplays[vdvBundle.currentBundle()]->metaText.c_str());
+      ImGui::Text("%s", dataDisplays[vdvBundle.currentBundle()]
+                            ->mDatasetManager.metaText.c_str());
 
       if (ImGui::CollapsingHeader("Slicing")) {
         ImGui::Indent(20.0);

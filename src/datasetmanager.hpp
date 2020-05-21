@@ -47,6 +47,8 @@ public:
 
   std::string mTitle;
 
+  std::string metaText;
+
   std::map<std::string, size_t> mCurrentLoadedIndeces;
 
   // Template and diffs for time history computation
@@ -63,9 +65,11 @@ public:
   ComputationChain sampleComputationChain{ComputationChain::PROCESS_ASYNC,
                                           "SampleComputation"};
 
+  ComputationChain atomPositionChain{"AtomPositionComputation"};
+
   DataScript labelProcessor{"AtomLabelProcessor"};
   DataScript graphGenerator{"GraphGenerator"};
-  DiffGenerator diffGen /*{"ComputeDiffs"}*/;
+  DataScript diffGen{"ComputeDiffs"};
 
   // TINC Buffers.
   BufferManager<std::map<std::string, std::vector<float>>> positionBuffers{8};
@@ -105,6 +109,7 @@ public:
   void setPythonScriptPath(std::string pythonScriptPath);
 
   std::string buildRootPath();
+  std::string fullConditionPath();
 
   void initRoot();
 
@@ -125,6 +130,37 @@ public:
   void processTemplatePositions();
   //  void loadFromPOSCAR();
   void computeNewSample();
+
+  void updateText() {
+    // Meta data texts
+    metaText = "Global Root: " + mGlobalRoot + "\n";
+
+    metaText += "Root: " + mRootPath.get() + "\n";
+    metaText += "Dataset: " + mCurrentDataset.get() + "\n";
+    metaText += "Subdir: " + getSubDir() + "\n";
+    metaText += "Condition Param: " + mConditionsParameter + " condition: " +
+                std::to_string(
+                    mParameterSpaces[mConditionsParameter]->getCurrentIndex()) +
+                "\n";
+
+    metaText += " ----- Parameters -----\n";
+    for (auto param : mParameterSpaces) {
+      if (param.second->size() > 2) {
+        metaText += param.first + " : " + param.second->getCurrentId() + "\n";
+      } else if (param.second->size() == 1) {
+        // For spaces with a single value, the id will be ./ so show the value
+        metaText += param.first + " : " +
+                    std::to_string(param.second->getCurrentValue()) + "\n";
+      }
+    }
+    metaText += " ----- Data -----\n";
+    for (auto compData : getCurrentCompositions()) {
+      metaText +=
+          compData.first + " = " + std::to_string(compData.second) + "\n";
+    }
+    metaText += "Current POSCAR :";
+    metaText += labelProcessor.outputFile();
+  }
 
   std::vector<std::string> getDataNames();
 

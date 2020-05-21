@@ -18,30 +18,6 @@ public:
 
   std::string datasetPath;
   std::string condition;
-
-  std::map<std::string, std::string> configuration() {
-
-    std::map<std::string, std::string> config;
-
-    config["dataset_path"] = datasetPath;
-
-    std::string prim_path;
-    if (File::exists(datasetPath + "/prim_labels.json")) {
-      prim_path = datasetPath + "/prim_labels.json";
-    } else if (File::exists(datasetPath + "/prim.json")) {
-      prim_path = datasetPath + "/prim.json";
-    } else if (File::exists(datasetPath + "../prim_labels.json")) {
-      prim_path = datasetPath + "../prim_labels.json";
-    } else if (File::exists(datasetPath + "../prim.json")) {
-      prim_path = datasetPath + "../prim.json";
-    }
-    config["prim_path"] = prim_path;
-    config["condition"] = condition;
-
-    config["__output_path"] = outputDirectory();
-
-    return config;
-  }
 };
 
 #endif // PROCESSORS_HPP

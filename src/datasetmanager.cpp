@@ -45,28 +45,6 @@ DatasetManager::DatasetManager() {
 
   mParameterSpaces["temperature"]->parameter().set(300);
 
-  // Parameters setup
-
-  for (auto &parameterSpace : mParameterSpaces) {
-    parameterSpace.second->parameter().registerChangeCallback([&](float value) {
-      if (parameterSpace.second->getCurrentId() !=
-          parameterSpace.second->idAt(parameterSpace.second->getIndexForValue(
-              value))) { // Only reload if id has changed
-
-        parameterSpace.second->parameter().setNoCalls(
-            value); // To have the internal value already changed for the
-                    // following functions.
-        std::cout << value << " : " << parameterSpace.second->getCurrentId()
-                  << "..."
-                  << parameterSpace.second->idAt(
-                         parameterSpace.second->getIndexForValue(value));
-        computeNewSample();
-        // TODO update text
-        //              updateText();
-      }
-    });
-  }
-
   // These parameters are used for data propagation, but shouldn't be set by the
   // user
   currentGraphName.setHint("hide", 1.0);
@@ -81,8 +59,10 @@ void DatasetManager::initializeComputation() {
   cacheManager.registerProcessor(graphGenerator);
 
   graphGenerator.verbose();
+  diffGen.verbose();
 
-  sampleComputationChain << labelProcessor << graphGenerator;
+  atomPositionChain << labelProcessor << diffGen;
+  sampleComputationChain << atomPositionChain << graphGenerator;
 
   graphGenerator.registerDoneCallback([this](bool runOk) {
     if (runOk) {
@@ -111,6 +91,62 @@ void DatasetManager::initializeComputation() {
     }
   });
 
+  diffGen.registerDoneCallback([&](bool ok) {
+    std::string fullconditionPath = fullConditionPath();
+    if (mParameterSpaces["time"]->size() > 0 &&
+        File::exists(fullconditionPath + "time_diffs.json")) {
+      // Generate an internal template file for data at time 0
+      // Load new template if more than time has changed.
+      bool onlyTimeChanged = true;
+      for (auto &paramSpace : mParameterSpaces) {
+        if (paramSpace.first == "time") {
+          continue;
+        }
+        if (mCurrentLoadedIndeces[paramSpace.first] !=
+            paramSpace.second->getCurrentIndex()) {
+          onlyTimeChanged = false;
+          break;
+        }
+      }
+      int timeIndex = mParameterSpaces["time"]->getCurrentIndex();
+      if (!onlyTimeChanged) {
+        timeIndex = 0;
+        // Load diffs for this parameter space sample
+        std::ifstream f(fullconditionPath + "time_diffs.json");
+        std::string str;
+        if (!f.fail()) {
+          f.seekg(0, std::ios::end);
+          str.reserve(f.tellg());
+          f.seekg(0, std::ios::beg);
+
+          str.assign((std::istreambuf_iterator<char>(f)),
+                     std::istreambuf_iterator<char>());
+
+          mDiffs = json::parse(str);
+
+        } else {
+          std::cerr << "ERROR loading diff file" << std::endl;
+        }
+        //          std::string timeIndexId = mParameterSpaces["time"]->idAt(0);
+        //      labelProcessor.setRunningDirectory(mLoadedDataset);
+        //      labelProcessor.setParams(subDir, condition, mCurrentDataset,
+        //      "0"); bool ok = labelProcessor.process(false); if (ok) {
+        //        processTemplatePositions();
+        //      }
+      } else {
+        timeIndex = mCurrentLoadedIndeces["time"];
+      }
+
+      bool diffLoaded = loadDiff(timeIndex);
+      if (diffLoaded) {
+        auto positions = positionBuffers.getWritable();
+        *positions = mTemplatePositions;
+
+        positionBuffers.doneWriting(positions);
+      }
+    }
+  });
+
   // Parameter spaces trigger computation
 
   for (auto &parameterSpace : mParameterSpaces) {
@@ -129,7 +165,7 @@ void DatasetManager::initializeComputation() {
                          parameterSpace.second->getIndexForValue(value));
         computeNewSample();
         // FIXME update text
-        //              updateText();
+        updateText();
       }
     });
   }
@@ -159,12 +195,19 @@ void DatasetManager::setPythonScriptPath(std::string pythonScriptPath) {
   //      std::unique_lock<std::mutex> lk(mProcessingLock);
   labelProcessor.configuration["python_scripts_path"] = pythonScriptPath;
   graphGenerator.setScriptName(pythonScriptPath + "/graphing/plot.py");
-  diffGen.setScriptName(pythonScriptPath + "/reassign_occs/analyze_dmc.py");
+  diffGen.setScriptName(pythonScriptPath + "/reassign_occs/analyze_kmc.py");
 }
 
 std::string DatasetManager::buildRootPath() {
   return File::conformPathToOS(File::conformPathToOS(mGlobalRoot) +
                                File::conformPathToOS(mRootPath));
+}
+
+std::string DatasetManager::fullConditionPath() {
+  std::string condition =
+      std::to_string(mParameterSpaces[mConditionsParameter]->getCurrentIndex());
+  return File::conformPathToOS(buildRootPath() + mCurrentDataset.get() + "/" +
+                               getSubDir() + "/conditions." + condition + "/");
 }
 
 void DatasetManager::readParameterSpace() {
@@ -322,10 +365,6 @@ void DatasetManager::initRoot() {
   cacheManager.setOutputDirectory(fullDatasetPath + "/cached_output");
   cacheManager.setRunningDirectory(fullDatasetPath);
 
-  diffGen.datasetPath = fullDatasetPath;
-  diffGen.setRunningDirectory(fullDatasetPath);
-  diffGen.setOutputDirectory(fullDatasetPath);
-
   readParameterSpace();
 
   analyzeDataset();
@@ -336,23 +375,6 @@ void DatasetManager::initRoot() {
   mPlotXAxis.setElements(parameterSpaceNames);
   mPlotYAxis.set(0);
 
-  // Match atom of interest to atom that can fill vacancies
-  std::smatch match;
-  std::regex atomNameRegex("[A-Z][a-z]*");
-  for (auto atomName : getAvailableSpecies()["Va"]) {
-    // Use only first result
-    if (std::regex_search(atomName, match, atomNameRegex)) {
-      std::string result = match.str();
-      auto availableAtoms = mAtomOfInterest.getElements();
-      ptrdiff_t pos = std::distance(
-          availableAtoms.begin(),
-          find(availableAtoms.begin(), availableAtoms.end(), result));
-      if (pos < (int)availableAtoms.size()) {
-        mAtomOfInterest.set((int)pos);
-        break;
-      }
-    }
-  }
   auto dataNames = getDataNames();
   mPlotYAxis.setElements(dataNames);
   std::string defaultYAxis = "<comp_n(" + mAtomOfInterest.getCurrent() + ")>";
@@ -373,9 +395,9 @@ void DatasetManager::analyzeDataset() {
     return;
   }
   std::string datasetId = mCurrentDataset.get();
-  ; // mCurrentDataset might be more current than the internal parameter value
-    // as this might be called from the parameter change callback, when the
-    // internal value has not yet been updated
+  // mCurrentDataset might be more current than the internal parameter value
+  // as this might be called from the parameter change callback, when the
+  // internal value has not yet been updated
 
   mDataRanges.clear();
   mAvailableAtomsJson.clear();
@@ -456,6 +478,44 @@ void DatasetManager::analyzeDataset() {
       }
     }
     mTitle = primLabelsJson["title"].get<std::string>();
+
+    // Match atom of interest to atom that can fill vacancies
+    std::smatch match;
+    std::regex atomNameRegex("[A-Z][a-z]*");
+    auto availableSpecies = getAvailableSpecies();
+
+    // Populate mAtomOfInterest
+    std::vector<std::string> species;
+    for (auto atomName : availableSpecies) {
+      if (atomName.first != "Va") {
+        // Use only first result
+        if (std::regex_search(atomName.first, match, atomNameRegex)) {
+          std::string result = match.str();
+          if (std::find(species.begin(), species.end(), result) ==
+              species.end()) {
+            species.push_back(result);
+          }
+        }
+      }
+    }
+    mAtomOfInterest.setElements(species);
+    // Now set atom of interest
+    for (auto atomName : availableSpecies) {
+      if (atomName.first == "Va") {
+        for (auto atom : atomName.second) {
+          if (std::regex_search(atom, match, atomNameRegex)) {
+            std::string result = match.str();
+            auto availableAtoms = mAtomOfInterest.getElements();
+            if (std::find(availableAtoms.begin(), availableAtoms.end(),
+                          result) != availableAtoms.end()) {
+              mAtomOfInterest.setCurrent(result, true);
+              // Use only first result
+              break;
+            }
+          }
+        }
+      }
+    }
   } else {
     std::cerr << "ERROR failed to find prim labels file" << std::endl;
   }
@@ -549,7 +609,6 @@ void DatasetManager::processTemplatePositions() {
   } else {
     std::cerr << "ERROR creating template at time 0 ----------- " << std::endl;
   }
-  mHistory.clear();
   // Load empty template
   VASPReader emptyTemplateReader;
   if (emptyTemplateReader.loadFile(
@@ -566,6 +625,8 @@ bool DatasetManager::loadDiff(int timeIndex) {
 
   //      std::cout << timeIndex << " --> " << targetIndex << std::endl;
   if (timeIndex < targetIndex) {
+
+    mHistory.clear();
     for (int i = timeIndex; i != targetIndex; i++) {
       std::cout << "applying diff " << i << std::endl;
       std::pair<Vec3f, Vec3f> historyPoint;
@@ -664,104 +725,16 @@ void DatasetManager::computeNewSample() {
   std::string subDir = getSubDir();
   std::string condition =
       std::to_string(mParameterSpaces[mConditionsParameter]->getCurrentIndex());
-  // First chek if this has time steps. If it does, check to see if we have
-  // cached diff
-  std::string fullconditionPath = File::conformPathToOS(
-      mGlobalRoot + mRootPath.get() + mCurrentDataset.get() + "/" + subDir +
-      "/conditions." + condition + "/");
 
-  if (mParameterSpaces["time"]->size() > 0 &&
-      File::exists(fullconditionPath + "time_diffs.json")) {
-    // Generate an internal template file for data at time 0
-    // Load new template if more than time has changed.
-    bool onlyTimeChanged = true;
-    for (auto &paramSpace : mParameterSpaces) {
-      if (paramSpace.first == "time") {
-        continue;
-      }
-      if (mCurrentLoadedIndeces[paramSpace.first] !=
-          paramSpace.second->getCurrentIndex()) {
-        onlyTimeChanged = false;
-        break;
-      }
-    }
-    int timeIndex = mParameterSpaces["time"]->getCurrentIndex();
-    if (!onlyTimeChanged) {
-      timeIndex = 0;
-      // Load diffs for this parameter space sample
-      std::ifstream f(fullconditionPath + "time_diffs.json");
-      std::string str;
-      if (!f.fail()) {
-        f.seekg(0, std::ios::end);
-        str.reserve(f.tellg());
-        f.seekg(0, std::ios::beg);
-
-        str.assign((std::istreambuf_iterator<char>(f)),
-                   std::istreambuf_iterator<char>());
-
-        mDiffs = json::parse(str);
-
-      } else {
-        std::cerr << "ERROR loading diff file" << std::endl;
-      }
-      //          std::string timeIndexId = mParameterSpaces["time"]->idAt(0);
-      labelProcessor.setRunningDirectory(mLoadedDataset);
-      //      labelProcessor.setParams(subDir, condition, mCurrentDataset, "0");
-      //      bool ok = labelProcessor.process(false);
-      //      if (ok) {
-      //        processTemplatePositions();
-      //      }
-    } else {
-      timeIndex = mCurrentLoadedIndeces["time"];
-    }
-
-    //    bool diffLoaded = loadDiff(timeIndex);
-    //    if (diffLoaded) {
-    //      auto positions = positionBuffers.getWritable();
-    //      *positions = mTemplatePositions;
-
-    //      positionBuffers.doneWriting(positions);
-    //    } else {
-    //      //      loadFromPOSCAR();
-    //    }
-  } else { // Generate POSCAR file from template if no time space and no cached
-           // diffs
-           //    loadFromPOSCAR();
-  }
-
-  // This is loadFromPOSCAR()
-  mHistory.clear();
   int timeIndex = -1;
   if (mParameterSpaces["time"]->size() > 0) {
     timeIndex = mParameterSpaces["time"]->getCurrentIndex();
   }
-  labelProcessor.setRunningDirectory(mLoadedDataset);
-
   auto timeIndexStr = std::to_string(timeIndex);
 
   std::string root_path = buildRootPath();
   std::string template_pos_path = File::conformPathToOS(
       root_path + mCurrentDataset.get() + "/cached_output/template_POSCAR");
-
-  std::string folder = File::conformDirectory(subDir);
-
-  // Try to find "template_POSCAR"
-  if (!File::exists(template_pos_path)) {
-    std::cout << "Failed to find template file. Call it 'template_POSCAR'."
-              << std::endl;
-    return;
-  }
-
-  labelProcessor.setOutputFileNames({DataScript::sanitizeName(
-      template_pos_path + mCurrentDataset.get() + "_" + folder + "_" +
-      condition + "_" + timeIndexStr)});
-
-  std::string conditionSubdir =
-      File::conformPathToOS(folder + "conditions." + condition + "/");
-
-  //        config["root_path"] = File::conformDirectory(root_path);
-  labelProcessor.configuration["dataset_path"] =
-      File::conformPathToOS(root_path + mCurrentDataset.get());
 
   std::string prim_path;
   if (File::exists(root_path + mCurrentDataset.get() + "/prim_labels.json")) {
@@ -773,6 +746,42 @@ void DatasetManager::computeNewSample() {
   } else if (File::exists(root_path + "prim.json")) {
     prim_path = root_path + "prim.json";
   }
+
+  // Try to find "template_POSCAR"
+  if (!File::exists(template_pos_path)) {
+    std::cerr << "Failed to find template file. Call it 'template_POSCAR'."
+              << std::endl;
+    return;
+  }
+
+  std::string folder = File::conformDirectory(subDir);
+
+  // Configure diff generator
+  if (mParameterSpaces["time"]->size() > 0) {
+    diffGen.setRunningDirectory(root_path + mCurrentDataset.get());
+    diffGen.setOutputDirectory(root_path + mCurrentDataset.get() +
+                               "/cached_output");
+
+    diffGen.configuration["prim_path"] = prim_path;
+    diffGen.configuration["template_path"] = template_pos_path;
+    diffGen.enabled = true;
+  } else {
+    diffGen.enabled = false;
+  }
+
+  // Configure label processor
+  labelProcessor.setRunningDirectory(mLoadedDataset);
+
+  labelProcessor.setOutputFileNames({DataScript::sanitizeName(
+      template_pos_path + mCurrentDataset.get() + "_" + folder + "_" +
+      condition + "_" + timeIndexStr)});
+
+  std::string conditionSubdir =
+      File::conformPathToOS(folder + "conditions." + condition + "/");
+
+  //        config["root_path"] = File::conformDirectory(root_path);
+  labelProcessor.configuration["dataset_path"] =
+      File::conformPathToOS(root_path + mCurrentDataset.get());
   labelProcessor.configuration["prim_path"] = prim_path;
 
   std::string final_state_path =
@@ -785,14 +794,10 @@ void DatasetManager::computeNewSample() {
   labelProcessor.configuration["condition"] = condition;
   labelProcessor.configuration["time_step"] = timeIndexStr;
 
-  //      config["__output_name"] = outputFile(false);
-  //      config["__output_path"] = outputDirectory();
-
-  // End loadFromPOSCAR()
-
   prepareGraphGeneration();
 
   sampleComputationChain.process();
+  updateText();
 }
 
 std::vector<std::string> DatasetManager::getDataNames() {

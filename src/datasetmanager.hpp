@@ -164,8 +164,6 @@ public:
 
   std::vector<std::string> getDataNames();
 
-  void prepareGraphGeneration();
-
   typedef std::map<std::string, std::vector<std::string>> SpeciesLabelMap;
 
   SpeciesLabelMap getAvailableSpecies();

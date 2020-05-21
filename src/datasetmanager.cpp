@@ -58,11 +58,111 @@ void DatasetManager::initializeComputation() {
   cacheManager.registerProcessor(labelProcessor);
   cacheManager.registerProcessor(graphGenerator);
 
-  graphGenerator.verbose();
+  //  graphGenerator.verbose();
   diffGen.verbose();
 
   atomPositionChain << labelProcessor << diffGen;
   sampleComputationChain << atomPositionChain << graphGenerator;
+
+  // Graph generator
+  graphGenerator.prepareFunction = [&]() {
+    std::string datasetId = mCurrentDataset.get();
+    std::string xLabel = mPlotXAxis.getCurrent();
+    std::string yLabel = mPlotYAxis.getCurrent();
+
+    //  std::string yLabelSanitized = yLabel;
+    //  replaceAll(yLabelSanitized, "<", "_");
+    //  replaceAll(yLabelSanitized, ">", "_");
+    //  replaceAll(yLabelSanitized, "(", "_");
+    //  replaceAll(yLabelSanitized, ")", "_");
+
+    auto jsonText = readJsonResultsFile(mCurrentDataset, getSubDir());
+    if (jsonText.size() > 0) {
+      std::vector<double> datax, datay;
+      auto resultsJson = json::parse(jsonText);
+
+      if (resultsJson.find(yLabel) != resultsJson.end()) {
+        try {
+          datay.reserve(resultsJson[yLabel].size());
+          datay.insert(datay.begin(), resultsJson[yLabel].begin(),
+                       resultsJson[yLabel].end());
+        } catch (std::exception &) {
+        }
+      }
+      std::string highlightValue = "0.0";
+
+      if (mParameterSpaces.find(xLabel) != mParameterSpaces.end()) {
+        try {
+          datax.reserve(mParameterSpaces[xLabel]->size());
+          for (auto value : mParameterSpaces[xLabel]->values()) {
+            datax.push_back(value.second);
+          }
+          highlightValue =
+              std::to_string(int(mParameterSpaces[xLabel]->getCurrentValue()));
+        } catch (std::exception &) {
+        }
+      }
+
+      std::string fullDatasetPath = File::conformPathToOS(
+          buildRootPath() + File::conformPathToOS(mCurrentDataset.get()));
+
+      std::ofstream ofsx(fullDatasetPath + "cached_output/inx.bin",
+                         std::ofstream::out | std::ios::binary);
+      ofsx.write((char *)datax.data(), datax.size() * sizeof(double));
+      ofsx.flush();
+      ofsx.close();
+      std::ofstream ofsy(fullDatasetPath + "cached_output/iny.bin",
+                         std::ofstream::out | std::ios::binary);
+      ofsy.write((char *)datay.data(), datay.size() * sizeof(double));
+      ofsy.flush();
+      ofsy.close();
+      std::string subDir = getSubDir();
+      // Check data range for whole dataset
+      std::string str = readJsonResultsFile(datasetId, getSubDir());
+      std::pair<float, float> dataRange(FLT_MAX, FLT_MIN);
+      if (str.size() > 0) {
+        auto resultsJson = json::parse(str);
+        auto data = resultsJson[yLabel];
+        for (json::iterator v = data.begin(); v != data.end(); ++v) {
+          if (v->get<float>() < dataRange.first) {
+            dataRange.first = v->get<float>();
+          } else if (v->get<float>() > dataRange.second) {
+            dataRange.second = v->get<float>();
+          }
+        }
+      }
+
+      std::string yLabelSanitized = yLabel;
+      replaceAll(yLabelSanitized, "<", "_");
+      replaceAll(yLabelSanitized, ">", "_");
+      replaceAll(yLabelSanitized, "(", "_");
+      replaceAll(yLabelSanitized, ")", "_");
+
+      graphGenerator.configuration["title"] = mTitle;
+      graphGenerator.configuration["dataset"] = datasetId;
+      graphGenerator.configuration["temp_interest"] = highlightValue;
+      graphGenerator.configuration["subdir"] = subDir;
+      graphGenerator.configuration["xLabel"] = xLabel;
+      graphGenerator.configuration["yLabel"] = yLabelSanitized;
+
+      graphGenerator.configuration["miny"] = std::to_string(dataRange.first);
+      graphGenerator.configuration["maxy"] = std::to_string(dataRange.second);
+      graphGenerator.configuration["inxFile"] =
+          std::string("cached_output/inx.bin");
+      graphGenerator.configuration["inyFile"] =
+          std::string("cached_output/iny.bin");
+
+      graphGenerator.setOutputDirectory(graphGenerator.runningDirectory() +
+                                        "/cached_output");
+      graphGenerator.setOutputFileNames({datasetId + "_" + highlightValue +
+                                         "_" +
+                                         DataScript::sanitizeName(subDir) +
+                                         "_" + yLabelSanitized + "_graph.png"});
+    } else {
+      return false;
+    }
+    return true;
+  };
 
   graphGenerator.registerDoneCallback([this](bool runOk) {
     if (runOk) {
@@ -70,8 +170,66 @@ void DatasetManager::initializeComputation() {
       std::cout << "Generated graph: " << graphGenerator.outputFile()
                 << std::endl;
       //              graphProcessing = false;
+    } else {
+      std::cerr << "Graph generation failed." << std::endl;
     }
   });
+
+  labelProcessor.prepareFunction = [&]() {
+    std::string condition = std::to_string(
+        mParameterSpaces[mConditionsParameter]->getCurrentIndex());
+
+    int timeIndex = -1;
+    if (mParameterSpaces["time"]->size() > 0) {
+      timeIndex = mParameterSpaces["time"]->getCurrentIndex();
+    }
+    auto timeIndexStr = std::to_string(timeIndex);
+
+    std::string folder = File::conformDirectory(getSubDir());
+    std::string root_path = buildRootPath();
+    std::string template_pos_path = File::conformPathToOS(
+        root_path + mCurrentDataset.get() + "/cached_output/template_POSCAR");
+    // Try to find "template_POSCAR"
+    if (!File::exists(template_pos_path)) {
+      std::cerr << "Failed to find template file. Call it 'template_POSCAR'."
+                << std::endl;
+      return false;
+    }
+    std::string prim_path;
+    if (File::exists(root_path + mCurrentDataset.get() + "/prim_labels.json")) {
+      prim_path = root_path + mCurrentDataset.get() + "/prim_labels.json";
+    } else if (File::exists(root_path + mCurrentDataset.get() + "/prim.json")) {
+      prim_path = root_path + mCurrentDataset.get() + "/prim.json";
+    } else if (File::exists(root_path + "prim_labels.json")) {
+      prim_path = root_path + "prim_labels.json";
+    } else if (File::exists(root_path + "prim.json")) {
+      prim_path = root_path + "prim.json";
+    }
+
+    labelProcessor.setRunningDirectory(mLoadedDataset);
+
+    labelProcessor.setOutputFileNames({DataScript::sanitizeName(
+        template_pos_path + mCurrentDataset.get() + "_" + folder + "_" +
+        condition + "_" + timeIndexStr)});
+
+    std::string conditionSubdir =
+        File::conformPathToOS(folder + "conditions." + condition + "/");
+
+    labelProcessor.configuration["dataset_path"] =
+        File::conformPathToOS(root_path + mCurrentDataset.get());
+    labelProcessor.configuration["prim_path"] = prim_path;
+
+    std::string final_state_path =
+        conditionSubdir + "final_state.json"; // final_state.json file
+    labelProcessor.configuration["final_state_path"] = File::conformPathToOS(
+        root_path + mCurrentDataset.get() + "/" + final_state_path);
+
+    labelProcessor.configuration["template_path"] = File::conformPathToOS(
+        root_path + mCurrentDataset.get() + "/cached_output/template_POSCAR");
+    labelProcessor.configuration["condition"] = condition;
+    labelProcessor.configuration["time_step"] = timeIndexStr;
+    return true;
+  };
 
   labelProcessor.registerDoneCallback([&](bool ok) {
     if (ok) {
@@ -127,12 +285,6 @@ void DatasetManager::initializeComputation() {
         } else {
           std::cerr << "ERROR loading diff file" << std::endl;
         }
-        //          std::string timeIndexId = mParameterSpaces["time"]->idAt(0);
-        //      labelProcessor.setRunningDirectory(mLoadedDataset);
-        //      labelProcessor.setParams(subDir, condition, mCurrentDataset,
-        //      "0"); bool ok = labelProcessor.process(false); if (ok) {
-        //        processTemplatePositions();
-        //      }
       } else {
         timeIndex = mCurrentLoadedIndeces["time"];
       }
@@ -146,6 +298,39 @@ void DatasetManager::initializeComputation() {
       }
     }
   });
+
+  diffGen.prepareFunction = [this]() {
+    std::string root_path = buildRootPath();
+    std::string template_pos_path = File::conformPathToOS(
+        root_path + mCurrentDataset.get() + "/cached_output/template_POSCAR");
+    // Try to find "template_POSCAR"
+    if (!File::exists(template_pos_path)) {
+      std::cerr << "Failed to find template file. Call it 'template_POSCAR'."
+                << std::endl;
+      return false;
+    }
+
+    std::string prim_path;
+    if (File::exists(root_path + mCurrentDataset.get() + "/prim_labels.json")) {
+      prim_path = root_path + mCurrentDataset.get() + "/prim_labels.json";
+    } else if (File::exists(root_path + mCurrentDataset.get() + "/prim.json")) {
+      prim_path = root_path + mCurrentDataset.get() + "/prim.json";
+    } else if (File::exists(root_path + "prim_labels.json")) {
+      prim_path = root_path + "prim_labels.json";
+    } else if (File::exists(root_path + "prim.json")) {
+      prim_path = root_path + "prim.json";
+    }
+
+    diffGen.setRunningDirectory(root_path + mCurrentDataset.get());
+    diffGen.setOutputDirectory(root_path + mCurrentDataset.get() +
+                               "/cached_output");
+
+    diffGen.configuration["prim_path"] = prim_path;
+    diffGen.configuration["template_path"] = template_pos_path;
+    diffGen.configuration["dataset_path"] =
+        File::conformPathToOS(root_path + mCurrentDataset.get());
+    return true;
+  };
 
   // Parameter spaces trigger computation
 
@@ -164,19 +349,17 @@ void DatasetManager::initializeComputation() {
                   << parameterSpace.second->idAt(
                          parameterSpace.second->getIndexForValue(value));
         computeNewSample();
-        // FIXME update text
         updateText();
       }
     });
   }
 
-  // TODO we don't need to do a full data load here, just recompute the graph
   mPlotYAxis.registerChangeCallback([this](float value) {
     if (mPlotYAxis.get() != value) {
       graphGenerator.process();
     }
   });
-  // TODO we don't need to do a full data load here, just recompute the graph
+
   mPlotXAxis.registerChangeCallback([this](float value) {
     if (mPlotXAxis.get() != value) {
       graphGenerator.process();
@@ -335,15 +518,17 @@ void DatasetManager::readParameterSpace() {
     }
     // If there is a time space, use different script
     if (mParameterSpaces["time"]->size() > 0) {
-      labelProcessor.setScriptName(File::conformDirectory(
-          labelProcessor.configuration["python_scripts_path"].flagValueStr +
-          "reassign_occs/result_extractor.py"));
+      labelProcessor.setScriptName(
+          File::conformDirectory(
+              labelProcessor.configuration["python_scripts_path"]
+                  .flagValueStr) +
+          "/reassign_occs/result_extractor.py");
     } else {
       labelProcessor.setScriptName(
           File::conformDirectory(
               labelProcessor.configuration["python_scripts_path"]
                   .flagValueStr) +
-          "reassign_occs/reassign_occs.py");
+          "/reassign_occs/reassign_occs.py");
     }
     for (auto &paramSpace : mParameterSpaces) {
       paramSpace.second->unlock();
@@ -366,7 +551,6 @@ void DatasetManager::initRoot() {
   cacheManager.setRunningDirectory(fullDatasetPath);
 
   readParameterSpace();
-
   analyzeDataset();
 
   std::vector<std::string> parameterSpaceNames;
@@ -382,6 +566,15 @@ void DatasetManager::initRoot() {
                   dataNames.begin();
   if (pos < (int)dataNames.size()) {
     mPlotYAxis.set((int)pos);
+  }
+
+  // Configure diff generator
+  if (mParameterSpaces["time"]->size() > 0) {
+    diffGen.enabled = true;
+    graphGenerator.enabled = false; // Graphing not working with kmc yet.
+  } else {
+    diffGen.enabled = false;
+    graphGenerator.enabled = true;
   }
 
   lk.unlock();
@@ -522,7 +715,7 @@ void DatasetManager::analyzeDataset() {
 }
 
 void DatasetManager::preProcessDataset() {
-  // TODO preprocess for all datasets
+  // TODO implement preprocess for datasets
   std::string datasetId = mCurrentDataset.get();
 
 #ifdef AL_BUILD_MPI
@@ -722,80 +915,6 @@ void DatasetManager::computeNewSample() {
   }
   std::unique_lock<std::mutex> lk(mDataLock);
 
-  std::string subDir = getSubDir();
-  std::string condition =
-      std::to_string(mParameterSpaces[mConditionsParameter]->getCurrentIndex());
-
-  int timeIndex = -1;
-  if (mParameterSpaces["time"]->size() > 0) {
-    timeIndex = mParameterSpaces["time"]->getCurrentIndex();
-  }
-  auto timeIndexStr = std::to_string(timeIndex);
-
-  std::string root_path = buildRootPath();
-  std::string template_pos_path = File::conformPathToOS(
-      root_path + mCurrentDataset.get() + "/cached_output/template_POSCAR");
-
-  std::string prim_path;
-  if (File::exists(root_path + mCurrentDataset.get() + "/prim_labels.json")) {
-    prim_path = root_path + mCurrentDataset.get() + "/prim_labels.json";
-  } else if (File::exists(root_path + mCurrentDataset.get() + "/prim.json")) {
-    prim_path = root_path + mCurrentDataset.get() + "/prim.json";
-  } else if (File::exists(root_path + "prim_labels.json")) {
-    prim_path = root_path + "prim_labels.json";
-  } else if (File::exists(root_path + "prim.json")) {
-    prim_path = root_path + "prim.json";
-  }
-
-  // Try to find "template_POSCAR"
-  if (!File::exists(template_pos_path)) {
-    std::cerr << "Failed to find template file. Call it 'template_POSCAR'."
-              << std::endl;
-    return;
-  }
-
-  std::string folder = File::conformDirectory(subDir);
-
-  // Configure diff generator
-  if (mParameterSpaces["time"]->size() > 0) {
-    diffGen.setRunningDirectory(root_path + mCurrentDataset.get());
-    diffGen.setOutputDirectory(root_path + mCurrentDataset.get() +
-                               "/cached_output");
-
-    diffGen.configuration["prim_path"] = prim_path;
-    diffGen.configuration["template_path"] = template_pos_path;
-    diffGen.enabled = true;
-  } else {
-    diffGen.enabled = false;
-  }
-
-  // Configure label processor
-  labelProcessor.setRunningDirectory(mLoadedDataset);
-
-  labelProcessor.setOutputFileNames({DataScript::sanitizeName(
-      template_pos_path + mCurrentDataset.get() + "_" + folder + "_" +
-      condition + "_" + timeIndexStr)});
-
-  std::string conditionSubdir =
-      File::conformPathToOS(folder + "conditions." + condition + "/");
-
-  //        config["root_path"] = File::conformDirectory(root_path);
-  labelProcessor.configuration["dataset_path"] =
-      File::conformPathToOS(root_path + mCurrentDataset.get());
-  labelProcessor.configuration["prim_path"] = prim_path;
-
-  std::string final_state_path =
-      conditionSubdir + "final_state.json"; // final_state.json file
-  labelProcessor.configuration["final_state_path"] = File::conformPathToOS(
-      root_path + mCurrentDataset.get() + "/" + final_state_path);
-
-  labelProcessor.configuration["template_path"] = File::conformPathToOS(
-      root_path + mCurrentDataset.get() + "/cached_output/template_POSCAR");
-  labelProcessor.configuration["condition"] = condition;
-  labelProcessor.configuration["time_step"] = timeIndexStr;
-
-  prepareGraphGeneration();
-
   sampleComputationChain.process();
   updateText();
 }
@@ -806,103 +925,6 @@ std::vector<std::string> DatasetManager::getDataNames() {
     names.push_back(entry.first);
   }
   return names;
-}
-
-void DatasetManager::prepareGraphGeneration() {
-  std::string datasetId = mCurrentDataset.get();
-  std::string xLabel = mPlotXAxis.getCurrent();
-  std::string yLabel = mPlotYAxis.getCurrent();
-
-  //  std::string yLabelSanitized = yLabel;
-  //  replaceAll(yLabelSanitized, "<", "_");
-  //  replaceAll(yLabelSanitized, ">", "_");
-  //  replaceAll(yLabelSanitized, "(", "_");
-  //  replaceAll(yLabelSanitized, ")", "_");
-
-  auto jsonText = readJsonResultsFile(mCurrentDataset, getSubDir());
-  if (jsonText.size() > 0) {
-    std::vector<double> datax, datay;
-    auto resultsJson = json::parse(jsonText);
-
-    if (resultsJson.find(yLabel) != resultsJson.end()) {
-      try {
-        datay.reserve(resultsJson[yLabel].size());
-        datay.insert(datay.begin(), resultsJson[yLabel].begin(),
-                     resultsJson[yLabel].end());
-      } catch (std::exception &) {
-      }
-    }
-    std::string highlightValue = "0.0";
-
-    if (mParameterSpaces.find(xLabel) != mParameterSpaces.end()) {
-      try {
-        datax.reserve(mParameterSpaces[xLabel]->size());
-        for (auto value : mParameterSpaces[xLabel]->values()) {
-          datax.push_back(value.second);
-        }
-        highlightValue =
-            std::to_string(int(mParameterSpaces[xLabel]->getCurrentValue()));
-      } catch (std::exception &) {
-      }
-    }
-
-    std::string fullDatasetPath = File::conformPathToOS(
-        buildRootPath() + File::conformPathToOS(mCurrentDataset.get()));
-
-    std::ofstream ofsx(fullDatasetPath + "cached_output/inx.bin",
-                       std::ofstream::out | std::ios::binary);
-    ofsx.write((char *)datax.data(), datax.size() * sizeof(double));
-    ofsx.flush();
-    ofsx.close();
-    std::ofstream ofsy(fullDatasetPath + "cached_output/iny.bin",
-                       std::ofstream::out | std::ios::binary);
-    ofsy.write((char *)datay.data(), datay.size() * sizeof(double));
-    ofsy.flush();
-    ofsy.close();
-
-    std::string subDir = getSubDir();
-
-    // Check data range for whole dataset
-    std::string str = readJsonResultsFile(datasetId, getSubDir());
-    std::pair<float, float> dataRange(FLT_MAX, FLT_MIN);
-    if (str.size() > 0) {
-      auto resultsJson = json::parse(str);
-      auto data = resultsJson[yLabel];
-      for (json::iterator v = data.begin(); v != data.end(); ++v) {
-        if (v->get<float>() < dataRange.first) {
-          dataRange.first = v->get<float>();
-        } else if (v->get<float>() > dataRange.second) {
-          dataRange.second = v->get<float>();
-        }
-      }
-    }
-
-    std::string yLabelSanitized = yLabel;
-    replaceAll(yLabelSanitized, "<", "_");
-    replaceAll(yLabelSanitized, ">", "_");
-    replaceAll(yLabelSanitized, "(", "_");
-    replaceAll(yLabelSanitized, ")", "_");
-
-    graphGenerator.configuration["title"] = mTitle;
-    graphGenerator.configuration["dataset"] = datasetId;
-    graphGenerator.configuration["temp_interest"] = highlightValue;
-    graphGenerator.configuration["subdir"] = subDir;
-    graphGenerator.configuration["xLabel"] = xLabel;
-    graphGenerator.configuration["yLabel"] = yLabelSanitized;
-
-    graphGenerator.configuration["miny"] = std::to_string(dataRange.first);
-    graphGenerator.configuration["maxy"] = std::to_string(dataRange.second);
-    graphGenerator.configuration["inxFile"] =
-        std::string("cached_output/inx.bin");
-    graphGenerator.configuration["inyFile"] =
-        std::string("cached_output/iny.bin");
-
-    graphGenerator.setOutputDirectory(graphGenerator.runningDirectory() +
-                                      "/cached_output");
-    graphGenerator.setOutputFileNames({datasetId + "_" + highlightValue + "_" +
-                                       DataScript::sanitizeName(subDir) + "_" +
-                                       yLabelSanitized + "_graph.png"});
-  }
 }
 
 DatasetManager::SpeciesLabelMap DatasetManager::getAvailableSpecies() {

@@ -155,6 +155,7 @@ public:
   ComputationChain initRootComputationChain{"PrepareDataset"};
 
   DataScript parameterSpaceProcessor{"ParameterSpaceProcessor"};
+  DataScript transfmatExtractor{"TransfmatExtractor"};
   DataScript templateGen{"TemplateGenerator"};
 
   ProcessorServer processorServer; // To expose processor chains on the network
@@ -1182,13 +1183,40 @@ public:
     parameterSpaceProcessor.setOutputFileNames({"_parameter_space.json"});
     parameterSpaceProcessor.verbose(true);
 
+    transfmatExtractor.setCommand(pythonBinary);
+    transfmatExtractor.setScriptName(pythonScriptPath.get() +
+                                     "/extract_transfmat.py");
+    transfmatExtractor.setOutputFileNames({"transfmat"});
+    transfmatExtractor.verbose(true);
+
     templateGen.setCommand(pythonBinary);
     templateGen.setScriptName(pythonScriptPath.get() +
                               "/reassign_occs/template_creator.py");
     templateGen.setOutputFileNames({"template_POSCAR"});
     templateGen.verbose(true);
 
-    initRootComputationChain << parameterSpaceProcessor << templateGen;
+    templateGen.prepareFunction = [&]() {
+      auto transfmatFile = transfmatExtractor.outputFile();
+
+      if (File::exists(transfmatFile)) {
+        templateGen.configuration["transfmat"] = transfmatFile;
+      } else if (File::exists(templateGen.runningDirectory() +
+                              "cached_output/transfmat")) {
+        templateGen.configuration["transfmat"] =
+            Flag("cached_output/transfmat");
+      } else if (File::exists(templateGen.runningDirectory() + "transfmat")) {
+        templateGen.configuration["transfmat"] = "transfmat";
+      } else if (File::exists(templateGen.runningDirectory() +
+                              "../transfmat")) {
+        templateGen.configuration["transfmat"] = "../transfmat";
+      } else {
+        return false;
+      }
+      return true;
+    };
+
+    initRootComputationChain << parameterSpaceProcessor << transfmatExtractor
+                             << templateGen;
 
     // Only the root chain needs to be
     processorServer << initRootComputationChain
@@ -1614,18 +1642,11 @@ public:
         parameterSpaceProcessor.setOutputDirectory(element.filepath() +
                                                    "/cached_output");
 
+        transfmatExtractor.setRunningDirectory(element.filepath());
+        transfmatExtractor.setOutputDirectory(element.filepath());
+
         templateGen.setRunningDirectory(element.filepath());
         templateGen.setOutputDirectory(element.filepath() + "/cached_output");
-
-        if (File::exists(templateGen.runningDirectory() +
-                         "cached_output/transfmat")) {
-          templateGen.configuration["transfmat"] =
-              Flag("cached_output/transfmat");
-        } else if (File::exists(templateGen.runningDirectory() + "transfmat")) {
-          templateGen.configuration["transfmat"] = "transfmat";
-        } else {
-          templateGen.configuration["transfmat"] = "../transfmat";
-        }
 
         bool ok = initRootComputationChain.process();
 

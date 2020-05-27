@@ -254,7 +254,7 @@ public:
     }
 
     // use object control for model matrix
-    append(object_transform);
+    defaultWindow().append(object_transform);
     object_transform.setHome(Vec3f(0, 0, 0));
     object_transform.reset();
 
@@ -1652,14 +1652,14 @@ public:
 
         std::cout << "Process parameter space asyc for " << element.filepath()
                   << std::endl;
-        if (ok && File::exists(File::conformPathToOS(element.filepath()) +
+        if (ok && File::exists(File::conformDirectory(element.filepath()) +
                                "cached_output/_parameter_space.json")) {
-          updateAvailableDatasets(this->dataRoot + rootPath);
         } else {
           //                Dir::removeRecursively(element.filepath() +
           //                "/cached_output");
         }
       }
+      updateAvailableDatasets(this->dataRoot + rootPath);
     }
   }
 

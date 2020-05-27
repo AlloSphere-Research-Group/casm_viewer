@@ -10,7 +10,7 @@
 
 #include "al/ui/al_Parameter.hpp"
 
-#include "tinc/ParameterSpace.hpp"
+#include "tinc/ParameterSpaceDimension.hpp"
 
 #include "processors.hpp"
 #include "slice.hpp"
@@ -91,7 +91,7 @@ public:
       mConditionsParameter; // Parameter that maps to conditions.X directories
   std::vector<std::string>
       mParameterForSubDir; // Parameter value determines the subdirectory
-  std::map<std::string, ParameterSpace *> mParameterSpaces;
+  std::map<std::string, ParameterSpaceDimension *> mParameterSpaces;
 
   // Plot axes
   ParameterMenu mPlotYAxis{"PlotYAxis"};

@@ -32,16 +32,16 @@ void replaceAll(std::string &s, const std::string &search,
 }
 
 DatasetManager::DatasetManager() {
-  mParameterSpaces["temperature"] = new ParameterSpace("temperature");
-  mParameterSpaces["chempotA"] = new ParameterSpace("chempotA");
-  mParameterSpaces["chempotB"] = new ParameterSpace("chempotB");
+  mParameterSpaces["temperature"] = new ParameterSpaceDimension("temperature");
+  mParameterSpaces["chempotA"] = new ParameterSpaceDimension("chempotA");
+  mParameterSpaces["chempotB"] = new ParameterSpaceDimension("chempotB");
 
   mParameterSpaces["chempotA"]->addConnectedParameterSpace(
       mParameterSpaces["chempotB"]);
   mParameterSpaces["chempotB"]->addConnectedParameterSpace(
       mParameterSpaces["chempotA"]);
 
-  mParameterSpaces["time"] = new ParameterSpace("time");
+  mParameterSpaces["time"] = new ParameterSpaceDimension("time");
 
   mParameterSpaces["temperature"]->parameter().set(300);
 
@@ -300,6 +300,7 @@ void DatasetManager::initializeComputation() {
   });
 
   diffGen.prepareFunction = [this]() {
+    std::cout << "Using KMC diff generator for display" << std::endl;
     std::string root_path = buildRootPath();
     std::string template_pos_path = File::conformPathToOS(
         root_path + mCurrentDataset.get() + "/cached_output/template_POSCAR");
@@ -468,32 +469,36 @@ void DatasetManager::readParameterSpace() {
       mConditionsParameter = "temperature";
     }
 
+    //    Verify conditions parameter space from parameter space file against
+    //    results.json
     std::string resultsFile =
         File::conformPathToOS(buildRootPath() +
                               File::conformPathToOS(mCurrentDataset.get())) +
         "/" + File::conformPathToOS(getSubDir()) + "results.json";
-    std::ifstream results(resultsFile);
-    results.seekg(0, std::ios::end);
-    str.reserve(results.tellg());
-    results.seekg(0, std::ios::beg);
+    if (File::exists(resultsFile)) {
+      std::ifstream results(resultsFile);
+      results.seekg(0, std::ios::end);
+      str.reserve(results.tellg());
+      results.seekg(0, std::ios::beg);
 
-    str.assign((std::istreambuf_iterator<char>(results)),
-               std::istreambuf_iterator<char>());
-    json resultsJson = json::parse(str);
+      str.assign((std::istreambuf_iterator<char>(results)),
+                 std::istreambuf_iterator<char>());
+      json resultsJson = json::parse(str);
 
-    std::string conditionInJson = mConditionsParameter;
-    for (auto mapEntry : parameterNameMap) {
-      if (mapEntry.second == mConditionsParameter) {
-        conditionInJson = mapEntry.first;
-        break;
+      std::string conditionInJson = mConditionsParameter;
+      for (auto mapEntry : parameterNameMap) {
+        if (mapEntry.second == mConditionsParameter) {
+          conditionInJson = mapEntry.first;
+          break;
+        }
       }
-    }
 
-    auto conditionValues = resultsJson[conditionInJson];
-    if (conditionValues.is_array()) {
-      mParameterSpaces[mConditionsParameter]->clear();
-      for (auto value : conditionValues) {
-        mParameterSpaces[mConditionsParameter]->push_back(value.get<float>());
+      auto conditionValues = resultsJson[conditionInJson];
+      if (conditionValues.is_array()) {
+        mParameterSpaces[mConditionsParameter]->clear();
+        for (auto value : conditionValues) {
+          mParameterSpaces[mConditionsParameter]->push_back(value.get<float>());
+        }
       }
     }
 
@@ -579,7 +584,9 @@ void DatasetManager::initRoot() {
 
   lk.unlock();
   // Update data
-  computeNewSample();
+  // Not necessary as this is triggered automatically through change in
+  // mLoadedDataset
+  //  computeNewSample();
 }
 
 void DatasetManager::analyzeDataset() {

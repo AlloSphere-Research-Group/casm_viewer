@@ -6,20 +6,19 @@
 #include <vector>
 
 #include "tinc/ComputationChain.hpp"
+#include "tinc/ImageDiskBuffer.hpp"
+#include "tinc/ParameterSpaceDimension.hpp"
 #include "tinc/VASPReader.hpp"
 
 #include "al/ui/al_Parameter.hpp"
 
-#include "tinc/ParameterSpaceDimension.hpp"
-
-#include "processors.hpp"
 #include "slice.hpp"
 
 #include "nlohmann/json.hpp"
 
-#include "tinc/ImageDiskBuffer.hpp"
-
 using json = nlohmann::json;
+
+using namespace tinc;
 
 class DatasetManager {
 public:
@@ -46,6 +45,7 @@ public:
   std::string mLoadedDataset;
 
   std::string mTitle;
+  json mCurrentBasis;
 
   std::string metaText;
 
@@ -69,10 +69,19 @@ public:
 
   DataScript labelProcessor{"AtomLabelProcessor"};
   DataScript graphGenerator{"GraphGenerator"};
-  DataScript diffGen{"ComputeDiffs"};
+  DataScript decompressTrajectory{"DecompressTrajectory"};
 
   // TINC Buffers.
-  BufferManager<std::map<std::string, std::vector<float>>> positionBuffers{8};
+  //  BufferManager<std::map<std::string, std::vector<float>>>
+  //  positionBuffers{8};
+
+  struct s1 {
+    int8_t basis_index;
+    int8_t occupancy_dof;
+    //    float x, y, z;
+  };
+  BufferManager<std::vector<s1>> occupationData{8};
+  std::vector<float> templateData;
 
   // ----------------
 

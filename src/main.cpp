@@ -157,6 +157,7 @@ public:
   DataScript parameterSpaceProcessor{"ParameterSpaceProcessor"};
   DataScript transfmatExtractor{"TransfmatExtractor"};
   DataScript templateGen{"TemplateGenerator"};
+  DataScript trajectoryProcessor{"TrajectoryPreprocessor"};
 
   ProcessorServer processorServer; // To expose processor chains on the network
 
@@ -1195,6 +1196,11 @@ public:
     templateGen.setOutputFileNames({"template_POSCAR"});
     templateGen.verbose(true);
 
+    trajectoryProcessor.setCommand(pythonBinary);
+    trajectoryProcessor.setScriptName(pythonScriptPath.get() +
+                                      "/reassign_occs/analyze_kmc.py");
+    trajectoryProcessor.verbose();
+
     templateGen.prepareFunction = [&]() {
       auto transfmatFile = transfmatExtractor.outputFile();
 
@@ -1215,8 +1221,58 @@ public:
       return true;
     };
 
+    trajectoryProcessor.registerDoneCallback([&](bool ok) {
+      //        std::string fullconditionPath = fullConditionPath();
+      //        if (mParameterSpaces["time"]->size() > 0 &&
+      //            File::exists(fullconditionPath + "time_diffs.json")) {
+      //            // Generate an internal template file for data at time 0
+      //            // Load new template if more than time has changed.
+      //            bool onlyTimeChanged = true;
+      //            for (auto &paramSpace : mParameterSpaces) {
+      //                if (paramSpace.first == "time") {
+      //                    continue;
+      //                }
+      //                if (mCurrentLoadedIndeces[paramSpace.first] !=
+      //                    paramSpace.second->getCurrentIndex()) {
+      //                    onlyTimeChanged = false;
+      //                    break;
+      //                }
+      //            }
+      //            int timeIndex = mParameterSpaces["time"]->getCurrentIndex();
+      //            if (!onlyTimeChanged) {
+      //                timeIndex = 0;
+      //                // Load diffs for this parameter space sample
+      //                std::ifstream f(fullconditionPath + "time_diffs.json");
+      //                std::string str;
+      //                if (!f.fail()) {
+      //                    f.seekg(0, std::ios::end);
+      //                    str.reserve(f.tellg());
+      //                    f.seekg(0, std::ios::beg);
+
+      //                    str.assign((std::istreambuf_iterator<char>(f)),
+      //                               std::istreambuf_iterator<char>());
+
+      //                    mDiffs = json::parse(str);
+
+      //                } else {
+      //                    std::cerr << "ERROR loading diff file" << std::endl;
+      //                }
+      //            } else {
+      //                timeIndex = mCurrentLoadedIndeces["time"];
+      //            }
+
+      //            bool diffLoaded = loadDiff(timeIndex);
+      //            if (diffLoaded) {
+      //                auto positions = positionBuffers.getWritable();
+      //                *positions = mTemplatePositions;
+
+      //                positionBuffers.doneWriting(positions);
+      //            }
+      //        }
+    });
+
     initRootComputationChain << parameterSpaceProcessor << transfmatExtractor
-                             << templateGen;
+                             << templateGen << trajectoryProcessor;
 
     // Only the root chain needs to be
     processorServer << initRootComputationChain
@@ -1634,9 +1690,18 @@ public:
 
   void processNewDataRoot(string rootPath) {
     auto filelist = itemListInDir(dataRoot + rootPath);
+
     for (FilePath &element : filelist) {
       if (File::isDirectory(element.filepath())) {
         // Attempt to generate data space for all directories in root dir.
+
+        auto subdirs = itemListInDir(element.filepath());
+        for (FilePath &subdir : subdirs) {
+
+          if (subdir.file() == "trajectory.json") {
+            std::cout << subdir.filepath() << std ::endl;
+          }
+        }
 
         parameterSpaceProcessor.setRunningDirectory(element.filepath());
         parameterSpaceProcessor.setOutputDirectory(element.filepath() +
@@ -1647,6 +1712,8 @@ public:
 
         templateGen.setRunningDirectory(element.filepath());
         templateGen.setOutputDirectory(element.filepath() + "/cached_output");
+
+        trajectoryProcessor.setRunningDirectory(element.filepath());
 
         bool ok = initRootComputationChain.process();
 

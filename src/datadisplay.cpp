@@ -388,7 +388,7 @@ void DataDisplay::prepare(Graphics &g, Matrix4f &transformMatrix) {
     // Schedule processing of changes for next pass to allow drawing one frame.
   }
 
-  if (mDatasetManager.positionBuffers.newDataAvailable()) {
+  if (mDatasetManager.occupationData.newDataAvailable()) {
     updateDisplayBuffers();
   }
   prepareHistoryMesh();
@@ -475,22 +475,21 @@ void DataDisplay::dumpImages(string dumpPrefix) {
     std::cerr << "ERROR copying png file." << std::endl;
   }
 
-  auto allPositions = mDatasetManager.positionBuffers.get(false);
+  auto allPositions = mDatasetManager.occupationData.get(false);
   File allPositionsFile(File::conformPathToOS(dumpDirectory + "/" + dumpPrefix +
                                               "_positions.csv"),
                         "w", true);
   std::string header = "element,x,y,z\n";
   allPositionsFile.write(header);
-  for (auto elemPositions : *allPositions) {
-    auto positionIt = elemPositions.second.begin();
-    while (positionIt != elemPositions.second.end()) {
-      std::string line = elemPositions.first + ",";
-      line += std::to_string(*positionIt++) + ",";
-      line += std::to_string(*positionIt++) + ",";
-      line += std::to_string(*positionIt++) + "\n";
-      positionIt++; // Ignore label?
-      allPositionsFile.write(line);
-    }
+  for (auto &elemPositions : *allPositions) {
+    std::string line =
+        mDatasetManager.mCurrentBasis[elemPositions.basis_index]
+                                     [elemPositions.occupancy_dof] +
+        ",";
+    line += std::to_string(elemPositions.x) + ",";
+    line += std::to_string(elemPositions.y) + ",";
+    line += std::to_string(elemPositions.z) + "\n";
+    allPositionsFile.write(line);
   }
   allPositionsFile.close();
 
@@ -508,28 +507,27 @@ void DataDisplay::dumpImages(string dumpPrefix) {
   auto plane_point = atomrender.mSlicingPlanePoint.get();
   auto plane_normal = atomrender.mSlicingPlaneNormal.get().normalized();
   auto second_plane_distance = atomrender.mSlicingPlaneThickness.get();
-  auto slicePositions = *mDatasetManager.positionBuffers.get(false);
   File slicePositionsFile(File::conformPathToOS(dumpDirectory + "/" +
                                                 dumpPrefix +
                                                 "_slice_positions.csv"),
                           "w", true);
   std::string slicePositionsHeader = "element,x,y,z\n";
   slicePositionsFile.write(slicePositionsHeader);
+  {
+    auto allPositions = mDatasetManager.occupationData.get(false);
+    for (auto &elemPositions : *allPositions) {
 
-  auto selectedElements = mShowAtoms.getSelectedElements();
-  for (auto atom : selectedElements) {
-    for (size_t i = 0; i < slicePositions[atom].size(); i += 4) {
-      auto x = slicePositions[atom][i];
-      auto y = slicePositions[atom][i + 1];
-      auto z = slicePositions[atom][i + 2];
-      Vec3f pos(x, y, z);
+      Vec3f pos(elemPositions.x, elemPositions.y, elemPositions.z);
       if (between_planes(pos, plane_point, plane_normal,
                          second_plane_distance)) {
-        std::string line = atom + ",";
-        line += std::to_string(x) + ",";
-        line += std::to_string(y) + ",";
-        line += std::to_string(z) + "\n";
-        slicePositionsFile.write(line);
+        std::string line =
+            mDatasetManager.mCurrentBasis[elemPositions.basis_index]
+                                         [elemPositions.occupancy_dof] +
+            ",";
+        line += std::to_string(elemPositions.x) + ",";
+        line += std::to_string(elemPositions.y) + ",";
+        line += std::to_string(elemPositions.z) + "\n";
+        allPositionsFile.write(line);
       }
     }
   }
@@ -559,9 +557,9 @@ void DataDisplay::dumpImages(string dumpPrefix) {
 }
 
 void DataDisplay::updateDisplayBuffers() {
-  std::map<string, int> elementCounts;
+  //  std::map<string, int> elementCounts;
 
-  auto allPositions = mDatasetManager.positionBuffers.get();
+  auto allPositions = mDatasetManager.occupationData.get();
 
   mDatasetManager.mCurrentLoadedIndeces.clear();
   for (auto &paramSpace : mDatasetManager.mParameterSpaces) {
@@ -569,41 +567,59 @@ void DataDisplay::updateDisplayBuffers() {
         paramSpace.second->getCurrentIndex();
   }
 
-  vector<vector<float> *> elemPositions;
+  //  vector<vector<float> *> elemPositions;
 
-  // Now that the layer direction has been computed from the atom of interest,
-  // we need to generate aligned data from the visible atoms.
-  elemPositions.clear();
-  auto visibleAtoms = mShowAtoms.getSelectedElements();
-  for (auto &elementData : *allPositions) {
-    if (std::find(visibleAtoms.begin(), visibleAtoms.end(),
-                  elementData.first) != visibleAtoms.end()) {
-      elemPositions.push_back(&(elementData.second));
-    }
-  }
-  // also prepare layer normal direction aligned data
-  size_t totalSize = 0;
-  for (auto *elems : elemPositions) {
-    totalSize += elems->size();
-  }
+  //  elemPositions.clear();
+  //  auto visibleAtoms = mShowAtoms.getSelectedElements();
+  //  for (auto &atomData : *allPositions) {
+
+  //      if (visibleAtoms.get() & (1 << atomData.species)) {
+
+  //      }
+  //    if (std::find(visibleAtoms.begin(), visibleAtoms.end(),
+  //                  elementData.first) != visibleAtoms.end()) {
+  //      elemPositions.push_back(&(elementData.second));
+  //    }
+  //  }
+  //  // also prepare layer normal direction aligned data
+  //  size_t totalSize = 0;
+  //  for (auto *elems : elemPositions) {
+  //    totalSize += elems->size();
+  //  }
+  auto curVisibleAtoms = mShowAtoms.getSelectedElements();
+  // TODO these colors should be exposed as a preference
+
+  vector<Color> colorList = {
+      Color(0.0, 0.0, 0.0, 0.0), Color(0.0, 0.0, 0.0, 0.0),
+      Color(0.0, 1.0, 1.0, 1.0), Color(1.0, 1.0, 0.0, 1.0),
+      Color(1.0, 0.0, 1.0, 1.0), Color(0.0, 1.0, 1.0, 1.0),
+      Color(1.0, 1.0, 0.0, 1.0), Color(1.0, 0.0, 1.0, 1.0)};
+
+  vector<Color> colorList2 = {
+      Color(0.7f, 0.0f, 0.7f, 0.4f), Color(0.7f, 0.0f, 0.7f, 1.0f),
+      Color(0.0f, 0.7f, 0.0f, 0.4f), Color(0.0f, 0.7f, 0.0f, 1.0f),
+      Color(0.0f, 0.0f, 0.7f, 0.4f), Color(0.0f, 0.0f, 0.7f, 1.0f),
+      Color(0.7f, 0.0f, 0.7f, 0.4f), Color(0.7f, 0.0f, 0.7f, 1.0f),
+      Color(0.0f, 0.7f, 0.0f, 0.4f), Color(0.0f, 0.7f, 0.0f, 1.0f),
+      Color(0.0f, 0.0f, 0.7f, 0.4f), Color(0.0f, 0.0f, 0.7f, 1.0f),
+  };
 
   mDataBoundaries.resetInv();
-  mAligned4fData.resize(totalSize * 4);
-  auto outit = mAligned4fData.begin();
+  mAligned4fData.clear();
   // now fill the
-  for (auto *elems : elemPositions) {
-    auto it = elems->begin();
-    while (it != elems->end()) {
-      assert(outit != mAligned4fData.end());
-      float &x = *it++;
-      float &y = *it++;
-      float &z = *it++;
-      float &w = *it++;
-      Vec3f vec(x, y, z);
-      *outit++ = x;
-      *outit++ = y;
-      *outit++ = z;
-      *outit++ = w;
+  for (auto &atom : *allPositions) {
+
+    if (std::find(curVisibleAtoms.begin(), curVisibleAtoms.end(),
+                  mDatasetManager
+                      .mCurrentBasis[atom.basis_index, atom.occupancy_dof]) !=
+        curVisibleAtoms.end()) {
+      mAligned4fData.push_back(atom.x);
+      mAligned4fData.push_back(atom.y);
+      mAligned4fData.push_back(atom.z);
+
+      auto hue = rgb2hsv(colorList[1].rgb()).h;
+      mAligned4fData.push_back(hue);
+      Vec3f vec(atom.x, atom.y, atom.z);
       mDataBoundaries.includePoint(vec);
     }
   }
@@ -619,84 +635,73 @@ void DataDisplay::updateDisplayBuffers() {
   }
 
   // Set active atoms and colors
-  atomPropertiesProj.clear();
-  vector<AtomProperties> atomPropertiesPersp;
+  //  atomPropertiesProj.clear();
+  //  vector<AtomProperties> atomPropertiesPersp;
 
-  // TODO these colors should be exposed as a preference
-  vector<Color> colorList = {
-      Color(0.0, 1.0, 1.0, 1.0), Color(1.0, 1.0, 0.0, 1.0),
-      Color(1.0, 0.0, 1.0, 1.0), Color(0.0, 1.0, 1.0, 1.0),
-      Color(1.0, 1.0, 0.0, 1.0), Color(1.0, 0.0, 1.0, 1.0)};
+  //  auto colorListIt = colorList.begin();
+  //  auto colorList2It = colorList2.begin();
 
-  vector<Color> colorList2 = {
-      Color(0.7f, 0.0f, 0.7f, 0.4f), Color(0.7f, 0.0f, 0.7f, 1.0f),
-      Color(0.0f, 0.7f, 0.0f, 0.4f), Color(0.0f, 0.7f, 0.0f, 1.0f),
-      Color(0.0f, 0.0f, 0.7f, 0.4f), Color(0.0f, 0.0f, 0.7f, 1.0f),
-      Color(0.7f, 0.0f, 0.7f, 0.4f), Color(0.7f, 0.0f, 0.7f, 1.0f),
-      Color(0.0f, 0.7f, 0.0f, 0.4f), Color(0.0f, 0.7f, 0.0f, 1.0f),
-      Color(0.0f, 0.0f, 0.7f, 0.4f), Color(0.0f, 0.0f, 0.7f, 1.0f),
-  };
-  auto colorListIt = colorList.begin();
-  auto colorList2It = colorList2.begin();
+  //  auto selectedElements = mShowAtoms.getSelectedElements();
+  //  for (auto atom : mShowAtoms.getElements()) {
+  //    if (std::find(selectedElements.begin(), selectedElements.end(), atom) !=
+  //        selectedElements.end()) {
+  //      if (elementData.find(atom) != elementData.end()) {
+  //        //                    std::cout << "Color for: " << atom << ":" <<
+  //        //                    elementData[atom].color.r << " " <<
+  //        //                    elementData[atom].color.g << " "<<
+  //        //                    elementData[atom].color.b << " "  <<std::endl
+  //        ;
+  //        // Atom was matched in elements.ini file, so use those colors
 
-  auto selectedElements = mShowAtoms.getSelectedElements();
-  for (auto atom : mShowAtoms.getElements()) {
-    if (std::find(selectedElements.begin(), selectedElements.end(), atom) !=
-        selectedElements.end()) {
-      if (elementData.find(atom) != elementData.end()) {
-        //                    std::cout << "Color for: " << atom << ":" <<
-        //                    elementData[atom].color.r << " " <<
-        //                    elementData[atom].color.g << " "<<
-        //                    elementData[atom].color.b << " "  <<std::endl ;
-        // Atom was matched in elements.ini file, so use those colors
+  //        atomPropertiesProj.push_back(AtomProperties{
+  //            atom, elementData[atom].radius, elementData[atom].color});
 
-        atomPropertiesProj.push_back(AtomProperties{
-            atom, elementData[atom].radius, elementData[atom].color});
+  //        atomPropertiesPersp.push_back(AtomProperties{
+  //            atom, elementData[atom].radius, elementData[atom].color});
+  //      } else { // Use defaults
+  //        atomPropertiesProj.push_back(AtomProperties{atom, 1.0f,
+  //        *colorListIt});
 
-        atomPropertiesPersp.push_back(AtomProperties{
-            atom, elementData[atom].radius, elementData[atom].color});
-      } else { // Use defaults
-        atomPropertiesProj.push_back(AtomProperties{atom, 1.0f, *colorListIt});
-
-        atomPropertiesPersp.push_back(
-            AtomProperties{atom, 1.0f, *colorList2It});
-      }
-    }
-    colorListIt++;
-    colorList2It++;
-    colorList2It++;
-  }
+  //        atomPropertiesPersp.push_back(
+  //            AtomProperties{atom, 1.0f, *colorList2It});
+  //      }
+  //    }
+  //    colorListIt++;
+  //    colorList2It++;
+  //    colorList2It++;
+  //  }
 
   // Apply colors to aligned data -----------
-  list<Color> colors;
-  mAtomData.clear();
-  for (auto elem : *allPositions) {
-    elementCounts[elem.first] = elem.second.size() / 4;
-  }
-  for (auto atomProps : atomPropertiesProj) {
-    colors.push_back(atomProps.color);
-    mAtomData.push_back(
-        {elementCounts[atomProps.name], atomProps.drawScale, atomProps.name});
-  }
-  float hue = 0.0f;
+  //  std::vector<Color> colors;
+  //  mAtomData.clear();
+  //  for (auto elem : *allPositions) {
+  //    elementCounts[elem.first] = elem.second.size() / 4;
+  //  }
+  //  for (auto atomProps : atomPropertiesProj) {
+  //    colors.push_back(atomProps.color);
+  //    mAtomData.push_back(
+  //        {elementCounts[atomProps.name], atomProps.drawScale,
+  //        atomProps.name});
+  //  }
+  //  float hue = 0.0f;
 
-  if (colors.size() > 0) {
-    hue = rgb2hsv(colors.front().rgb()).h;
-  }
-  if (mAtomData.size() > 0) {
-    auto atomDataIt = mAtomData.begin();
-    int atomCounter = 0;
-    for (size_t i = 0; i < mAligned4fData.size() / 4; i++) {
-      //            assert(atomCountsIt != mAtomCounts.end());
-      if (atomDataIt != mAtomData.end() && --atomCounter <= 0) {
-        atomCounter = atomDataIt->counts;
-        atomDataIt++;
-        hue = rgb2hsv(colors.front().rgb()).h;
-        colors.pop_front();
-      }
-      mAligned4fData[4 * i + 3] = hue;
-    }
-  }
+  //  if (colors.size() > 0) {
+  //    hue = rgb2hsv(colors.front().rgb()).h;
+  //  }
+  //  if (mAtomData.size() > 0) {
+  //    auto atomDataIt = mAtomData.begin();
+  //    int atomCounter = 0;
+  //    for (size_t i = 0; i < mAligned4fData.size() / 4; i++) {
+  //      //            assert(atomCountsIt != mAtomCounts.end());
+  //      if (atomDataIt != mAtomData.end() && --atomCounter <= 0) {
+  //        atomCounter = atomDataIt->counts;
+  //        atomDataIt++;
+  //        hue = rgb2hsv(colors.front().rgb()).h;
+  //        colors.pop_front();
+  //      }
+  //      mAligned4fData[4 * i + 3] = hue;
+  //    }
+  //  }
 }
 
 void DataDisplay::prepareParallelProjection(Graphics &g,
@@ -819,32 +824,15 @@ void DataDisplay::prepareParallelProjection(Graphics &g,
   gl::depthTesting(false);
   g.pushMatrix();
 
-  if (atomPropertiesProj.size() > 0) {
+  /*if (atomPropertiesProj.size() > 0) */ {
     // ----------------------------------------
-    int cumulativeCount = 0;
-    for (auto &data : mAtomData) {
-      if (mAlignData) {
-        //            instancing_mesh0.attrib_data(
-        //              mAligned4fData.size() * sizeof(float),
-        //              mAligned4fData.data(),
-        //              mAligned4fData.size()/4
-        //            );
-        int count = data.counts;
-        assert((int)mAligned4fData.size() >= (cumulativeCount + count) * 4);
-        atomrender.instancing_mesh0.attrib_data(
-            count * 4 * sizeof(float),
-            mAligned4fData.data() + (cumulativeCount * 4), count);
-        cumulativeCount += count;
-        //                        std::cout << "Drawing " << counts << " of "
-        //                        << cumulativeCount << std::endl;
-      } else {
-        //            auto& elemPositions = r0->getElementPositions(p0.name);
-        //            instancing_mesh0.attrib_data(
-        //              elemPositions.size() * sizeof(float),
-        //              elemPositions.data(),
-        //              elemPositions.size()/4
-        //            );
-      }
+    //    int cumulativeCount = 0;
+    /*for (auto &data : mAtomData)*/ {
+
+      atomrender.instancing_mesh0.attrib_data(
+          mAligned4fData.size() * 4 * sizeof(float), mAligned4fData.data(),
+          mAligned4fData.size() / 4);
+      //      cumulativeCount += count;
       // now draw data with custom shader
       g.shader(atomrender.instancing_mesh0.shader);
       g.update(); // sends modelview and projection matrices
@@ -852,9 +840,12 @@ void DataDisplay::prepareParallelProjection(Graphics &g,
       g.shader().uniform("layerSeparation", 1.0);
       // A scaling value of 4.0 found empirically...
       if (atomrender.mShowRadius == 1.0f) {
-        g.shader().uniform("markerScale", data.radius *
-                                              atomrender.mAtomMarkerSize *
+        g.shader().uniform("markerScale", atomrender.mAtomMarkerSize *
                                               atomrender.mMarkerScale);
+        //        g.shader().uniform("markerScale", data.radius *
+        //                                              atomrender.mAtomMarkerSize
+        //                                              *
+        //                                              atomrender.mMarkerScale);
       } else {
         g.shader().uniform("markerScale", atomrender.mAtomMarkerSize *
                                               atomrender.mMarkerScale);

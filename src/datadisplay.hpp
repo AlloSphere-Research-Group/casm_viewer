@@ -36,7 +36,6 @@
 #include "tinc/VASPReader.hpp"
 
 #include "datasetmanager.hpp"
-#include "processors.hpp"
 #include "slice.hpp"
 
 //#include "imgui.h"

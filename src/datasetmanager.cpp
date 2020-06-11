@@ -16,6 +16,8 @@
 
 #include "datasetmanager.hpp"
 
+#include "tinc/NetCDFDiskBuffer.hpp"
+
 using namespace al;
 
 void replaceAll(std::string &s, const std::string &search,
@@ -58,11 +60,24 @@ void DatasetManager::initializeComputation() {
   cacheManager.registerProcessor(labelProcessor);
   cacheManager.registerProcessor(graphGenerator);
 
+  //  setenv("HDF5_DISABLE_VERSION_CHECK", "2", 1);
   //  graphGenerator.verbose();
-  diffGen.verbose();
+  labelProcessor.verbose();
 
-  atomPositionChain << labelProcessor << diffGen;
+  for (auto pspace : mParameterSpaces) {
+    labelProcessor << pspace.second->parameter();
+    graphGenerator << pspace.second->parameter();
+  }
+  atomPositionChain << labelProcessor;
   sampleComputationChain << atomPositionChain << graphGenerator;
+
+  decompressTrajectory.setCommand("tar");
+  Flag flag;
+  flag.commandFlag = "-xvz";
+  Flag inputFlag = "tajectories.tar.gz";
+  inputFlag.commandFlag = "-f";
+
+  decompressTrajectory.configuration["flags"] = flag;
 
   // Graph generator
   graphGenerator.prepareFunction = [&]() {
@@ -167,8 +182,8 @@ void DatasetManager::initializeComputation() {
   graphGenerator.registerDoneCallback([this](bool runOk) {
     if (runOk) {
       currentGraphName.set(graphGenerator.outputFile());
-      std::cout << "Generated graph: " << graphGenerator.outputFile()
-                << std::endl;
+      //      std::cout << "Generated graph: " << graphGenerator.outputFile()
+      //                << std::endl;
       //              graphProcessing = false;
     } else {
       std::cerr << "Graph generation failed." << std::endl;
@@ -235,103 +250,67 @@ void DatasetManager::initializeComputation() {
     if (ok) {
       currentPoscarName.set(labelProcessor.outputFile());
 
-      if (reader.loadFile(currentPoscarName)) {
-        std::cout << "*********** Read:" << currentPoscarName.get()
-                  << std::endl;
-      } else {
-        std::cout << "Cannot Read:" << currentPoscarName.get() << std::endl;
+      //      if (reader.loadFile(currentPoscarName)) {
+      //        std::cout << "*********** Read:" << currentPoscarName.get()
+      //                  << std::endl;
+      //      } else {
+      //        std::cout << "Cannot Read:" << currentPoscarName.get() <<
+      //        std::endl;
+      //      }
+
+      //      auto positions = positionBuffers.getWritable();
+      //      *positions = reader.getAllPositions();
+
+      //      positionBuffers.doneWriting(positions);
+
+      // --------------netcdf ----------------------------
+
+      int ncid, retval;
+
+      std::string filename = currentPoscarName.get() + ".nc";
+      /* Open the file. NC_NOWRITE tells netCDF we want read-only access
+       * to the file.*/
+      if ((retval = nc_open(filename.c_str(), NC_NOWRITE | NC_SHARE, &ncid))) {
+
+        return /*false*/;
+      }
+      int varid;
+      if ((retval = nc_inq_varid(ncid, "atoms_var", &varid))) {
+        return /*false*/;
       }
 
-      auto positions = positionBuffers.getWritable();
-      *positions = reader.getAllPositions();
+      nc_type xtypep;
+      char name[32];
+      int ndimsp;
+      int dimidsp[32];
+      int *nattsp = nullptr;
+      if ((retval = nc_inq_var(ncid, varid, name, &xtypep, &ndimsp, dimidsp,
+                               nattsp))) {
+        return /*false*/;
+      }
 
-      positionBuffers.doneWriting(positions);
+      size_t lenp;
+      if ((retval = nc_inq_dimlen(ncid, dimidsp[0], &lenp))) {
+        return /*false*/;
+      }
+
+      auto newPositionData = occupationData.getWritable();
+      newPositionData->resize(lenp);
+
+      /* Read the data. */
+      if ((retval = nc_get_var(ncid, varid, newPositionData->data()))) {
+        return /*false*/;
+      }
+      occupationData.doneWriting(newPositionData);
+
+      /* Close the file, freeing all resources. */
+      if ((retval = nc_close(ncid))) {
+        return /*false*/;
+      }
+
+      // ---------------------------------------------
     }
   });
-
-  diffGen.registerDoneCallback([&](bool ok) {
-    std::string fullconditionPath = fullConditionPath();
-    if (mParameterSpaces["time"]->size() > 0 &&
-        File::exists(fullconditionPath + "time_diffs.json")) {
-      // Generate an internal template file for data at time 0
-      // Load new template if more than time has changed.
-      bool onlyTimeChanged = true;
-      for (auto &paramSpace : mParameterSpaces) {
-        if (paramSpace.first == "time") {
-          continue;
-        }
-        if (mCurrentLoadedIndeces[paramSpace.first] !=
-            paramSpace.second->getCurrentIndex()) {
-          onlyTimeChanged = false;
-          break;
-        }
-      }
-      int timeIndex = mParameterSpaces["time"]->getCurrentIndex();
-      if (!onlyTimeChanged) {
-        timeIndex = 0;
-        // Load diffs for this parameter space sample
-        std::ifstream f(fullconditionPath + "time_diffs.json");
-        std::string str;
-        if (!f.fail()) {
-          f.seekg(0, std::ios::end);
-          str.reserve(f.tellg());
-          f.seekg(0, std::ios::beg);
-
-          str.assign((std::istreambuf_iterator<char>(f)),
-                     std::istreambuf_iterator<char>());
-
-          mDiffs = json::parse(str);
-
-        } else {
-          std::cerr << "ERROR loading diff file" << std::endl;
-        }
-      } else {
-        timeIndex = mCurrentLoadedIndeces["time"];
-      }
-
-      bool diffLoaded = loadDiff(timeIndex);
-      if (diffLoaded) {
-        auto positions = positionBuffers.getWritable();
-        *positions = mTemplatePositions;
-
-        positionBuffers.doneWriting(positions);
-      }
-    }
-  });
-
-  diffGen.prepareFunction = [this]() {
-    std::cout << "Using KMC diff generator for display" << std::endl;
-    std::string root_path = buildRootPath();
-    std::string template_pos_path = File::conformPathToOS(
-        root_path + mCurrentDataset.get() + "/cached_output/template_POSCAR");
-    // Try to find "template_POSCAR"
-    if (!File::exists(template_pos_path)) {
-      std::cerr << "Failed to find template file. Call it 'template_POSCAR'."
-                << std::endl;
-      return false;
-    }
-
-    std::string prim_path;
-    if (File::exists(root_path + mCurrentDataset.get() + "/prim_labels.json")) {
-      prim_path = root_path + mCurrentDataset.get() + "/prim_labels.json";
-    } else if (File::exists(root_path + mCurrentDataset.get() + "/prim.json")) {
-      prim_path = root_path + mCurrentDataset.get() + "/prim.json";
-    } else if (File::exists(root_path + "prim_labels.json")) {
-      prim_path = root_path + "prim_labels.json";
-    } else if (File::exists(root_path + "prim.json")) {
-      prim_path = root_path + "prim.json";
-    }
-
-    diffGen.setRunningDirectory(root_path + mCurrentDataset.get());
-    diffGen.setOutputDirectory(root_path + mCurrentDataset.get() +
-                               "/cached_output");
-
-    diffGen.configuration["prim_path"] = prim_path;
-    diffGen.configuration["template_path"] = template_pos_path;
-    diffGen.configuration["dataset_path"] =
-        File::conformPathToOS(root_path + mCurrentDataset.get());
-    return true;
-  };
 
   // Parameter spaces trigger computation
 
@@ -349,7 +328,7 @@ void DatasetManager::initializeComputation() {
                   << "..."
                   << parameterSpace.second->idAt(
                          parameterSpace.second->getIndexForValue(value));
-        computeNewSample();
+        //        computeNewSample();
         updateText();
       }
     });
@@ -372,14 +351,12 @@ void DatasetManager::setPythonBinary(std::string pythonBinaryPath) {
   //      std::unique_lock<std::mutex> lk(mProcessingLock);
   graphGenerator.setCommand(pythonBinaryPath);
   labelProcessor.setCommand(pythonBinaryPath);
-  diffGen.setCommand(pythonBinaryPath);
 }
 
 void DatasetManager::setPythonScriptPath(std::string pythonScriptPath) {
   //      std::unique_lock<std::mutex> lk(mProcessingLock);
   labelProcessor.configuration["python_scripts_path"] = pythonScriptPath;
   graphGenerator.setScriptName(pythonScriptPath + "/graphing/plot.py");
-  diffGen.setScriptName(pythonScriptPath + "/reassign_occs/analyze_kmc.py");
 }
 
 std::string DatasetManager::buildRootPath() {
@@ -434,9 +411,9 @@ void DatasetManager::readParameterSpace() {
         if (mappedKey == "chempotA" || mappedKey == "chempotB") {
           mParameterSpaces[mappedKey]->sort();
         }
-        // set to current value to clamp if needed
-        mParameterSpaces[mappedKey]->parameter().set(
-            mParameterSpaces[mappedKey]->parameter().get());
+        //        // set to current value to clamp if needed
+        //        mParameterSpaces[mappedKey]->parameter().set(
+        //            mParameterSpaces[mappedKey]->parameter().get());
       }
     }
 
@@ -575,10 +552,8 @@ void DatasetManager::initRoot() {
 
   // Configure diff generator
   if (mParameterSpaces["time"]->size() > 0) {
-    diffGen.enabled = true;
     graphGenerator.enabled = false; // Graphing not working with kmc yet.
   } else {
-    diffGen.enabled = false;
     graphGenerator.enabled = true;
   }
 
@@ -650,8 +625,10 @@ void DatasetManager::analyzeDataset() {
   // Read prim_labels file. This tells us the atoms, the vacancies and the
   // labeling
   std::string primFileContents = readJsonPrimLabelsFile(datasetId, "");
+
   if (primFileContents.size() > 0) {
     auto primLabelsJson = json::parse(primFileContents);
+    mCurrentBasis = primLabelsJson["basis"];
     for (auto basis : primLabelsJson["basis"]) {
       //                std::cout << basis.dump() <<std::endl;
       bool isVacancy = false;

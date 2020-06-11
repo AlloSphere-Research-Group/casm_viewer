@@ -14,7 +14,6 @@ add_executable(${APP_NAME}
 
   src/datadisplay.hpp
   src/datasetmanager.hpp
-  src/processors.hpp
   src/slice.hpp)
 
 # add allolib as a subdirectory to the project
@@ -22,7 +21,7 @@ add_subdirectory(external/tinc)
 
 # link allolib to project
 #target_link_libraries(${APP_NAME} PRIVATE al)
-target_link_libraries(${APP_NAME} PRIVATE tinc al)
+target_link_libraries(${APP_NAME} PRIVATE tinc)
 
 #if (EXISTS ${CMAKE_CURRENT_LIST_DIR}/al_ext)
 #  message("Buiding extensions in al_ext")

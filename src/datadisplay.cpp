@@ -449,112 +449,117 @@ void DataDisplay::setFont(string name, float size) {
   }
 }
 
-void DataDisplay::dumpImages(string dumpPrefix) {
-  std::unique_lock<std::mutex> lk(mDrawLock);
-  std::string dumpDirectory = File::conformPathToOS(
-      mDatasetManager.buildRootPath() + mDatasetManager.mCurrentDataset.get() +
-      "/graphics");
-  if (!File::exists(dumpDirectory)) {
-    if (!Dir::make(dumpDirectory)) {
-      std::cerr << "Failed to create directory: " << dumpDirectory << std::endl;
-      return;
-    }
-  }
+// void DataDisplay::dumpImages(string dumpPrefix) {
+//  std::unique_lock<std::mutex> lk(mDrawLock);
+//  std::string dumpDirectory = File::conformPathToOS(
+//      mDatasetManager.buildRootPath() + mDatasetManager.mCurrentDataset.get()
+//      +
+//      "/graphics");
+//  if (!File::exists(dumpDirectory)) {
+//    if (!Dir::make(dumpDirectory)) {
+//      std::cerr << "Failed to create directory: " << dumpDirectory <<
+//      std::endl; return;
+//    }
+//  }
 
-  std::string fullDatasetPath = File::conformPathToOS(
-      mDatasetManager.buildRootPath() +
-      File::conformPathToOS(mDatasetManager.mCurrentDataset.get()));
-  std::string graphFilename =
-      File::conformPathToOS(dumpDirectory + "/" + dumpPrefix + "_graph.png");
-  std::cout << "dumping "
-            << fullDatasetPath + mDatasetManager.currentGraphName.get()
-            << " -> " << graphFilename << std::endl;
-  if (!File::copy(File::conformPathToOS(fullDatasetPath +
-                                        mDatasetManager.currentGraphName.get()),
-                  graphFilename)) {
-    std::cerr << "ERROR copying png file." << std::endl;
-  }
+//  std::string fullDatasetPath = File::conformPathToOS(
+//      mDatasetManager.buildRootPath() +
+//      File::conformPathToOS(mDatasetManager.mCurrentDataset.get()));
+//  std::string graphFilename =
+//      File::conformPathToOS(dumpDirectory + "/" + dumpPrefix + "_graph.png");
+//  std::cout << "dumping "
+//            << fullDatasetPath + mDatasetManager.currentGraphName.get()
+//            << " -> " << graphFilename << std::endl;
+//  if (!File::copy(File::conformPathToOS(fullDatasetPath +
+//                                        mDatasetManager.currentGraphName.get()),
+//                  graphFilename)) {
+//    std::cerr << "ERROR copying png file." << std::endl;
+//  }
 
-  auto allPositions = mDatasetManager.occupationData.get(false);
-  File allPositionsFile(File::conformPathToOS(dumpDirectory + "/" + dumpPrefix +
-                                              "_positions.csv"),
-                        "w", true);
-  std::string header = "element,x,y,z\n";
-  allPositionsFile.write(header);
-  for (auto &elemPositions : *allPositions) {
-    std::string line =
-        mDatasetManager.mCurrentBasis[elemPositions.basis_index]
-                                     [elemPositions.occupancy_dof] +
-        ",";
-    line += std::to_string(elemPositions.x) + ",";
-    line += std::to_string(elemPositions.y) + ",";
-    line += std::to_string(elemPositions.z) + "\n";
-    allPositionsFile.write(line);
-  }
-  allPositionsFile.close();
+//  auto allPositions = mDatasetManager.occupationData.get(false);
+//  File allPositionsFile(File::conformPathToOS(dumpDirectory + "/" + dumpPrefix
+//  +
+//                                              "_positions.csv"),
+//                        "w", true);
+//  std::string header = "element,x,y,z\n";
+//  allPositionsFile.write(header);
+//  for (auto &elemPositions : *allPositions) {
+//    std::string line =
+//        mDatasetManager.mCurrentBasis[elemPositions.basis_index]
+//                                     [elemPositions.occupancy_dof] +
+//        ",";
+//    line += std::to_string(elemPositions.x) + ",";
+//    line += std::to_string(elemPositions.y) + ",";
+//    line += std::to_string(elemPositions.z) + "\n";
+//    allPositionsFile.write(line);
+//  }
+//  allPositionsFile.close();
 
-  auto between_planes = [&](Vec3f &point, Vec3f &plane_point,
-                            Vec3f &plane_normal, float &second_plane_distance) {
-    Vec3f difference = point - plane_point;
-    float proj = plane_normal.dot(difference);
-    if (proj >= 0 && proj <= second_plane_distance) {
-      return true;
-    } else {
-      return false;
-    }
-  };
+//  auto between_planes = [&](Vec3f &point, Vec3f &plane_point,
+//                            Vec3f &plane_normal, float &second_plane_distance)
+//                            {
+//    Vec3f difference = point - plane_point;
+//    float proj = plane_normal.dot(difference);
+//    if (proj >= 0 && proj <= second_plane_distance) {
+//      return true;
+//    } else {
+//      return false;
+//    }
+//  };
 
-  auto plane_point = atomrender.mSlicingPlanePoint.get();
-  auto plane_normal = atomrender.mSlicingPlaneNormal.get().normalized();
-  auto second_plane_distance = atomrender.mSlicingPlaneThickness.get();
-  File slicePositionsFile(File::conformPathToOS(dumpDirectory + "/" +
-                                                dumpPrefix +
-                                                "_slice_positions.csv"),
-                          "w", true);
-  std::string slicePositionsHeader = "element,x,y,z\n";
-  slicePositionsFile.write(slicePositionsHeader);
-  {
-    auto allPositions = mDatasetManager.occupationData.get(false);
-    for (auto &elemPositions : *allPositions) {
+//  auto plane_point = atomrender.mSlicingPlanePoint.get();
+//  auto plane_normal = atomrender.mSlicingPlaneNormal.get().normalized();
+//  auto second_plane_distance = atomrender.mSlicingPlaneThickness.get();
+//  File slicePositionsFile(File::conformPathToOS(dumpDirectory + "/" +
+//                                                dumpPrefix +
+//                                                "_slice_positions.csv"),
+//                          "w", true);
+//  std::string slicePositionsHeader = "element,x,y,z\n";
+//  slicePositionsFile.write(slicePositionsHeader);
+//  {
+//    auto allPositions = mDatasetManager.occupationData.get(false);
+//    for (auto &elemPositions : *allPositions) {
 
-      Vec3f pos(elemPositions.x, elemPositions.y, elemPositions.z);
-      if (between_planes(pos, plane_point, plane_normal,
-                         second_plane_distance)) {
-        std::string line =
-            mDatasetManager.mCurrentBasis[elemPositions.basis_index]
-                                         [elemPositions.occupancy_dof] +
-            ",";
-        line += std::to_string(elemPositions.x) + ",";
-        line += std::to_string(elemPositions.y) + ",";
-        line += std::to_string(elemPositions.z) + "\n";
-        allPositionsFile.write(line);
-      }
-    }
-  }
-  slicePositionsFile.close();
+//      Vec3f pos(elemPositions.x, elemPositions.y, elemPositions.z);
+//      if (between_planes(pos, plane_point, plane_normal,
+//                         second_plane_distance)) {
+//        std::string line =
+//            mDatasetManager.mCurrentBasis[elemPositions.basis_index]
+//                                         [elemPositions.occupancy_dof] +
+//            ",";
+//        line += std::to_string(elemPositions.x) + ",";
+//        line += std::to_string(elemPositions.y) + ",";
+//        line += std::to_string(elemPositions.z) + "\n";
+//        allPositionsFile.write(line);
+//      }
+//    }
+//  }
+//  slicePositionsFile.close();
 
-  json metadata;
-  metadata["dataset"]["path"] = mDatasetManager.currentDataset();
-  metadata["dataset"]["subdir"] = mDatasetManager.getSubDir();
-  metadata["dataset"]["rootpath"] = mDatasetManager.buildRootPath();
-  std::string condition = std::to_string(
-      mDatasetManager.mParameterSpaces[mDatasetManager.mConditionsParameter]
-          ->getCurrentIndex());
-  metadata["dataset"]["condition"] = condition;
-  for (auto space : mDatasetManager.mParameterSpaces) {
-    if (space.second && space.second->size() > 0) {
-      metadata["parameters"][space.first] = space.second->getAllCurrentIds()[0];
-    }
-  }
+//  json metadata;
+//  metadata["dataset"]["path"] = mDatasetManager.currentDataset();
+//  metadata["dataset"]["subdir"] = mDatasetManager.getSubDir();
+//  metadata["dataset"]["rootpath"] = mDatasetManager.buildRootPath();
+//  std::string condition = std::to_string(
+//      mDatasetManager.mParameterSpaces[mDatasetManager.mConditionsParameter]
+//          ->getCurrentIndex());
+//  metadata["dataset"]["condition"] = condition;
+//  for (auto space : mDatasetManager.mParameterSpaces) {
+//    if (space.second && space.second->size() > 0) {
+//      metadata["parameters"][space.first] =
+//      space.second->getAllCurrentIds()[0];
+//    }
+//  }
 
-  metadata["SlicingPlanePoint"] = {plane_point.x, plane_point.y, plane_point.z};
-  metadata["SliceNormal"] = {plane_normal.x, plane_normal.y, plane_normal.z};
+//  metadata["SlicingPlanePoint"] = {plane_point.x, plane_point.y,
+//  plane_point.z}; metadata["SliceNormal"] = {plane_normal.x, plane_normal.y,
+//  plane_normal.z};
 
-  metadata["SliceThickness"] = atomrender.mSlicingPlaneThickness.get();
-  std::ofstream metadatafile(dumpDirectory + "/" + dumpPrefix +
-                             "_metadata.json");
-  metadatafile << std::setw(4) << metadata;
-}
+//  metadata["SliceThickness"] = atomrender.mSlicingPlaneThickness.get();
+//  std::ofstream metadatafile(dumpDirectory + "/" + dumpPrefix +
+//                             "_metadata.json");
+//  metadatafile << std::setw(4) << metadata;
+//}
 
 void DataDisplay::updateDisplayBuffers() {
   //  std::map<string, int> elementCounts;
@@ -567,61 +572,60 @@ void DataDisplay::updateDisplayBuffers() {
         paramSpace.second->getCurrentIndex();
   }
 
-  //  vector<vector<float> *> elemPositions;
-
-  //  elemPositions.clear();
-  //  auto visibleAtoms = mShowAtoms.getSelectedElements();
-  //  for (auto &atomData : *allPositions) {
-
-  //      if (visibleAtoms.get() & (1 << atomData.species)) {
-
-  //      }
-  //    if (std::find(visibleAtoms.begin(), visibleAtoms.end(),
-  //                  elementData.first) != visibleAtoms.end()) {
-  //      elemPositions.push_back(&(elementData.second));
-  //    }
-  //  }
-  //  // also prepare layer normal direction aligned data
-  //  size_t totalSize = 0;
-  //  for (auto *elems : elemPositions) {
-  //    totalSize += elems->size();
-  //  }
   auto curVisibleAtoms = mShowAtoms.getSelectedElements();
   // TODO these colors should be exposed as a preference
 
   vector<Color> colorList = {
-      Color(0.0, 0.0, 0.0, 0.0), Color(0.0, 0.0, 0.0, 0.0),
+      Color(0.0, 1.0, 0.0, 0.0), Color(0.0, 0.0, 0.0, 0.0),
       Color(0.0, 1.0, 1.0, 1.0), Color(1.0, 1.0, 0.0, 1.0),
       Color(1.0, 0.0, 1.0, 1.0), Color(0.0, 1.0, 1.0, 1.0),
       Color(1.0, 1.0, 0.0, 1.0), Color(1.0, 0.0, 1.0, 1.0)};
 
-  vector<Color> colorList2 = {
-      Color(0.7f, 0.0f, 0.7f, 0.4f), Color(0.7f, 0.0f, 0.7f, 1.0f),
-      Color(0.0f, 0.7f, 0.0f, 0.4f), Color(0.0f, 0.7f, 0.0f, 1.0f),
-      Color(0.0f, 0.0f, 0.7f, 0.4f), Color(0.0f, 0.0f, 0.7f, 1.0f),
-      Color(0.7f, 0.0f, 0.7f, 0.4f), Color(0.7f, 0.0f, 0.7f, 1.0f),
-      Color(0.0f, 0.7f, 0.0f, 0.4f), Color(0.0f, 0.7f, 0.0f, 1.0f),
-      Color(0.0f, 0.0f, 0.7f, 0.4f), Color(0.0f, 0.0f, 0.7f, 1.0f),
-  };
+  //  vector<Color> colorList2 = {
+  //      Color(0.7f, 0.0f, 0.7f, 0.4f), Color(0.7f, 0.0f, 0.7f, 1.0f),
+  //      Color(0.0f, 0.7f, 0.0f, 0.4f), Color(0.0f, 0.7f, 0.0f, 1.0f),
+  //      Color(0.0f, 0.0f, 0.7f, 0.4f), Color(0.0f, 0.0f, 0.7f, 1.0f),
+  //      Color(0.7f, 0.0f, 0.7f, 0.4f), Color(0.7f, 0.0f, 0.7f, 1.0f),
+  //      Color(0.0f, 0.7f, 0.0f, 0.4f), Color(0.0f, 0.7f, 0.0f, 1.0f),
+  //      Color(0.0f, 0.0f, 0.7f, 0.4f), Color(0.0f, 0.0f, 0.7f, 1.0f),
+  //  };
 
   mDataBoundaries.resetInv();
   mAligned4fData.clear();
-  // now fill the
+
+  mAtomData.clear();
+
+  auto colorIt = colorList.begin();
+  for (auto visibleAtom : curVisibleAtoms) {
+    if (elementData.find(visibleAtom) != elementData.end()) {
+      mAtomData[visibleAtom] =
+          tinc::AtomData{0, visibleAtom, elementData[visibleAtom].radius,
+                         elementData[visibleAtom].color};
+    } else {
+
+      mAtomData[visibleAtom] = tinc::AtomData{0, visibleAtom, 1.0, *colorIt};
+      colorIt++;
+    }
+  }
+
+  auto templateDataIt = mDatasetManager.templateData.begin();
   for (auto &atom : *allPositions) {
-
-    if (std::find(curVisibleAtoms.begin(), curVisibleAtoms.end(),
-                  mDatasetManager
-                      .mCurrentBasis[atom.basis_index, atom.occupancy_dof]) !=
+    std::string atomName =
+        mDatasetManager.mCurrentBasis[atom.basis_index]["occupant_dof"]
+                                     [atom.occupancy_dof];
+    if (std::find(curVisibleAtoms.begin(), curVisibleAtoms.end(), atomName) !=
         curVisibleAtoms.end()) {
-      mAligned4fData.push_back(atom.x);
-      mAligned4fData.push_back(atom.y);
-      mAligned4fData.push_back(atom.z);
+      mAligned4fData.push_back(templateDataIt->x);
+      mAligned4fData.push_back(templateDataIt->y);
+      mAligned4fData.push_back(templateDataIt->z);
+      mAtomData[atomName].counts++;
 
-      auto hue = rgb2hsv(colorList[1].rgb()).h;
+      auto hue = rgb2hsv(mAtomData[atomName].color.rgb()).h;
       mAligned4fData.push_back(hue);
-      Vec3f vec(atom.x, atom.y, atom.z);
+      Vec3f vec(templateDataIt->x, templateDataIt->y, templateDataIt->z);
       mDataBoundaries.includePoint(vec);
     }
+    templateDataIt++;
   }
 
   if (mAligned4fData.size() > 0) {
@@ -826,13 +830,14 @@ void DataDisplay::prepareParallelProjection(Graphics &g,
 
   /*if (atomPropertiesProj.size() > 0) */ {
     // ----------------------------------------
-    //    int cumulativeCount = 0;
-    /*for (auto &data : mAtomData)*/ {
+    int cumulativeCount = 0;
+    for (auto &data : mAtomData) {
 
       atomrender.instancing_mesh0.attrib_data(
-          mAligned4fData.size() * 4 * sizeof(float), mAligned4fData.data(),
-          mAligned4fData.size() / 4);
-      //      cumulativeCount += count;
+          data.second.counts * sizeof(float),
+          mAligned4fData.data() + (cumulativeCount * 4),
+          data.second.counts / 4);
+      cumulativeCount += data.second.counts;
       // now draw data with custom shader
       g.shader(atomrender.instancing_mesh0.shader);
       g.update(); // sends modelview and projection matrices
@@ -920,12 +925,6 @@ void DataDisplay::drawPerspective(Graphics &g) {
   g.scale(20);
   g.draw(axis);
   g.popMatrix();
-  // g.scale(mPerspectiveScale);
-
-  //        float near = mDataBoundaries.minz + (mNearClip *
-  //        (mDataBoundaries.maxz- mDataBoundaries.minz)); float farClip =
-  //        mDataBoundaries.minz + (mFarClip * (mDataBoundaries.maxz-
-  //        mDataBoundaries.minz));
 
   atomrender.draw(g, perspectivePickable.scale, mAtomData, mAligned4fData);
 

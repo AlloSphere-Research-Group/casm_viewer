@@ -75,13 +75,17 @@ public:
   //  BufferManager<std::map<std::string, std::vector<float>>>
   //  positionBuffers{8};
 
-  struct s1 {
+  struct occupation_t {
     int8_t basis_index;
     int8_t occupancy_dof;
     //    float x, y, z;
   };
-  BufferManager<std::vector<s1>> occupationData{8};
-  std::vector<float> templateData;
+  BufferManager<std::vector<occupation_t>> occupationData{8};
+
+  struct position_t {
+    float x, y, z;
+  };
+  std::vector<position_t> templateData;
 
   // ----------------
 

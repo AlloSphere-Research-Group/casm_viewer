@@ -111,7 +111,7 @@ public:
   Trigger stepRollAngleNeg{"stepRollAngleNeg", "AngleControl"};
   Trigger CalculateSlicing{"CalculateSlicing"};
   Trigger ResetSlicing{"ResetSlicing"};
-  Trigger mSaveGraphics{"SaveSnapshot"};
+  Trigger mSaveGraphics{"SaveScreenshot"};
   Trigger mAlignTemperatures{"AlignTemperatures"};
   Trigger mAlignChempots{"AlignChempots"};
   Trigger mRecomputeSpace{"RecomputeSpace"};
@@ -1460,13 +1460,13 @@ public:
         timeinfo = localtime(&rawtime);
         strftime(buffer, sizeof(buffer), "%d-%m-%Y_%H%M%S", timeinfo);
         std::string str(buffer);
-        int counter = 0;
-        for (DataDisplay *display : this->dataDisplays) {
-          if (display->mVisible == 1.0f) {
-            std::string prefix = str + "_" + std::to_string(counter++);
-            display->dumpImages(prefix);
-          }
-        }
+        //        int counter = 0;
+        //        for (DataDisplay *display : this->dataDisplays) {
+        //          if (display->mVisible == 1.0f) {
+        //            std::string prefix = str + "_" +
+        //            std::to_string(counter++); display->dumpImages(prefix);
+        //          }
+        //        }
         mScreenshotMutex.lock();
         mScreenshotPrefix = str;
         mScreenshotMutex.unlock();

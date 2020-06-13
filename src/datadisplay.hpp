@@ -69,14 +69,6 @@ inline HSV rgb2hsv(RGB c) {
   return HSV(abs(q.z + (q.w - q.y) / (6.0 * d + e)), d / (q.x + e), q.x);
 }
 
-class AtomProperties {
-public:
-  string name;
-  float drawScale = 1.0;
-  Color color;
-  //  gl::PolygonMode polygonMode{Mesh::FILL};
-};
-
 struct ElementData {
   float radius;
   Color color;
@@ -124,7 +116,7 @@ public:
 
 class DataDisplay : public DataDisplayParameters {
 public:
-  vector<AtomProperties> atomPropertiesProj;
+  //  vector<AtomProperties> atomPropertiesProj;
 
   std::map<std::string, ElementData> elementData;
 
@@ -199,7 +191,7 @@ public:
 
   void previousLayer() { atomrender.previousLayer(); }
 
-  void dumpImages(std::string dumpPrefix);
+  //  void dumpImages(std::string dumpPrefix);
 
   void computeSlicing() {
     if (mDatasetManager.mRunProcessors) {
@@ -273,7 +265,7 @@ private:
   std::atomic<bool> mNeedsProcessing{false};
   bool mRequestInit{false};
 
-  vector<AtomData> mAtomData;
+  std::map<std::string, AtomData> mAtomData;
   std::vector<float> mAligned4fData;
   BoundingBoxData mDataBoundaries;
 };

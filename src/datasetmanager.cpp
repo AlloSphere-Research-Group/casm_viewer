@@ -557,6 +557,46 @@ void DatasetManager::initRoot() {
     graphGenerator.enabled = true;
   }
 
+  std::string templatePath =
+      fullDatasetPath + "cached_output/template_POSCAR.nc";
+  if (File::exists(templatePath)) {
+    int retval, ncid, varid;
+    if ((retval =
+             nc_open(templatePath.c_str(), NC_NOWRITE | NC_SHARE, &ncid))) {
+      return /*false*/;
+    }
+    if ((retval = nc_inq_varid(ncid, "atoms_var", &varid))) {
+      return /*false*/;
+    }
+
+    nc_type xtypep;
+    char name[32];
+    int ndimsp;
+    int dimidsp[32];
+    int *nattsp = nullptr;
+    if ((retval = nc_inq_var(ncid, varid, name, &xtypep, &ndimsp, dimidsp,
+                             nattsp))) {
+      return /*false*/;
+    }
+
+    size_t lenp;
+    if ((retval = nc_inq_dimlen(ncid, dimidsp[0], &lenp))) {
+      return /*false*/;
+    }
+
+    templateData.resize(lenp);
+
+    /* Read the data. */
+    if ((retval = nc_get_var(ncid, varid, templateData.data()))) {
+      return /*false*/;
+    }
+
+    /* Close the file, freeing all resources. */
+    if ((retval = nc_close(ncid))) {
+      return /*false*/;
+    }
+  }
+
   lk.unlock();
   // Update data
   // Not necessary as this is triggered automatically through change in

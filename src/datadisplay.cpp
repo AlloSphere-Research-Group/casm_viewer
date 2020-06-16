@@ -608,24 +608,65 @@ void DataDisplay::updateDisplayBuffers() {
     }
   }
 
-  auto templateDataIt = mDatasetManager.templateData.begin();
-  for (auto &atom : *allPositions) {
-    std::string atomName =
-        mDatasetManager.mCurrentBasis[atom.basis_index]["occupant_dof"]
-                                     [atom.occupancy_dof];
-    if (std::find(curVisibleAtoms.begin(), curVisibleAtoms.end(), atomName) !=
-        curVisibleAtoms.end()) {
-      mAligned4fData.push_back(templateDataIt->x);
-      mAligned4fData.push_back(templateDataIt->y);
-      mAligned4fData.push_back(templateDataIt->z);
-      mAtomData[atomName].counts++;
+  if (mDatasetManager.mParameterSpaces["time"]->size() > 0) {
+    // This is a Kinetic MC dataset.
+    auto currentIndex =
+        mDatasetManager.mParameterSpaces["time"]->getAllCurrentIndeces()[0];
+    auto templateDataIt = mDatasetManager.templateData.begin();
+    uint8_t *occupationPtr =
+        &(mDatasetManager.trajectoryData
+              .data()[mDatasetManager.numAtoms * currentIndex]);
 
-      auto hue = rgb2hsv(mAtomData[atomName].color.rgb()).h;
-      mAligned4fData.push_back(hue);
-      Vec3f vec(templateDataIt->x, templateDataIt->y, templateDataIt->z);
-      mDataBoundaries.includePoint(vec);
+    if (mDatasetManager.templateData.size() != mDatasetManager.numAtoms) {
+      std::cerr << "Error template size mismatch" << std::endl;
     }
-    templateDataIt++;
+
+    uint64_t counter = 0;
+    uint64_t atomsInBasis = mDatasetManager.templateData.size() /
+                            mDatasetManager.mCurrentBasis.size();
+    size_t basis_index = 0;
+    while (templateDataIt != mDatasetManager.templateData.end()) {
+
+      std::string atomName =
+          mDatasetManager
+              .mCurrentBasis[basis_index]["occupant_dof"][*occupationPtr];
+      if (std::find(curVisibleAtoms.begin(), curVisibleAtoms.end(), atomName) !=
+          curVisibleAtoms.end()) {
+        mAligned4fData.push_back(templateDataIt->x);
+        mAligned4fData.push_back(templateDataIt->y);
+        mAligned4fData.push_back(templateDataIt->z);
+        mAtomData[atomName].counts++;
+
+        auto hue = rgb2hsv(mAtomData[atomName].color.rgb()).h;
+        mAligned4fData.push_back(hue);
+        Vec3f vec(templateDataIt->x, templateDataIt->y, templateDataIt->z);
+        mDataBoundaries.includePoint(vec);
+      }
+      counter++;
+      if (counter == atomsInBasis) {
+        counter = 0;
+        basis_index++;
+      }
+      occupationPtr++;
+      templateDataIt++;
+    }
+
+  } else {
+    // Dataset is Grand Canonical MC
+    auto templateDataIt = mDatasetManager.templateData.begin();
+    for (auto &atom : *allPositions) {
+      std::string atomName =
+          mDatasetManager.mCurrentBasis[atom.basis_index]["occupant_dof"]
+                                       [atom.occupancy_dof];
+      if (std::find(curVisibleAtoms.begin(), curVisibleAtoms.end(), atomName) !=
+          curVisibleAtoms.end()) {
+        mAligned4fData.push_back(templateDataIt->x);
+        mAligned4fData.push_back(templateDataIt->y);
+        mAligned4fData.push_back(templateDataIt->z);
+        mAtomData[atomName].counts++;
+      }
+      templateDataIt++;
+    }
   }
 
   if (mAligned4fData.size() > 0) {

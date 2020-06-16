@@ -69,7 +69,6 @@ public:
 
   DataScript labelProcessor{"AtomLabelProcessor"};
   DataScript graphGenerator{"GraphGenerator"};
-  DataScript decompressTrajectory{"DecompressTrajectory"};
 
   // TINC Buffers.
   //  BufferManager<std::map<std::string, std::vector<float>>>
@@ -86,6 +85,9 @@ public:
     float x, y, z;
   };
   std::vector<position_t> templateData;
+
+  std::vector<uint8_t> trajectoryData;
+  size_t numTimeSteps, numAtoms;
 
   // ----------------
 
@@ -176,6 +178,8 @@ public:
   }
 
   std::vector<std::string> getDataNames();
+
+  void loadTrajectory();
 
   typedef std::map<std::string, std::vector<std::string>> SpeciesLabelMap;
 

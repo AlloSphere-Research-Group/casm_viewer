@@ -71,25 +71,11 @@ void DatasetManager::initializeComputation() {
   atomPositionChain << labelProcessor;
   sampleComputationChain << atomPositionChain << graphGenerator;
 
-  decompressTrajectory.setCommand("tar");
-  Flag flag;
-  flag.commandFlag = "-xvz";
-  Flag inputFlag = "tajectories.tar.gz";
-  inputFlag.commandFlag = "-f";
-
-  decompressTrajectory.configuration["flags"] = flag;
-
   // Graph generator
   graphGenerator.prepareFunction = [&]() {
     std::string datasetId = mCurrentDataset.get();
     std::string xLabel = mPlotXAxis.getCurrent();
     std::string yLabel = mPlotYAxis.getCurrent();
-
-    //  std::string yLabelSanitized = yLabel;
-    //  replaceAll(yLabelSanitized, "<", "_");
-    //  replaceAll(yLabelSanitized, ">", "_");
-    //  replaceAll(yLabelSanitized, "(", "_");
-    //  replaceAll(yLabelSanitized, ")", "_");
 
     auto jsonText = readJsonResultsFile(mCurrentDataset, getSubDir());
     if (jsonText.size() > 0) {
@@ -194,12 +180,6 @@ void DatasetManager::initializeComputation() {
     std::string condition = std::to_string(
         mParameterSpaces[mConditionsParameter]->getCurrentIndex());
 
-    int timeIndex = -1;
-    if (mParameterSpaces["time"]->size() > 0) {
-      timeIndex = mParameterSpaces["time"]->getCurrentIndex();
-    }
-    auto timeIndexStr = std::to_string(timeIndex);
-
     std::string folder = File::conformDirectory(getSubDir());
     std::string root_path = buildRootPath();
     std::string template_pos_path = File::conformPathToOS(
@@ -223,9 +203,9 @@ void DatasetManager::initializeComputation() {
 
     labelProcessor.setRunningDirectory(mLoadedDataset);
 
-    labelProcessor.setOutputFileNames({DataScript::sanitizeName(
-        template_pos_path + mCurrentDataset.get() + "_" + folder + "_" +
-        condition + "_" + timeIndexStr)});
+    labelProcessor.setOutputFileNames(
+        {DataScript::sanitizeName(template_pos_path + mCurrentDataset.get() +
+                                  "_" + folder + "_" + condition)});
 
     std::string conditionSubdir =
         File::conformPathToOS(folder + "conditions." + condition + "/");
@@ -242,26 +222,12 @@ void DatasetManager::initializeComputation() {
     labelProcessor.configuration["template_path"] = File::conformPathToOS(
         root_path + mCurrentDataset.get() + "/cached_output/template_POSCAR");
     labelProcessor.configuration["condition"] = condition;
-    labelProcessor.configuration["time_step"] = timeIndexStr;
     return true;
   };
 
   labelProcessor.registerDoneCallback([&](bool ok) {
     if (ok) {
       currentPoscarName.set(labelProcessor.outputFile());
-
-      //      if (reader.loadFile(currentPoscarName)) {
-      //        std::cout << "*********** Read:" << currentPoscarName.get()
-      //                  << std::endl;
-      //      } else {
-      //        std::cout << "Cannot Read:" << currentPoscarName.get() <<
-      //        std::endl;
-      //      }
-
-      //      auto positions = positionBuffers.getWritable();
-      //      *positions = reader.getAllPositions();
-
-      //      positionBuffers.doneWriting(positions);
 
       // --------------netcdf ----------------------------
 
@@ -328,7 +294,13 @@ void DatasetManager::initializeComputation() {
                   << "..."
                   << parameterSpace.second->idAt(
                          parameterSpace.second->getIndexForValue(value));
-        //        computeNewSample();
+        if (mParameterSpaces["time"]->size() > 0) {
+          if (parameterSpace.first == mConditionsParameter) {
+            loadTrajectory();
+          }
+
+          computeNewSample();
+        }
         updateText();
       }
     });
@@ -355,8 +327,9 @@ void DatasetManager::setPythonBinary(std::string pythonBinaryPath) {
 
 void DatasetManager::setPythonScriptPath(std::string pythonScriptPath) {
   //      std::unique_lock<std::mutex> lk(mProcessingLock);
-  labelProcessor.configuration["python_scripts_path"] = pythonScriptPath;
   graphGenerator.setScriptName(pythonScriptPath + "/graphing/plot.py");
+  labelProcessor.setScriptName(File::conformDirectory(
+      pythonScriptPath + "/reassign_occs/reassign_occs.py"));
 }
 
 std::string DatasetManager::buildRootPath() {
@@ -498,19 +471,11 @@ void DatasetManager::readParameterSpace() {
         }
       }
     }
-    // If there is a time space, use different script
+    // If there is a time space, don't use script. Data is already avaialble
     if (mParameterSpaces["time"]->size() > 0) {
-      labelProcessor.setScriptName(
-          File::conformDirectory(
-              labelProcessor.configuration["python_scripts_path"]
-                  .flagValueStr) +
-          "/reassign_occs/result_extractor.py");
+      labelProcessor.enabled = false;
     } else {
-      labelProcessor.setScriptName(
-          File::conformDirectory(
-              labelProcessor.configuration["python_scripts_path"]
-                  .flagValueStr) +
-          "/reassign_occs/reassign_occs.py");
+      labelProcessor.enabled = true;
     }
     for (auto &paramSpace : mParameterSpaces) {
       paramSpace.second->unlock();
@@ -535,6 +500,8 @@ void DatasetManager::initRoot() {
   readParameterSpace();
   analyzeDataset();
 
+  loadTrajectory();
+
   std::vector<std::string> parameterSpaceNames;
   parameterSpaceNames.push_back("temperature");
 
@@ -548,13 +515,6 @@ void DatasetManager::initRoot() {
                   dataNames.begin();
   if (pos < (int)dataNames.size()) {
     mPlotYAxis.set((int)pos);
-  }
-
-  // Configure diff generator
-  if (mParameterSpaces["time"]->size() > 0) {
-    graphGenerator.enabled = false; // Graphing not working with kmc yet.
-  } else {
-    graphGenerator.enabled = true;
   }
 
   std::string templatePath =
@@ -595,6 +555,13 @@ void DatasetManager::initRoot() {
     if ((retval = nc_close(ncid))) {
       return /*false*/;
     }
+  }
+
+  // Configure diff generator
+  if (mParameterSpaces["time"]->size() > 0) {
+    graphGenerator.enabled = false; // Graphing not working with kmc yet.
+  } else {
+    graphGenerator.enabled = true;
   }
 
   lk.unlock();
@@ -940,6 +907,11 @@ void DatasetManager::computeNewSample() {
   std::unique_lock<std::mutex> lk(mDataLock);
 
   sampleComputationChain.process();
+
+  if (mParameterSpaces["time"]->size() > 0) {
+    occupationData.doneWriting(occupationData.getWritable());
+  }
+
   updateText();
 }
 
@@ -949,6 +921,51 @@ std::vector<std::string> DatasetManager::getDataNames() {
     names.push_back(entry.first);
   }
   return names;
+}
+
+void DatasetManager::loadTrajectory() {
+  auto trajectoryFile = fullConditionPath() + "trajectory.nc";
+  if (File::exists(trajectoryFile)) {
+
+    int retval, ncid, varid;
+    if ((retval =
+             nc_open(trajectoryFile.c_str(), NC_NOWRITE | NC_SHARE, &ncid))) {
+      return /*false*/;
+    }
+    if ((retval = nc_inq_varid(ncid, "occupation", &varid))) {
+      return /*false*/;
+    }
+
+    nc_type xtypep;
+    char name[32];
+    int ndimsp;
+    int dimidsp[32];
+    int *nattsp = nullptr;
+    if ((retval = nc_inq_var(ncid, varid, name, &xtypep, &ndimsp, dimidsp,
+                             nattsp))) {
+      return /*false*/;
+    }
+
+    if ((retval = nc_inq_dimlen(ncid, dimidsp[0], &numTimeSteps))) {
+      return /*false*/;
+    }
+
+    if ((retval = nc_inq_dimlen(ncid, dimidsp[1], &numAtoms))) {
+      return /*false*/;
+    }
+
+    trajectoryData.resize(numTimeSteps * numAtoms);
+
+    /* Read the data. */
+    if ((retval = nc_get_var(ncid, varid, trajectoryData.data()))) {
+      return /*false*/;
+    }
+
+    /* Close the file, freeing all resources. */
+    if ((retval = nc_close(ncid))) {
+      return /*false*/;
+    }
+  }
 }
 
 DatasetManager::SpeciesLabelMap DatasetManager::getAvailableSpecies() {

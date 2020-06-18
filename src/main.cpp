@@ -1216,6 +1216,7 @@ public:
                               "../transfmat")) {
         templateGen.configuration["transfmat"] = "../transfmat";
       } else {
+        std::cerr << "Template not found! " << transfmatFile << std::endl;
         return false;
       }
       return true;

@@ -254,6 +254,7 @@ private:
   VAOMesh graphlinesMesh;
   VAOMesh boxMesh;
   VAOMesh mGridMesh;
+  VAOMesh mMarker;
 
   // Graph
   Texture mGraphTexture;
@@ -264,6 +265,9 @@ private:
 
   std::atomic<bool> mNeedsProcessing{false};
   bool mRequestInit{false};
+
+  std::map<std::string, std::vector<DatasetManager::position_t>> atomAdded;
+  std::vector<DatasetManager::position_t> atomRemoved;
 
   std::map<std::string, AtomData> mAtomData;
   std::vector<float> mAligned4fData;

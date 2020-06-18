@@ -96,7 +96,7 @@ void DatasetManager::initializeComputation() {
         try {
           datax.reserve(mParameterSpaces[xLabel]->size());
           for (auto value : mParameterSpaces[xLabel]->values()) {
-            datax.push_back(value.second);
+            datax.push_back(value);
           }
           highlightValue =
               std::to_string(int(mParameterSpaces[xLabel]->getCurrentValue()));
@@ -359,7 +359,6 @@ void DatasetManager::readParameterSpace() {
   if (!f.fail()) {
     mParameterForSubDir.clear();
     for (auto &paramSpace : mParameterSpaces) {
-      paramSpace.second->lock();
       paramSpace.second->clear();
     }
 
@@ -458,16 +457,18 @@ void DatasetManager::readParameterSpace() {
       json j2 = it.value();
       int timeOffset = 0;
       if (key == "time") {
+        mParameterSpaces["time"]->reserve(mParameterSpaces["time"]->size() +
+                                          j2.size());
+        uint64_t previous = std::numeric_limits<uint64_t>::min();
         for (json::iterator values = j2.begin(); values != j2.end(); values++) {
           // TODO we should get the actual time values here (available in the
           // results file.
-          if (mParameterSpaces["time"]->size() > 0 &&
-              mParameterSpaces["time"]->at(mParameterSpaces["time"]->size() -
-                                           1) > int(*values)) {
+          if (mParameterSpaces["time"]->size() > 0 && previous > *values) {
             timeOffset = mParameterSpaces["time"]->at(
                 mParameterSpaces["time"]->size() - 1);
           }
           mParameterSpaces["time"]->push_back(int(*values) + timeOffset);
+          previous = int(*values);
         }
       }
     }
@@ -476,9 +477,6 @@ void DatasetManager::readParameterSpace() {
       labelProcessor.enabled = false;
     } else {
       labelProcessor.enabled = true;
-    }
-    for (auto &paramSpace : mParameterSpaces) {
-      paramSpace.second->unlock();
     }
   } else {
     std::cerr << "ERROR failed to find parameter space file: " << paramSpaceFile
@@ -590,7 +588,7 @@ void DatasetManager::analyzeDataset() {
     if (paramSpace.second->size() > 0) {
       auto previous = paramSpace.second->at(0);
       for (auto &value : paramSpace.second->values()) {
-        if (value.second != previous) {
+        if (value != previous) {
           isVariable = true;
           break;
         }
@@ -952,6 +950,10 @@ void DatasetManager::loadTrajectory() {
 
     if ((retval = nc_inq_dimlen(ncid, dimidsp[1], &numAtoms))) {
       return /*false*/;
+    }
+
+    if (numAtoms != templateData.size()) {
+      std::cerr << "ERROR trajectory data atoms mismatch" << std::endl;
     }
 
     trajectoryData.resize(numTimeSteps * numAtoms);

@@ -53,6 +53,9 @@ void DataDisplay::init() {
   //    orthoMesh0.update();
   //  }
 
+  addSphere(mMarker);
+  mMarker.update();
+
   EasyFBOSetting setting;
   setting.mUseMipmap = true;
   setting.filterMin = GL_LINEAR_MIPMAP_LINEAR;
@@ -581,15 +584,6 @@ void DataDisplay::updateDisplayBuffers() {
       Color(1.0, 0.0, 1.0, 1.0), Color(0.0, 1.0, 1.0, 1.0),
       Color(1.0, 1.0, 0.0, 1.0), Color(1.0, 0.0, 1.0, 1.0)};
 
-  //  vector<Color> colorList2 = {
-  //      Color(0.7f, 0.0f, 0.7f, 0.4f), Color(0.7f, 0.0f, 0.7f, 1.0f),
-  //      Color(0.0f, 0.7f, 0.0f, 0.4f), Color(0.0f, 0.7f, 0.0f, 1.0f),
-  //      Color(0.0f, 0.0f, 0.7f, 0.4f), Color(0.0f, 0.0f, 0.7f, 1.0f),
-  //      Color(0.7f, 0.0f, 0.7f, 0.4f), Color(0.7f, 0.0f, 0.7f, 1.0f),
-  //      Color(0.0f, 0.7f, 0.0f, 0.4f), Color(0.0f, 0.7f, 0.0f, 1.0f),
-  //      Color(0.0f, 0.0f, 0.7f, 0.4f), Color(0.0f, 0.0f, 0.7f, 1.0f),
-  //  };
-
   mDataBoundaries.resetInv();
   mAligned4fData.clear();
 
@@ -617,9 +611,19 @@ void DataDisplay::updateDisplayBuffers() {
         &(mDatasetManager.trajectoryData
               .data()[mDatasetManager.numAtoms * currentIndex]);
 
+    uint8_t *prevOccupationPtr = nullptr;
+    if (currentIndex > 0) {
+      prevOccupationPtr =
+          &(mDatasetManager.trajectoryData
+                .data()[mDatasetManager.numAtoms * (currentIndex - 1)]);
+    }
+
     if (mDatasetManager.templateData.size() != mDatasetManager.numAtoms) {
       std::cerr << "Error template size mismatch" << std::endl;
     }
+
+    atomAdded.clear();
+    atomRemoved.clear();
 
     uint64_t counter = 0;
     uint64_t atomsInBasis = mDatasetManager.templateData.size() /
@@ -641,11 +645,30 @@ void DataDisplay::updateDisplayBuffers() {
         mAligned4fData.push_back(hue);
         Vec3f vec(templateDataIt->x, templateDataIt->y, templateDataIt->z);
         mDataBoundaries.includePoint(vec);
+        if (prevOccupationPtr) {
+          std::string prevAtomName =
+              mDatasetManager.mCurrentBasis[basis_index]["occupant_dof"]
+                                           [*prevOccupationPtr];
+          if (prevAtomName != atomName) {
+            if (atomName != "Va") {
+              atomRemoved.push_back(*templateDataIt);
+            } else {
+              if (atomAdded.find(atomName) == atomAdded.end()) {
+                atomAdded[atomName] = std::vector<DatasetManager::position_t>();
+              }
+              atomAdded[atomName].push_back(*templateDataIt);
+            }
+          }
+        }
       }
+
       counter++;
       if (counter == atomsInBasis) {
         counter = 0;
         basis_index++;
+      }
+      if (prevOccupationPtr) {
+        prevOccupationPtr++;
       }
       occupationPtr++;
       templateDataIt++;
@@ -785,7 +808,6 @@ void DataDisplay::prepareParallelProjection(Graphics &g,
                                mDataBoundaries.min.z - 100,
                                mDataBoundaries.max.z + 100));
 
-  bool mAlignData = true;
   double scalingFactor = 1.0 / (mDataBoundaries.max.y - mDataBoundaries.min.y);
 
   // std::cout << near << "..." << farClip <<std::endl;
@@ -874,13 +896,13 @@ void DataDisplay::prepareParallelProjection(Graphics &g,
     int cumulativeCount = 0;
     for (auto &data : mAtomData) {
 
-      atomrender.instancing_mesh0.attrib_data(
-          data.second.counts * sizeof(float),
-          mAligned4fData.data() + (cumulativeCount * 4),
-          data.second.counts / 4);
+      int count = data.second.counts;
+      atomrender.instancingMesh.attrib_data(
+          count * 4 * sizeof(float),
+          mAligned4fData.data() + (cumulativeCount * 4), count);
       cumulativeCount += data.second.counts;
       // now draw data with custom shader
-      g.shader(atomrender.instancing_mesh0.shader);
+      g.shader(atomrender.instancingMesh.shader);
       g.update(); // sends modelview and projection matrices
       g.shader().uniform("dataScale", scalingFactor);
       g.shader().uniform("layerSeparation", 1.0);
@@ -909,7 +931,7 @@ void DataDisplay::prepareParallelProjection(Graphics &g,
       //                    g.shader().uniform("near_clip", near);
       g.shader().uniform("clipped_mult", 0.0);
 
-      atomrender.instancing_mesh0.draw();
+      atomrender.instancingMesh.draw();
     }
 
     drawHistory(g);
@@ -968,6 +990,31 @@ void DataDisplay::drawPerspective(Graphics &g) {
   g.popMatrix();
 
   atomrender.draw(g, perspectivePickable.scale, mAtomData, mAligned4fData);
+
+  // Draw change markers
+  g.pushMatrix();
+
+  gl::depthTesting(true);
+  //  g.scale(perspectivePickable.scale);
+  gl::polygonLine();
+  for (auto added : atomAdded) {
+    for (auto addedPos : added.second) {
+      g.pushMatrix();
+      //      g.translate(addedPos.x, addedPos.y, addedPos.z);
+      g.color(1, 1, 1);
+      g.draw(mMarker);
+      g.popMatrix();
+    }
+  }
+  for (auto removed : atomRemoved) {
+    g.pushMatrix();
+    //    g.translate(removed.x, removed.y, removed.z);
+    g.color(0, 0, 0);
+    g.draw(mMarker);
+    g.popMatrix();
+  }
+
+  g.popMatrix();
 
   gl::depthTesting(true);
   gl::blending(true);

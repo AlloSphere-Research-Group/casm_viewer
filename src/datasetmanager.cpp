@@ -329,7 +329,7 @@ void DatasetManager::setPythonScriptPath(std::string pythonScriptPath) {
   //      std::unique_lock<std::mutex> lk(mProcessingLock);
   graphGenerator.setScriptName(pythonScriptPath + "/graphing/plot.py");
   labelProcessor.setScriptName(File::conformDirectory(
-      pythonScriptPath + "/reassign_occs/reassign_occs.py"));
+      pythonScriptPath) + "/reassign_occs/reassign_occs.py");
 }
 
 std::string DatasetManager::buildRootPath() {

@@ -7,7 +7,7 @@
 
 #include "tinc/ComputationChain.hpp"
 #include "tinc/ImageDiskBuffer.hpp"
-#include "tinc/ParameterSpaceDimension.hpp"
+#include "tinc/ParameterSpace.hpp"
 #include "tinc/VASPReader.hpp"
 
 #include "al/ui/al_Parameter.hpp"
@@ -48,8 +48,6 @@ public:
   json mCurrentBasis;
 
   std::string metaText;
-
-  std::map<std::string, size_t> mCurrentLoadedIndeces;
 
   // Template and diffs for time history computation
   std::map<std::string, std::vector<float>> mTemplatePositions;
@@ -99,14 +97,8 @@ public:
   ParameterString currentPoscarName{"currentPoscarName", "internal", ""};
   ParameterBool processing{"processing", "internal", false};
 
-  std::map<std::string, bool>
-      mParameterIsVariable; // Parameter space has changes
-
-  std::string
-      mConditionsParameter; // Parameter that maps to conditions.X directories
-  std::vector<std::string>
-      mParameterForSubDir; // Parameter value determines the subdirectory
-  std::map<std::string, ParameterSpaceDimension *> mParameterSpaces;
+  //  std::map<std::string, ParameterSpaceDimension *> mParameterSpaces;
+  ParameterSpace mParameterSpace;
 
   // Plot axes
   ParameterMenu mPlotYAxis{"PlotYAxis"};
@@ -126,7 +118,7 @@ public:
   std::string buildRootPath();
   std::string fullConditionPath();
 
-  void initRoot();
+  void initDataset();
 
   void analyzeDataset();
 
@@ -141,7 +133,7 @@ public:
   std::string getSubDir();
 
   // Processing functions for atom positions
-  bool loadDiff(int timeIndex);
+  //  bool loadDiff(int timeIndex);
   void processTemplatePositions();
   //  void loadFromPOSCAR();
   void computeNewSample();
@@ -153,20 +145,19 @@ public:
     metaText += "Root: " + mRootPath.get() + "\n";
     metaText += "Dataset: " + mCurrentDataset.get() + "\n";
     metaText += "Subdir: " + getSubDir() + "\n";
-    metaText += "Condition Param: " + mConditionsParameter + " condition: " +
+    metaText += "Condition Param: " +
+                mParameterSpace.conditionParameters[0]->getName() +
+                " condition: " +
                 std::to_string(
-                    mParameterSpaces[mConditionsParameter]->getCurrentIndex()) +
+                    mParameterSpace.conditionParameters[0]->getCurrentIndex()) +
                 "\n";
 
     metaText += " ----- Parameters -----\n";
-    for (auto param : mParameterSpaces) {
-      if (param.second->size() > 2) {
-        metaText += param.first + " : " + param.second->getCurrentId() + "\n";
-      } else if (param.second->size() == 1) {
-        // For spaces with a single value, the id will be ./ so show the value
-        metaText += param.first + " : " +
-                    std::to_string(param.second->getCurrentValue()) + "\n";
-      }
+    for (auto param : mParameterSpace.parameters) {
+      metaText += param->getName() + " : " + param->getCurrentId() + "\n";
+    }
+    for (auto param : mParameterSpace.mappedParameters) {
+      metaText += param->getName() + " : " + param->getCurrentId() + "\n";
     }
     metaText += " ----- Data -----\n";
     for (auto compData : getCurrentCompositions()) {
@@ -198,9 +189,9 @@ public:
         std::string key = it.key();
         //                // Look for available comp_n atom names
         if (key.compare(0, comp_prefix.size(), comp_prefix) == 0) {
-          if (mConditionsParameter != "") {
+          if (mParameterSpace.conditionParameters.size() > 0) {
             auto index =
-                mParameterSpaces[mConditionsParameter]->getCurrentIndex();
+                mParameterSpace.conditionParameters[0]->getCurrentIndex();
             if (it.value().size() > index) {
               compositions.push_back({key, it.value()[index].get<float>()});
             } else {

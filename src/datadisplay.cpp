@@ -110,7 +110,7 @@ void DataDisplay::init() {
         //        if (value != mDatasetManager.mCurrentDataset.get()) {
         // First force application of value
         mDatasetManager.mCurrentDataset.setLocking(value);
-        initRootDirectory();
+        initDataset();
         resetSlicing();
         //        }
       });
@@ -194,10 +194,10 @@ void DataDisplay::init() {
   bundle << mDatasetManager.mRootPath;
   bundle << mDatasetManager.mCurrentDataset;
   bundle << mVisible;
-  bundle << mDatasetManager.mParameterSpaces["temperature"]->parameter();
-  bundle << mDatasetManager.mParameterSpaces["chempotA"]->parameter()
-         << mDatasetManager.mParameterSpaces["chempotB"]->parameter();
-  bundle << mDatasetManager.mParameterSpaces["time"]->parameter();
+  //  bundle << mDatasetManager.mParameterSpaces["temperature"]->parameter();
+  //  bundle << mDatasetManager.mParameterSpaces["chempotA"]->parameter()
+  //         << mDatasetManager.mParameterSpaces["chempotB"]->parameter();
+  //  bundle << mDatasetManager.mParameterSpaces["time"]->parameter();
   bundle << atomrender.mAtomMarkerSize;
 
   bundle << mShowAtoms;
@@ -221,10 +221,10 @@ void DataDisplay::init() {
   bundle << mDrawLabels;
 }
 
-void DataDisplay::initRootDirectory() {
+void DataDisplay::initDataset() {
   mDatasetManager.mLoadedDataset = "";
 
-  mDatasetManager.initRoot();
+  mDatasetManager.initDataset();
 
   DatasetManager::SpeciesLabelMap labelMap =
       mDatasetManager.getAvailableSpecies();
@@ -364,11 +364,16 @@ void DataDisplay::prepare(Graphics &g, Matrix4f &transformMatrix) {
     mNeedsProcessing = false;
     // Parameter text
     auto subDir = mDatasetManager.getSubDir();
-    auto temperatureId =
-        mDatasetManager.mParameterSpaces["temperature"]->getCurrentId();
+    std::string temperatureId;
+    if (mDatasetManager.mParameterSpace.getDimension("temperature")) {
+      temperatureId =
+          mDatasetManager.mParameterSpace.getDimension("temperature")
+              ->getCurrentId();
+    }
     std::string timeId;
-    if (mDatasetManager.mParameterSpaces["time"]->size() > 0) {
-      timeId = mDatasetManager.mParameterSpaces["time"]->getCurrentId();
+    if (mDatasetManager.mParameterSpace.getDimension("time")) {
+      timeId =
+          mDatasetManager.mParameterSpace.getDimension("time")->getCurrentId();
     }
     if (subDir.size() > 0) {
       mParamText = subDir;
@@ -451,6 +456,42 @@ void DataDisplay::setFont(string name, float size) {
     std::cout << "Could not sync font: " << name << std::endl;
   }
 }
+
+void DataDisplay::nextTemp() {
+  mDatasetManager.mParameterSpace.getDimension("temperature")->stepIncrement();
+}
+
+void DataDisplay::previousTemp() {
+  mDatasetManager.mParameterSpace.getDimension("temperature")->stepDecrease();
+}
+
+void DataDisplay::nextChempot() {
+  mDatasetManager.mParameterSpace.getDimension("chempotA")->stepIncrement();
+}
+
+void DataDisplay::previousChempot() {
+  mDatasetManager.mParameterSpace.getDimension("chempotA")->stepDecrease();
+}
+
+void DataDisplay::nextChempot2() {
+  mDatasetManager.mParameterSpace.getDimension("chempotB")->stepIncrement();
+}
+
+void DataDisplay::previousChempot2() {
+  mDatasetManager.mParameterSpace.getDimension("chempotB")->stepDecrease();
+}
+
+void DataDisplay::nextTime() {
+  mDatasetManager.mParameterSpace.getDimension("time")->stepIncrement();
+}
+
+void DataDisplay::previousTime() {
+  mDatasetManager.mParameterSpace.getDimension("time")->stepDecrease();
+}
+
+void DataDisplay::nextLayer() { atomrender.nextLayer(); }
+
+void DataDisplay::previousLayer() { atomrender.previousLayer(); }
 
 // void DataDisplay::dumpImages(string dumpPrefix) {
 //  std::unique_lock<std::mutex> lk(mDrawLock);
@@ -569,20 +610,8 @@ void DataDisplay::updateDisplayBuffers() {
 
   auto allPositions = mDatasetManager.occupationData.get();
 
-  mDatasetManager.mCurrentLoadedIndeces.clear();
-  for (auto &paramSpace : mDatasetManager.mParameterSpaces) {
-    mDatasetManager.mCurrentLoadedIndeces[paramSpace.first] =
-        paramSpace.second->getCurrentIndex();
-  }
-
   auto curVisibleAtoms = mShowAtoms.getSelectedElements();
   // TODO these colors should be exposed as a preference
-
-  vector<Color> colorList = {
-      Color(0.0, 1.0, 0.0, 0.0), Color(0.0, 0.0, 0.0, 0.0),
-      Color(0.0, 1.0, 1.0, 1.0), Color(1.0, 1.0, 0.0, 1.0),
-      Color(1.0, 0.0, 1.0, 1.0), Color(0.0, 1.0, 1.0, 1.0),
-      Color(1.0, 1.0, 0.0, 1.0), Color(1.0, 0.0, 1.0, 1.0)};
 
   mDataBoundaries.resetInv();
   mAligned4fData.clear();
@@ -602,10 +631,10 @@ void DataDisplay::updateDisplayBuffers() {
     }
   }
 
-  if (mDatasetManager.mParameterSpaces["time"]->size() > 0) {
+  if (mDatasetManager.mParameterSpace.getDimension("time")) {
     // This is a Kinetic MC dataset.
     auto currentIndex =
-        mDatasetManager.mParameterSpaces["time"]->getAllCurrentIndeces()[0];
+        mDatasetManager.mParameterSpace.getDimension("time")->getCurrentIndex();
     auto templateDataIt = mDatasetManager.templateData.begin();
     uint8_t *occupationPtr =
         &(mDatasetManager.trajectoryData
@@ -645,12 +674,17 @@ void DataDisplay::updateDisplayBuffers() {
         mAligned4fData.push_back(hue);
         Vec3f vec(templateDataIt->x, templateDataIt->y, templateDataIt->z);
         mDataBoundaries.includePoint(vec);
-        if (prevOccupationPtr) {
-          std::string prevAtomName =
-              mDatasetManager.mCurrentBasis[basis_index]["occupant_dof"]
-                                           [*prevOccupationPtr];
+      }
+      if (prevOccupationPtr) {
+        std::string prevAtomName =
+            mDatasetManager
+                .mCurrentBasis[basis_index]["occupant_dof"][*prevOccupationPtr];
+        if (std::find(curVisibleAtoms.begin(), curVisibleAtoms.end(),
+                      atomName) != curVisibleAtoms.end() ||
+            std::find(curVisibleAtoms.begin(), curVisibleAtoms.end(),
+                      prevAtomName) != curVisibleAtoms.end()) {
           if (prevAtomName != atomName) {
-            if (atomName != "Va") {
+            if (atomName == "Va") {
               atomRemoved.push_back(*templateDataIt);
             } else {
               if (atomAdded.find(atomName) == atomAdded.end()) {
@@ -701,75 +735,22 @@ void DataDisplay::updateDisplayBuffers() {
     // rh.pose.pos().set(perspectivePickable.bb.cen);
     atomrender.setDataBoundaries(b);
   }
+}
 
-  // Set active atoms and colors
-  //  atomPropertiesProj.clear();
-  //  vector<AtomProperties> atomPropertiesPersp;
-
-  //  auto colorListIt = colorList.begin();
-  //  auto colorList2It = colorList2.begin();
-
-  //  auto selectedElements = mShowAtoms.getSelectedElements();
-  //  for (auto atom : mShowAtoms.getElements()) {
-  //    if (std::find(selectedElements.begin(), selectedElements.end(), atom) !=
-  //        selectedElements.end()) {
-  //      if (elementData.find(atom) != elementData.end()) {
-  //        //                    std::cout << "Color for: " << atom << ":" <<
-  //        //                    elementData[atom].color.r << " " <<
-  //        //                    elementData[atom].color.g << " "<<
-  //        //                    elementData[atom].color.b << " "  <<std::endl
-  //        ;
-  //        // Atom was matched in elements.ini file, so use those colors
-
-  //        atomPropertiesProj.push_back(AtomProperties{
-  //            atom, elementData[atom].radius, elementData[atom].color});
-
-  //        atomPropertiesPersp.push_back(AtomProperties{
-  //            atom, elementData[atom].radius, elementData[atom].color});
-  //      } else { // Use defaults
-  //        atomPropertiesProj.push_back(AtomProperties{atom, 1.0f,
-  //        *colorListIt});
-
-  //        atomPropertiesPersp.push_back(
-  //            AtomProperties{atom, 1.0f, *colorList2It});
-  //      }
-  //    }
-  //    colorListIt++;
-  //    colorList2It++;
-  //    colorList2It++;
-  //  }
-
-  // Apply colors to aligned data -----------
-  //  std::vector<Color> colors;
-  //  mAtomData.clear();
-  //  for (auto elem : *allPositions) {
-  //    elementCounts[elem.first] = elem.second.size() / 4;
-  //  }
-  //  for (auto atomProps : atomPropertiesProj) {
-  //    colors.push_back(atomProps.color);
-  //    mAtomData.push_back(
-  //        {elementCounts[atomProps.name], atomProps.drawScale,
-  //        atomProps.name});
-  //  }
-  //  float hue = 0.0f;
-
-  //  if (colors.size() > 0) {
-  //    hue = rgb2hsv(colors.front().rgb()).h;
-  //  }
-  //  if (mAtomData.size() > 0) {
-  //    auto atomDataIt = mAtomData.begin();
-  //    int atomCounter = 0;
-  //    for (size_t i = 0; i < mAligned4fData.size() / 4; i++) {
-  //      //            assert(atomCountsIt != mAtomCounts.end());
-  //      if (atomDataIt != mAtomData.end() && --atomCounter <= 0) {
-  //        atomCounter = atomDataIt->counts;
-  //        atomDataIt++;
-  //        hue = rgb2hsv(colors.front().rgb()).h;
-  //        colors.pop_front();
-  //      }
-  //      mAligned4fData[4 * i + 3] = hue;
-  //    }
-  //  }
+void DataDisplay::drawHistory(Graphics &g) {
+  g.pushMatrix();
+  g.meshColor();
+  gl::polygonFill();
+  if (mIndividualTrajectory.get() != 0.0f) {
+    g.draw(mHistoryMesh);
+  }
+  if (mCumulativeTrajectory.get() != 0.0f) {
+    g.translate((mDataBoundaries.max.x - mDataBoundaries.min.x) / 2.0f,
+                (mDataBoundaries.max.y - mDataBoundaries.min.y) / 2.0f,
+                (mDataBoundaries.max.z - mDataBoundaries.min.z) / 2.0f);
+    g.draw(mTrajectoryMesh);
+  }
+  g.popMatrix();
 }
 
 void DataDisplay::prepareParallelProjection(Graphics &g,
@@ -908,12 +889,9 @@ void DataDisplay::prepareParallelProjection(Graphics &g,
       g.shader().uniform("layerSeparation", 1.0);
       // A scaling value of 4.0 found empirically...
       if (atomrender.mShowRadius == 1.0f) {
-        g.shader().uniform("markerScale", atomrender.mAtomMarkerSize *
+        g.shader().uniform("markerScale", data.second.radius *
+                                              atomrender.mAtomMarkerSize *
                                               atomrender.mMarkerScale);
-        //        g.shader().uniform("markerScale", data.radius *
-        //                                              atomrender.mAtomMarkerSize
-        //                                              *
-        //                                              atomrender.mMarkerScale);
       } else {
         g.shader().uniform("markerScale", atomrender.mAtomMarkerSize *
                                               atomrender.mMarkerScale);
@@ -969,114 +947,124 @@ void DataDisplay::drawPerspective(Graphics &g) {
   }
 
   g.lens().far(2000);
-  perspectivePickable.pushMatrix(g);
+  {
+    perspectivePickable.pushMatrix(g);
 
-  // move to center
-  // g.translate(-(mDataBoundaries.maxx -
-  // mDataBoundaries.minx)/2,-(mDataBoundaries.maxy -
-  // mDataBoundaries.miny)/2,-(mDataBoundaries.maxz - mDataBoundaries.minz)/2);
-  // g.translate(0,0,-7 -(mDataBoundaries.minz+mDataBoundaries.maxz)/2);
-  // g.scale(1/(mDataBoundaries.maxy - mDataBoundaries.miny));
-  // g.rotate(mPerspectiveRotY.get(), 0, 1.0, 0);
+    // move to center
+    // g.translate(-(mDataBoundaries.maxx -
+    // mDataBoundaries.minx)/2,-(mDataBoundaries.maxy -
+    // mDataBoundaries.miny)/2,-(mDataBoundaries.maxz -
+    // mDataBoundaries.minz)/2); g.translate(0,0,-7
+    // -(mDataBoundaries.minz+mDataBoundaries.maxz)/2);
+    // g.scale(1/(mDataBoundaries.maxy - mDataBoundaries.miny));
+    // g.rotate(mPerspectiveRotY.get(), 0, 1.0, 0);
 
-  gl::blendAdd();
-  gl::depthTesting(false);
+    gl::blendAdd();
+    gl::depthTesting(false);
 
-  g.meshColor();
+    g.meshColor();
 
-  g.pushMatrix();
-  g.scale(20);
-  g.draw(axis);
-  g.popMatrix();
+    g.pushMatrix();
+    g.scale(20);
+    g.draw(axis);
+    g.popMatrix();
 
-  atomrender.draw(g, perspectivePickable.scale, mAtomData, mAligned4fData);
+    atomrender.draw(g, perspectivePickable.scale, mAtomData, mAligned4fData);
 
-  // Draw change markers
-  g.pushMatrix();
+    gl::depthTesting(true);
+    gl::blending(true);
 
-  gl::depthTesting(true);
-  //  g.scale(perspectivePickable.scale);
-  gl::polygonLine();
-  for (auto added : atomAdded) {
-    for (auto addedPos : added.second) {
+    {
       g.pushMatrix();
-      //      g.translate(addedPos.x, addedPos.y, addedPos.z);
-      g.color(1, 1, 1);
-      g.draw(mMarker);
+      // Update box mesh that marks near and far clipping
+      // assumption
+      //   1. data is aligned to z axis
+      //   2. data range is [0:1] for all x, y, z
+      //   3. modelview matrix for perspective view should have been applied
+      boxMesh.reset();
+      boxMesh.primitive(Mesh::LINES);
+      // const float z[2] = {mNearClip.get(), mFarClip.get()};
+      // double scalingFactor = 1.0/(mDataBoundaries.maxz -
+      // mDataBoundaries.minz);
+
+      // Plane equation Ax + By + Cz - D = 0
+      //        float D =  -mSlicingPlanePoint.get().dot(mSlicingPlaneNormal);
+      // Line Equation
+
+      const float x[2] = {mDataBoundaries.max.x, mDataBoundaries.min.x};
+      const float y[2] = {mDataBoundaries.max.y, mDataBoundaries.min.y};
+
+      const float z[2] = {0.0, (atomrender.mSlicingPlaneThickness)};
+
+      for (int k = 0; k <= 1; k++) {
+        for (int j = 0; j <= 1; j++) {
+          for (int i = 0; i <= 1; i++) {
+            boxMesh.vertex(x[i], y[j], z[k]);
+          }
+        }
+      }
+
+      static const int I[] = {0, 1, 2, 3, 4, 5, 6, 7, 0, 2, 1, 3,
+                              4, 6, 5, 7, 0, 4, 1, 5, 2, 6, 3, 7};
+      boxMesh.index(I, sizeof(I) / sizeof(*I), 0);
+      boxMesh.update();
+      g.shader().uniform("eye_sep", perspectivePickable.scale *
+                                        g.lens().eyeSep() * g.eye() / 2.0f);
+
+      g.shader().uniform("eye_sep",
+                         /*perspectivePickable.scale * */ g.lens().eyeSep() *
+                             g.eye() / 2.0f);
+
+      glLineWidth(5);
+      gl::polygonLine();
+      g.color(0.8f, 0.8f, 1.0f, 0.9f);
+      g.scale(1.0, 1.0, 1.0f + atomrender.mLayerSeparation);
+      g.translate(atomrender.mSlicingPlanePoint.get());
+      g.rotate(atomrender.mSliceRotationPitch * 360.0f / (M_2PI), 1.0, 0.0,
+               0.0);
+      g.rotate(atomrender.mSliceRotationRoll * 360.0f / (M_2PI), 0.0, -1.0,
+               0.0);
+      g.draw(boxMesh);
+      gl::polygonFill();
+      glLineWidth(1);
+
+      //  -----------
+
       g.popMatrix();
     }
-  }
-  for (auto removed : atomRemoved) {
-    g.pushMatrix();
-    //    g.translate(removed.x, removed.y, removed.z);
-    g.color(0, 0, 0);
-    g.draw(mMarker);
-    g.popMatrix();
-  }
 
-  g.popMatrix();
+    drawHistory(g);
 
-  gl::depthTesting(true);
-  gl::blending(true);
+    { // Draw change markers
+      g.pushMatrix();
 
-  g.pushMatrix();
-  // Update box mesh that marks near and far clipping
-  // assumption
-  //   1. data is aligned to z axis
-  //   2. data range is [0:1] for all x, y, z
-  //   3. modelview matrix for perspective view should have been applied
-  boxMesh.reset();
-  boxMesh.primitive(Mesh::LINES);
-  // const float z[2] = {mNearClip.get(), mFarClip.get()};
-  // double scalingFactor = 1.0/(mDataBoundaries.maxz - mDataBoundaries.minz);
-
-  // Plane equation Ax + By + Cz - D = 0
-  //        float D =  -mSlicingPlanePoint.get().dot(mSlicingPlaneNormal);
-  // Line Equation
-
-  const float x[2] = {mDataBoundaries.max.x, mDataBoundaries.min.x};
-  const float y[2] = {mDataBoundaries.max.y, mDataBoundaries.min.y};
-
-  const float z[2] = {0.0, (atomrender.mSlicingPlaneThickness)};
-
-  for (int k = 0; k <= 1; k++) {
-    for (int j = 0; j <= 1; j++) {
-      for (int i = 0; i <= 1; i++) {
-        boxMesh.vertex(x[i], y[j], z[k]);
+      gl::depthTesting(true);
+      gl::blendDisable();
+      //  g.scale(perspectivePickable.scale);
+      gl::polygonLine();
+      for (auto added : atomAdded) {
+        for (auto addedPos : added.second) {
+          g.pushMatrix();
+          g.translate(addedPos.x, addedPos.y, addedPos.z);
+          g.color(1, 1, 1);
+          g.draw(mMarker);
+          g.popMatrix();
+        }
       }
+      for (auto removed : atomRemoved) {
+        g.pushMatrix();
+        g.translate(removed.x, removed.y, removed.z);
+        g.color(0, 0, 0);
+        g.draw(mMarker);
+        g.popMatrix();
+      }
+
+      g.popMatrix();
     }
+    g.popMatrix(); // pickable
   }
 
-  static const int I[] = {0, 1, 2, 3, 4, 5, 6, 7, 0, 2, 1, 3,
-                          4, 6, 5, 7, 0, 4, 1, 5, 2, 6, 3, 7};
-  boxMesh.index(I, sizeof(I) / sizeof(*I), 0);
-  boxMesh.update();
-  g.shader().uniform("eye_sep", perspectivePickable.scale * g.lens().eyeSep() *
-                                    g.eye() / 2.0f);
-
-  g.shader().uniform("eye_sep",
-                     /*perspectivePickable.scale * */ g.lens().eyeSep() *
-                         g.eye() / 2.0f);
-
-  glLineWidth(5);
-  gl::polygonLine();
-  g.color(0.8f, 0.8f, 1.0f, 0.9f);
-  g.scale(1.0, 1.0, 1.0f + atomrender.mLayerSeparation);
-  g.translate(atomrender.mSlicingPlanePoint.get());
-  g.rotate(atomrender.mSliceRotationPitch * 360.0f / (M_2PI), 1.0, 0.0, 0.0);
-  g.rotate(atomrender.mSliceRotationRoll * 360.0f / (M_2PI), 0.0, -1.0, 0.0);
-  g.draw(boxMesh);
   gl::polygonFill();
-  glLineWidth(1);
-
-  //  -----------
-
-  g.popMatrix();
-
-  drawHistory(g);
-
-  g.popMatrix(); // pickable
-
   gl::depthTesting(false);
   gl::blendAdd();
   g.pushMatrix();

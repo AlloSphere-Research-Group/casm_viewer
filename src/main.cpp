@@ -45,7 +45,6 @@ using namespace std;
 
 struct State {
   float zoom = 0.0;
-  //    Nav nav;
   Matrix4f transformMatrix;
 };
 
@@ -109,7 +108,7 @@ public:
   Parameter rollAngleStep{"RollAngleStep", "AngleControl", 15, "", 0.0, 60.0};
   Trigger stepRollAnglePos{"stepRollAnglePos", "AngleControl"};
   Trigger stepRollAngleNeg{"stepRollAngleNeg", "AngleControl"};
-  Trigger CalculateSlicing{"CalculateSlicing"};
+  //  Trigger CalculateSlicing{"CalculateSlicing"};
   Trigger ResetSlicing{"ResetSlicing"};
   Trigger mSaveGraphics{"SaveScreenshot"};
   Trigger mAlignTemperatures{"AlignTemperatures"};
@@ -780,19 +779,37 @@ public:
       if (ImGui::Button("Load dataset")) {
         showLoadingWindow = !showLoadingWindow;
       }
-      for (auto &paramSpaces : this->dataDisplays[vdvBundle.currentBundle()]
-                                   ->mDatasetManager.mParameterSpaces) {
-        ParameterMeta *param = &paramSpaces.second->parameter();
-        if (param->getHint("hide") != 1.0f) {
-          ParameterGUI::drawParameterMeta(param);
+      if (mAutoAdvance == 0.0) {
+        for (auto &paramSpaces :
+             this->dataDisplays[vdvBundle.currentBundle()]
+                 ->mDatasetManager.mParameterSpace.conditionParameters) {
+          ParameterMeta *param = &paramSpaces->parameter();
+          if (param->getHint("hide") != 1.0f) {
+            ParameterGUI::drawParameterMeta(param);
+          }
+        }
+        for (auto &paramSpaces :
+             this->dataDisplays[vdvBundle.currentBundle()]
+                 ->mDatasetManager.mParameterSpace.mappedParameters) {
+          ParameterMeta *param = &paramSpaces->parameter();
+          if (param->getHint("hide") != 1.0f) {
+            ParameterGUI::drawParameterMeta(param);
+          }
+        }
+        for (auto &paramSpaces :
+             this->dataDisplays[vdvBundle.currentBundle()]
+                 ->mDatasetManager.mParameterSpace.parameters) {
+          ParameterMeta *param = &paramSpaces->parameter();
+          if (param->getHint("hide") != 1.0f) {
+            ParameterGUI::drawParameterMeta(param);
+          }
         }
       }
       ParameterGUI::drawParameterMeta(
           &this->dataDisplays[vdvBundle.currentBundle()]
                ->atomrender.mAtomMarkerSize);
       if (this->dataDisplays[vdvBundle.currentBundle()]
-              ->mDatasetManager.mParameterSpaces["time"]
-              ->size() > 0) {
+              ->mDatasetManager.mParameterSpace.getDimension("time")) {
         ParameterGUI::drawParameterMeta(&mAutoAdvance);
         if (mAutoAdvance == 0.0) {
           ParameterGUI::drawParameterMeta(&mAutoAdvanceFreq);
@@ -828,7 +845,7 @@ public:
         ParameterGUI::drawParameterMeta(&mJumpLayerNeg);
         ImGui::SameLine();
         ParameterGUI::drawParameterMeta(&mJumpLayerPos);
-        ParameterGUI::drawParameterMeta(&CalculateSlicing);
+        //        ParameterGUI::drawParameterMeta(&CalculateSlicing);
         ImGui::SameLine();
         ParameterGUI::drawParameterMeta(&pitchAngleStep);
         ParameterGUI::drawParameterMeta(&stepPitchAngleNeg);
@@ -978,7 +995,7 @@ public:
     }
     parameterServer() << resetView << stepXpos << stepXneg << stepYpos
                       << stepYneg << stepZpos << stepZneg;
-    parameterServer() << CalculateSlicing << ResetSlicing;
+    parameterServer() /*<< CalculateSlicing*/ << ResetSlicing;
     parameterServer() << backgroundColor << sliceBackground;
     parameterServer() << font << fontSize;
     // These parameters are command triggers
@@ -1147,9 +1164,9 @@ public:
         //            << g << " " << b << std::endl;
       }
     } else {
-      std::cout << name() << "Could not open elements.ini" << std::endl;
+      std::cout << name() << "Could not open elements.ini - Using defaults."
+                << std::endl;
     }
-    std::cout << name() << "After Elements.ini" << std::endl;
   }
 
   void processScreenshot() {
@@ -1181,7 +1198,7 @@ public:
     parameterSpaceProcessor.setScriptName(pythonScriptPath.get() +
                                           "/analyze_parameter_space.py");
 
-    parameterSpaceProcessor.setOutputFileNames({"_parameter_space.json"});
+    parameterSpaceProcessor.setOutputFileNames({"_parameter_space.nc"});
     parameterSpaceProcessor.verbose(true);
 
     transfmatExtractor.setCommand(pythonBinary);
@@ -1193,19 +1210,21 @@ public:
     templateGen.setCommand(pythonBinary);
     templateGen.setScriptName(pythonScriptPath.get() +
                               "/reassign_occs/template_creator.py");
-    templateGen.setOutputFileNames({"template_POSCAR"});
+    templateGen.setOutputFileNames({"cached_output/template.nc"});
     templateGen.verbose(true);
 
     trajectoryProcessor.setCommand(pythonBinary);
     trajectoryProcessor.setScriptName(pythonScriptPath.get() +
                                       "/reassign_occs/analyze_kmc.py");
+
+    trajectoryProcessor.setOutputFileNames({"trajectory.nc"});
     trajectoryProcessor.verbose();
 
     templateGen.prepareFunction = [&]() {
-      auto transfmatFile = transfmatExtractor.outputFile();
-
-      if (File::exists(transfmatFile)) {
+      if (File::exists(transfmatExtractor.outputFile())) {
+        auto transfmatFile = transfmatExtractor.outputFile(false);
         templateGen.configuration["transfmat"] = transfmatFile;
+        templateGen.setInputDirectory(transfmatExtractor.outputDirectory());
       } else if (File::exists(templateGen.runningDirectory() +
                               "cached_output/transfmat")) {
         templateGen.configuration["transfmat"] =
@@ -1216,64 +1235,14 @@ public:
                               "../transfmat")) {
         templateGen.configuration["transfmat"] = "../transfmat";
       } else {
-        std::cerr << "Template not found! " << transfmatFile << std::endl;
+        std::cerr << "Transformation matrix not found!" << std::endl;
         return false;
       }
       return true;
     };
 
-    trajectoryProcessor.registerDoneCallback([&](bool ok) {
-      //        std::string fullconditionPath = fullConditionPath();
-      //        if (mParameterSpaces["time"]->size() > 0 &&
-      //            File::exists(fullconditionPath + "time_diffs.json")) {
-      //            // Generate an internal template file for data at time 0
-      //            // Load new template if more than time has changed.
-      //            bool onlyTimeChanged = true;
-      //            for (auto &paramSpace : mParameterSpaces) {
-      //                if (paramSpace.first == "time") {
-      //                    continue;
-      //                }
-      //                if (mCurrentLoadedIndeces[paramSpace.first] !=
-      //                    paramSpace.second->getCurrentIndex()) {
-      //                    onlyTimeChanged = false;
-      //                    break;
-      //                }
-      //            }
-      //            int timeIndex = mParameterSpaces["time"]->getCurrentIndex();
-      //            if (!onlyTimeChanged) {
-      //                timeIndex = 0;
-      //                // Load diffs for this parameter space sample
-      //                std::ifstream f(fullconditionPath + "time_diffs.json");
-      //                std::string str;
-      //                if (!f.fail()) {
-      //                    f.seekg(0, std::ios::end);
-      //                    str.reserve(f.tellg());
-      //                    f.seekg(0, std::ios::beg);
-
-      //                    str.assign((std::istreambuf_iterator<char>(f)),
-      //                               std::istreambuf_iterator<char>());
-
-      //                    mDiffs = json::parse(str);
-
-      //                } else {
-      //                    std::cerr << "ERROR loading diff file" << std::endl;
-      //                }
-      //            } else {
-      //                timeIndex = mCurrentLoadedIndeces["time"];
-      //            }
-
-      //            bool diffLoaded = loadDiff(timeIndex);
-      //            if (diffLoaded) {
-      //                auto positions = positionBuffers.getWritable();
-      //                *positions = mTemplatePositions;
-
-      //                positionBuffers.doneWriting(positions);
-      //            }
-      //        }
-    });
-
     initRootComputationChain << parameterSpaceProcessor << transfmatExtractor
-                             << templateGen << trajectoryProcessor;
+                             << templateGen /*<< trajectoryProcessor*/;
 
     // Only the root chain needs to be
     processorServer << initRootComputationChain
@@ -1425,9 +1394,9 @@ public:
         }
       });
 
-      CalculateSlicing.registerChangeCallback([this](float value) {
-        this->dataDisplays[vdvBundle.currentBundle()]->computeSlicing();
-      });
+      //      CalculateSlicing.registerChangeCallback([this](float value) {
+      //        this->dataDisplays[vdvBundle.currentBundle()]->computeSlicing();
+      //      });
 
       ResetSlicing.registerChangeCallback([this](float value) {
         this->dataDisplays[vdvBundle.currentBundle()]->resetSlicing();
@@ -1473,33 +1442,33 @@ public:
         mScreenshotMutex.unlock();
       });
 
-      mAlignTemperatures.registerChangeCallback([this](float value) {
-        float baseTemp = dataDisplays[0]
-                             ->mDatasetManager.mParameterSpaces["temperature"]
-                             ->parameter();
-        for (size_t i = 1; i < dataDisplays.size(); i++) {
-          dataDisplays[i]
-              ->mDatasetManager.mParameterSpaces["temperature"]
-              ->parameter() = baseTemp;
-          for (size_t j = 0; j < i; j++) {
-            dataDisplays[i]->nextTemp();
-          }
-        }
-      });
+      //      mAlignTemperatures.registerChangeCallback([this](float value) {
+      //        float baseTemp = dataDisplays[0]
+      //                             ->mDatasetManager.mParameterSpaces["temperature"]
+      //                             ->parameter();
+      //        for (size_t i = 1; i < dataDisplays.size(); i++) {
+      //          dataDisplays[i]
+      //              ->mDatasetManager.mParameterSpaces["temperature"]
+      //              ->parameter() = baseTemp;
+      //          for (size_t j = 0; j < i; j++) {
+      //            dataDisplays[i]->nextTemp();
+      //          }
+      //        }
+      //      });
 
-      mAlignChempots.registerChangeCallback([this](float value) {
-        float baseChempot = dataDisplays[0]
-                                ->mDatasetManager.mParameterSpaces["chempotA"]
-                                ->parameter();
-        for (size_t i = 1; i < dataDisplays.size(); i++) {
-          dataDisplays[i]
-              ->mDatasetManager.mParameterSpaces["chempotA"]
-              ->parameter() = baseChempot;
-          for (size_t j = 0; j < i; j++) {
-            dataDisplays[i]->nextChempot();
-          }
-        }
-      });
+      //      mAlignChempots.registerChangeCallback([this](float value) {
+      //        float baseChempot = dataDisplays[0]
+      //                                ->mDatasetManager.mParameterSpaces["chempotA"]
+      //                                ->parameter();
+      //        for (size_t i = 1; i < dataDisplays.size(); i++) {
+      //          dataDisplays[i]
+      //              ->mDatasetManager.mParameterSpaces["chempotA"]
+      //              ->parameter() = baseChempot;
+      //          for (size_t j = 0; j < i; j++) {
+      //            dataDisplays[i]->nextChempot();
+      //          }
+      //        }
+      //      });
       stepPitchAngleNeg.registerChangeCallback([this](float value) {
         if (vdvBundle.bundleGlobal()) {
           float newAngle = dataDisplays[vdvBundle.currentBundle()]
@@ -1657,36 +1626,39 @@ public:
   }
 
   void cleanParameterSpace(string datasetPath) {
-    if (File::isDirectory(dataRoot + datasetPath)) {
-      FileList subDirs =
-          filterInDir(dataRoot + datasetPath, [&](FilePath const &fp) {
-            std::cout << fp.filepath() << std::endl;
-            return File::isDirectory(fp.filepath());
-          });
-      subDirs.add(FilePath(dataRoot + datasetPath));
-      for (auto subDir : subDirs) {
-        std::string cachedOutputDir = subDir.filepath() + "/cached_output/";
-        if (File::exists(cachedOutputDir) &&
-            File::isDirectory(cachedOutputDir)) {
-          if (!Dir::removeRecursively(cachedOutputDir)) {
-            std::cerr << "ERROR cleaning cache at " << cachedOutputDir
-                      << std::endl;
-          }
-        }
-        // FIXME This should be removed once no files are generated outside
-        // the cache directory
-        std::vector<std::string> additionalCacheFiles = {"transfmat",
-                                                         "template_POSCAR"};
-        for (auto fileToRemove : additionalCacheFiles) {
-          if (File::exists(subDir.filepath() + fileToRemove)) {
-            if (!File::remove(subDir.filepath() + fileToRemove)) {
-              std::cerr << "ERROR deleting cache file: "
-                        << subDir.filepath() + fileToRemove << std::endl;
-            }
-          }
-        }
-      }
-    }
+    // FIXME implement clearing cache for parameter spaces and computation
+    // chains in tinc
+    //    if (File::isDirectory(dataRoot + datasetPath)) {
+    //      FileList subDirs =
+    //          filterInDir(dataRoot + datasetPath, [&](FilePath const &fp) {
+    //            std::cout << fp.filepath() << std::endl;
+    //            return File::isDirectory(fp.filepath());
+    //          });
+    //      subDirs.add(FilePath(dataRoot + datasetPath));
+    //      for (auto subDir : subDirs) {
+    //        std::string cachedOutputDir = subDir.filepath() +
+    //        "/cached_output/"; if (File::exists(cachedOutputDir) &&
+    //            File::isDirectory(cachedOutputDir)) {
+    //          if (!Dir::removeRecursively(cachedOutputDir)) {
+    //            std::cerr << "ERROR cleaning cache at " << cachedOutputDir
+    //                      << std::endl;
+    //          }
+    //        }
+    //        // FIXME This should be removed once no files are generated
+    //        outside
+    //        // the cache directory
+    //        std::vector<std::string> additionalCacheFiles = {"transfmat",
+    //                                                         "template_POSCAR"};
+    //        for (auto fileToRemove : additionalCacheFiles) {
+    //          if (File::exists(subDir.filepath() + fileToRemove)) {
+    //            if (!File::remove(subDir.filepath() + fileToRemove)) {
+    //              std::cerr << "ERROR deleting cache file: "
+    //                        << subDir.filepath() + fileToRemove << std::endl;
+    //            }
+    //          }
+    //        }
+    //      }
+    //    }
   }
 
   void processNewDataRoot(string rootPath) {
@@ -1697,34 +1669,38 @@ public:
         // Attempt to generate data space for all directories in root dir.
 
         auto subdirs = itemListInDir(element.filepath());
-        for (FilePath &subdir : subdirs) {
 
-          if (subdir.file() == "trajectory.json") {
-            std::cout << subdir.filepath() << std ::endl;
+        // Determine if folder conatins CASM dataset.
+        bool isDataset = false;
+        for (FilePath &subdir : subdirs) {
+          if (subdir.file() == "results.json" || subdir.file() == "prim.json") {
+            isDataset = true;
+            break;
           }
         }
+        if (isDataset) {
+          auto conditionDirs = itemListInDir(element.filepath());
+          for (FilePath &condDir : conditionDirs) {
+            if (File::isDirectory(condDir.filepath())) {
+              if (File::exists(condDir.filepath() + "trajectory.json.gz")) {
+                trajectoryProcessor.setInputFileNames({"trajectory.json.gz"});
+                trajectoryProcessor.setOutputFileNames({"trajectory.nc"});
+                trajectoryProcessor.setDirectory(condDir.filepath());
+                trajectoryProcessor.process();
+              }
+            }
+          }
+          parameterSpaceProcessor.setRunningDirectory(element.filepath());
+          parameterSpaceProcessor.setOutputDirectory(element.filepath() +
+                                                     "/cached_output");
 
-        parameterSpaceProcessor.setRunningDirectory(element.filepath());
-        parameterSpaceProcessor.setOutputDirectory(element.filepath() +
-                                                   "/cached_output");
+          transfmatExtractor.setDirectory(element.filepath());
+          templateGen.setDirectory(element.filepath());
 
-        transfmatExtractor.setRunningDirectory(element.filepath());
-        transfmatExtractor.setOutputDirectory(element.filepath());
+          initRootComputationChain.process();
 
-        templateGen.setRunningDirectory(element.filepath());
-        templateGen.setOutputDirectory(element.filepath() + "/cached_output");
-
-        trajectoryProcessor.setRunningDirectory(element.filepath());
-
-        bool ok = initRootComputationChain.process();
-
-        std::cout << "Process parameter space asyc for " << element.filepath()
-                  << std::endl;
-        if (ok && File::exists(File::conformDirectory(element.filepath()) +
-                               "cached_output/_parameter_space.json")) {
-        } else {
-          //                Dir::removeRecursively(element.filepath() +
-          //                "/cached_output");
+          std::cout << "Process parameter space for " << element.filepath()
+                    << std::endl;
         }
       }
       updateAvailableDatasets(this->dataRoot + rootPath);
@@ -1740,7 +1716,7 @@ public:
     std::vector<std::string> directories;
     for (auto entry : entries) {
       auto spaceFileFullPath = File::conformPathToOS(entry.filepath()) +
-                               "/cached_output/_parameter_space.json";
+                               "/cached_output/_parameter_space.nc";
       if (File::exists(spaceFileFullPath)) {
         directories.push_back(entry.file());
       }
@@ -1764,11 +1740,8 @@ public:
 };
 
 int main() {
+  // App is too big for stack!
   std::unique_ptr<MyApp> app = std::make_unique<MyApp>();
-  //  app->stereo(true);
-  //  app->displayMode(app->displayMode() | Window::STEREO_BUF);
-  //  app.print();
-  //  app.initAudio();
   app->start();
   return 0;
 }

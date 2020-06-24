@@ -38,8 +38,6 @@
 #include "datasetmanager.hpp"
 #include "slice.hpp"
 
-//#include "imgui.h"
-
 #undef far
 #undef near
 
@@ -116,8 +114,6 @@ public:
 
 class DataDisplay : public DataDisplayParameters {
 public:
-  //  vector<AtomProperties> atomPropertiesProj;
-
   std::map<std::string, ElementData> elementData;
 
   DatasetManager mDatasetManager;
@@ -139,13 +135,18 @@ public:
 
   SlicingAtomRenderer atomrender;
 
+  std::vector<Color> colorList = {
+      Color(0.0, 1.0, 0.0, 0.0), Color(1.0, 0.0, 0.0, 0.0),
+      Color(0.0, 1.0, 1.0, 1.0), Color(1.0, 1.0, 0.0, 1.0),
+      Color(1.0, 0.0, 1.0, 1.0), Color(0.5, 1.0, 0.5, 1.0),
+      Color(1.0, 1.0, 0.0, 1.0), Color(0.0, 0.0, 1.0, 1.0)};
+
   void init();
 
-  void initRootDirectory();
+  void initDataset();
 
   // Prepare elements before draw call
   void prepare(Graphics &g, Matrix4f &transformMatrix);
-
   void prepareHistoryMesh();
   void prepareParallelProjection(Graphics &g, Matrix4f &transformMatrix);
 
@@ -157,39 +158,20 @@ public:
   // Functions to change increase/decrease parameters according to internal
   // parameter spaces
 
-  void nextTemp() {
-    mDatasetManager.mParameterSpaces["temperature"]->stepIncrement();
-  }
+  void nextTemp();
+  void previousTemp();
 
-  void previousTemp() {
-    mDatasetManager.mParameterSpaces["temperature"]->stepDecrease();
-  }
+  void nextChempot();
+  void previousChempot();
 
-  void nextChempot() {
-    mDatasetManager.mParameterSpaces["chempotA"]->stepIncrement();
-  }
+  void nextChempot2();
+  void previousChempot2();
 
-  void previousChempot() {
-    mDatasetManager.mParameterSpaces["chempotA"]->stepDecrease();
-  }
+  void nextTime();
+  void previousTime();
 
-  void nextChempot2() {
-    mDatasetManager.mParameterSpaces["chempotB"]->stepIncrement();
-  }
-
-  void previousChempot2() {
-    mDatasetManager.mParameterSpaces["chempotB"]->stepDecrease();
-  }
-
-  void nextTime() { mDatasetManager.mParameterSpaces["time"]->stepIncrement(); }
-
-  void previousTime() {
-    mDatasetManager.mParameterSpaces["time"]->stepDecrease();
-  }
-
-  void nextLayer() { atomrender.nextLayer(); }
-
-  void previousLayer() { atomrender.previousLayer(); }
+  void nextLayer();
+  void previousLayer();
 
   //  void dumpImages(std::string dumpPrefix);
 
@@ -226,26 +208,9 @@ protected:
   // This function should be called whenever there is new atom position data
   void updateDisplayBuffers();
 
-  void drawHistory(Graphics &g) {
-    g.pushMatrix();
-    g.meshColor();
-    gl::polygonFill();
-    if (mIndividualTrajectory.get() != 0.0f) {
-      g.draw(mHistoryMesh);
-    }
-    if (mCumulativeTrajectory.get() != 0.0f) {
-      g.translate((mDataBoundaries.max.x - mDataBoundaries.min.x) / 2.0f,
-                  (mDataBoundaries.max.y - mDataBoundaries.min.y) / 2.0f,
-                  (mDataBoundaries.max.z - mDataBoundaries.min.z) / 2.0f);
-      g.draw(mTrajectoryMesh);
-    }
-    g.popMatrix();
-  }
-
+  void drawHistory(Graphics &g);
   void drawPerspective(Graphics &g);
-
   void drawParallelProjection(Graphics &g);
-
   void drawGraph(Graphics &g);
 
 private:
@@ -263,9 +228,12 @@ private:
 
   EasyFBO fbo_iso;
 
-  std::atomic<bool> mNeedsProcessing{false};
-  bool mRequestInit{false};
+  bool mNeedsProcessing{
+      false}; // Schedule processing for next frame to ensure drawing current
+              // frame and processing current window events
 
+  // For KMC datasets list of atoms added/removed with respect to previous time
+  // step
   std::map<std::string, std::vector<DatasetManager::position_t>> atomAdded;
   std::vector<DatasetManager::position_t> atomRemoved;
 

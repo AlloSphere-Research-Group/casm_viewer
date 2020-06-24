@@ -34,6 +34,19 @@ void replaceAll(std::string &s, const std::string &search,
 }
 
 DatasetManager::DatasetManager() {
+  mParameterSpaces["temperature"] = new ParameterSpaceDimension("temperature");
+  mParameterSpaces["chempotA"] = new ParameterSpaceDimension("chempotA");
+  mParameterSpaces["chempotB"] = new ParameterSpaceDimension("chempotB");
+
+  mParameterSpaces["chempotA"]->addConnectedParameterSpace(
+      mParameterSpaces["chempotB"]);
+  mParameterSpaces["chempotB"]->addConnectedParameterSpace(
+      mParameterSpaces["chempotA"]);
+
+  mParameterSpaces["time"] = new ParameterSpaceDimension("time");
+
+  mParameterSpaces["temperature"]->parameter().set(300);
+
   // These parameters are used for data propagation, but shouldn't be set by the
   // user
   currentGraphName.setHint("hide", 1.0);
@@ -51,6 +64,10 @@ void DatasetManager::initializeComputation() {
   //  graphGenerator.verbose();
   labelProcessor.verbose();
 
+  for (auto pspace : mParameterSpaces) {
+    labelProcessor << pspace.second->parameter();
+    graphGenerator << pspace.second->parameter();
+  }
   atomPositionChain << labelProcessor;
   sampleComputationChain << atomPositionChain << graphGenerator;
 
@@ -75,14 +92,14 @@ void DatasetManager::initializeComputation() {
       }
       std::string highlightValue = "0.0";
 
-      if (mParameterSpace.getDimension(xLabel)) {
+      if (mParameterSpaces.find(xLabel) != mParameterSpaces.end()) {
         try {
-          datax.reserve(mParameterSpace.getDimension(xLabel)->size());
-          for (auto value : mParameterSpace.getDimension(xLabel)->values()) {
+          datax.reserve(mParameterSpaces[xLabel]->size());
+          for (auto value : mParameterSpaces[xLabel]->values()) {
             datax.push_back(value);
           }
-          highlightValue = std::to_string(
-              int(mParameterSpace.getDimension(xLabel)->getCurrentValue()));
+          highlightValue =
+              std::to_string(int(mParameterSpaces[xLabel]->getCurrentValue()));
         } catch (std::exception &) {
         }
       }
@@ -107,7 +124,7 @@ void DatasetManager::initializeComputation() {
       if (str.size() > 0) {
         auto resultsJson = json::parse(str);
         auto data = resultsJson[yLabel];
-        for (json::iterator v = data.begin(); v != data.end(); v++) {
+        for (json::iterator v = data.begin(); v != data.end(); ++v) {
           if (v->get<float>() < dataRange.first) {
             dataRange.first = v->get<float>();
           } else if (v->get<float>() > dataRange.second) {
@@ -161,7 +178,7 @@ void DatasetManager::initializeComputation() {
 
   labelProcessor.prepareFunction = [&]() {
     std::string condition = std::to_string(
-        mParameterSpace.conditionParameters[0]->getCurrentIndex());
+        mParameterSpaces[mConditionsParameter]->getCurrentIndex());
 
     std::string folder = File::conformDirectory(getSubDir());
     std::string root_path = buildRootPath();
@@ -212,9 +229,15 @@ void DatasetManager::initializeComputation() {
     if (ok) {
       currentPoscarName.set(labelProcessor.outputFile());
 
+      // --------------netcdf ----------------------------
+
       int ncid, retval;
+
       std::string filename = currentPoscarName.get() + ".nc";
+      /* Open the file. NC_NOWRITE tells netCDF we want read-only access
+       * to the file.*/
       if ((retval = nc_open(filename.c_str(), NC_NOWRITE | NC_SHARE, &ncid))) {
+
         return /*false*/;
       }
       int varid;
@@ -240,18 +263,48 @@ void DatasetManager::initializeComputation() {
       auto newPositionData = occupationData.getWritable();
       newPositionData->resize(lenp);
 
+      /* Read the data. */
       if ((retval = nc_get_var(ncid, varid, newPositionData->data()))) {
         return /*false*/;
       }
       occupationData.doneWriting(newPositionData);
 
+      /* Close the file, freeing all resources. */
       if ((retval = nc_close(ncid))) {
         return /*false*/;
       }
+
+      // ---------------------------------------------
     }
   });
 
   // Parameter spaces trigger computation
+
+  for (auto &parameterSpace : mParameterSpaces) {
+    parameterSpace.second->parameter().registerChangeCallback([&](float value) {
+      if (parameterSpace.second->getCurrentId() !=
+          parameterSpace.second->idAt(parameterSpace.second->getIndexForValue(
+              value))) { // Only reload if id has changed
+
+        // To have the internal value already changed for the following
+        // functions. This throws away the previous value, but we don't need it
+        // now.
+        parameterSpace.second->parameter().setNoCalls(value);
+        std::cout << value << " : " << parameterSpace.second->getCurrentId()
+                  << "..."
+                  << parameterSpace.second->idAt(
+                         parameterSpace.second->getIndexForValue(value));
+        if (mParameterSpaces["time"]->size() > 0) {
+          if (parameterSpace.first == mConditionsParameter) {
+            loadTrajectory();
+          }
+
+          computeNewSample();
+        }
+        updateText();
+      }
+    });
+  }
 
   mPlotYAxis.registerChangeCallback([this](float value) {
     if (mPlotYAxis.get() != value) {
@@ -275,8 +328,8 @@ void DatasetManager::setPythonBinary(std::string pythonBinaryPath) {
 void DatasetManager::setPythonScriptPath(std::string pythonScriptPath) {
   //      std::unique_lock<std::mutex> lk(mProcessingLock);
   graphGenerator.setScriptName(pythonScriptPath + "/graphing/plot.py");
-  labelProcessor.setScriptName(File::conformDirectory(pythonScriptPath) +
-                               "/reassign_occs/reassign_occs.py");
+  labelProcessor.setScriptName(File::conformDirectory(
+      pythonScriptPath) + "/reassign_occs/reassign_occs.py");
 }
 
 std::string DatasetManager::buildRootPath() {
@@ -286,7 +339,7 @@ std::string DatasetManager::buildRootPath() {
 
 std::string DatasetManager::fullConditionPath() {
   std::string condition =
-      std::to_string(mParameterSpace.conditionParameters[0]->getCurrentIndex());
+      std::to_string(mParameterSpaces[mConditionsParameter]->getCurrentIndex());
   return File::conformPathToOS(buildRootPath() + mCurrentDataset.get() + "/" +
                                getSubDir() + "/conditions." + condition + "/");
 }
@@ -295,82 +348,143 @@ void DatasetManager::readParameterSpace() {
   std::string paramSpaceFile =
       File::conformPathToOS(buildRootPath() +
                             File::conformPathToOS(mCurrentDataset.get())) +
-      "cached_output/_parameter_space.nc";
+      "cached_output/_parameter_space.json";
+  // Read parameter space json file
+  std::string str;
+  std::ifstream f(paramSpaceFile);
+  std::map<std::string, std::string> parameterNameMap = {
+      {"T", "temperature"},
+      {"param_chem_pot(a)", "chempotA"},
+      {"param_chem_pot(b)", "chempotB"}};
+  if (!f.fail()) {
+    mParameterForSubDir.clear();
+    for (auto &paramSpace : mParameterSpaces) {
+      paramSpace.second->clear();
+    }
 
-  auto newParameterSpace = tinc::ParameterSpace::loadFromNetCDF(paramSpaceFile);
+    f.seekg(0, std::ios::end);
+    str.reserve(f.tellg());
+    f.seekg(0, std::ios::beg);
 
-  newParameterSpace.parameterNameMap = {{"temperature", "T"},
-                                        {"chempotA", "param_chem_pot(a)"},
-                                        {"chempotB", "param_chem_pot(b)"}};
-  // TODO sort chempot spaces??
-  if (newParameterSpace.getDimension("time")) {
-
-    newParameterSpace.getDimension("time")->setCurrentValue(
-        newParameterSpace.getDimension("time")->at(0));
-  }
-
-  // TODO check below to see what is needed:
-  //  for (auto pspace : mParameterSpaces) {
-  //      labelProcessor << pspace.second->parameter();
-  //      graphGenerator << pspace.second->parameter();
-  //  }
-  //  {
-  //    // set to current value to clamp if needed
-  //    mParameterSpaces[key]->parameter().setNoCalls(
-  //        mParameterSpaces[key]->parameter().get());
-  //    if (mConditionsParameter.size() > 0) {
-  //      std::cerr << "ERROR conditions parameter already set. Overwriting."
-  //                << std::endl;
-  //    }
-  //    mConditionsParameter = key;
-
-  //    mParameterSpaces["temperature"] =
-  //        new ParameterSpaceDimension("temperature");
-  //    mParameterSpaces["chempotA"] = new ParameterSpaceDimension("chempotA");
-  //    mParameterSpaces["chempotB"] = new ParameterSpaceDimension("chempotB");
-
-  //    mParameterSpaces["chempotA"]->addConnectedParameterSpace(
-  //        mParameterSpaces["chempotB"]);
-  //    mParameterSpaces["chempotB"]->addConnectedParameterSpace(
-  //        mParameterSpaces["chempotA"]);
-
-  //    mParameterSpaces["time"] = new ParameterSpaceDimension("time");
-
-  //    mParameterSpaces["temperature"]->parameter().set(300);
-  //  }
-
-  mParameterSpace = newParameterSpace;
-
-  mParameterSpace.registerChangeCallback(
-      [&](float value, ParameterSpaceDimension *changed) {
-        changed->lock();
-        if (changed->getCurrentId() !=
-            changed->idAt(changed->getIndexForValue(
-                value))) { // Only reload if id has changed
-
-          // To have the internal value already changed for the following
-          // functions. This throws away the previous value, but we don't need
-          // it now.
-          changed->parameter().setNoCalls(value);
-          std::cout << value << " : " << changed->getCurrentId() << "..."
-                    << changed->idAt(changed->getIndexForValue(value));
-          if (mParameterSpace.getDimension("time") &&
-              mParameterSpace.conditionParameters.size() > 0) {
-            if (changed->getName() ==
-                mParameterSpace.conditionParameters[0]->getName()) {
-              loadTrajectory();
-            }
-
-            computeNewSample();
-          }
-          updateText();
-
-          changed->unlock();
+    str.assign((std::istreambuf_iterator<char>(f)),
+               std::istreambuf_iterator<char>());
+    json j = json::parse(str);
+    for (json::iterator it = j["parameters"].begin();
+         it != j["parameters"].end(); ++it) {
+      //          std::cout << it.key() << " : " << it.value() << std::endl;
+      std::string key = it.key();
+      if (parameterNameMap.find(key) != parameterNameMap.end()) {
+        std::string mappedKey = parameterNameMap[key];
+        mParameterForSubDir.push_back(mappedKey);
+        for (auto temps : it.value()) {
+          mParameterSpaces[mappedKey]->push_back(float(temps["value"]),
+                                                 temps["dir"]);
         }
-      });
+        if (mappedKey == "chempotA" || mappedKey == "chempotB") {
+          mParameterSpaces[mappedKey]->sort();
+        }
+        //        // set to current value to clamp if needed
+        //        mParameterSpaces[mappedKey]->parameter().set(
+        //            mParameterSpaces[mappedKey]->parameter().get());
+      }
+    }
+
+    for (json::iterator it = j["conditions"].begin();
+         it != j["conditions"].end(); ++it) {
+      std::string key = it.key();
+      if (parameterNameMap.find(key) != parameterNameMap.end()) {
+        key = parameterNameMap[key];
+        for (auto temps : it.value()) {
+          mParameterSpaces[key]->push_back(float(temps));
+        }
+        if (key == "chempotA" || key == "chempotB") {
+          mParameterSpaces[key]->sort();
+        }
+        // set to current value to clamp if needed
+        mParameterSpaces[key]->parameter().setNoCalls(
+            mParameterSpaces[key]->parameter().get());
+        if (mConditionsParameter.size() > 0) {
+          std::cerr << "ERROR conditions parameter already set. Overwriting."
+                    << std::endl;
+        }
+        mConditionsParameter = key;
+      }
+    }
+    if (mConditionsParameter == "" &&
+        mParameterSpaces["temperature"]->size() > 0) {
+      // This is a fallback to support datasets with only a single condition.
+      // In this case no conditions parameter is found, and therefore this would
+      // be considered an invalid dataset...
+      mConditionsParameter = "temperature";
+    }
+
+    //    Verify conditions parameter space from parameter space file against
+    //    results.json
+    std::string resultsFile =
+        File::conformPathToOS(buildRootPath() +
+                              File::conformPathToOS(mCurrentDataset.get())) +
+        "/" + File::conformPathToOS(getSubDir()) + "results.json";
+    if (File::exists(resultsFile)) {
+      std::ifstream results(resultsFile);
+      results.seekg(0, std::ios::end);
+      str.reserve(results.tellg());
+      results.seekg(0, std::ios::beg);
+
+      str.assign((std::istreambuf_iterator<char>(results)),
+                 std::istreambuf_iterator<char>());
+      json resultsJson = json::parse(str);
+
+      std::string conditionInJson = mConditionsParameter;
+      for (auto mapEntry : parameterNameMap) {
+        if (mapEntry.second == mConditionsParameter) {
+          conditionInJson = mapEntry.first;
+          break;
+        }
+      }
+
+      auto conditionValues = resultsJson[conditionInJson];
+      if (conditionValues.is_array()) {
+        mParameterSpaces[mConditionsParameter]->clear();
+        for (auto value : conditionValues) {
+          mParameterSpaces[mConditionsParameter]->push_back(value.get<float>());
+        }
+      }
+    }
+
+    for (json::iterator it = j["internal_states"].begin();
+         it != j["internal_states"].end(); ++it) {
+      std::string key = it.key();
+      json j2 = it.value();
+      int timeOffset = 0;
+      if (key == "time") {
+        mParameterSpaces["time"]->reserve(mParameterSpaces["time"]->size() +
+                                          j2.size());
+        uint64_t previous = std::numeric_limits<uint64_t>::min();
+        for (json::iterator values = j2.begin(); values != j2.end(); values++) {
+          // TODO we should get the actual time values here (available in the
+          // results file.
+          if (mParameterSpaces["time"]->size() > 0 && previous > *values) {
+            timeOffset = mParameterSpaces["time"]->at(
+                mParameterSpaces["time"]->size() - 1);
+          }
+          mParameterSpaces["time"]->push_back(int(*values) + timeOffset);
+          previous = int(*values);
+        }
+      }
+    }
+    // If there is a time space, don't use script. Data is already avaialble
+    if (mParameterSpaces["time"]->size() > 0) {
+      labelProcessor.enabled = false;
+    } else {
+      labelProcessor.enabled = true;
+    }
+  } else {
+    std::cerr << "ERROR failed to find parameter space file: " << paramSpaceFile
+              << std::endl;
+  }
 }
 
-void DatasetManager::initDataset() {
+void DatasetManager::initRoot() {
   std::unique_lock<std::mutex> lk(mDataLock);
 
   std::string fullDatasetPath = File::conformPathToOS(
@@ -383,13 +497,14 @@ void DatasetManager::initDataset() {
 
   readParameterSpace();
   analyzeDataset();
+
   loadTrajectory();
 
   std::vector<std::string> parameterSpaceNames;
   parameterSpaceNames.push_back("temperature");
 
   mPlotXAxis.setElements(parameterSpaceNames);
-  mPlotYAxis.setNoCalls(0);
+  mPlotYAxis.set(0);
 
   auto dataNames = getDataNames();
   mPlotYAxis.setElements(dataNames);
@@ -397,10 +512,11 @@ void DatasetManager::initDataset() {
   ptrdiff_t pos = std::find(dataNames.begin(), dataNames.end(), defaultYAxis) -
                   dataNames.begin();
   if (pos < (int)dataNames.size()) {
-    mPlotYAxis.setNoCalls((int)pos); // Avoid computing graph here.
+    mPlotYAxis.set((int)pos);
   }
 
-  std::string templatePath = fullDatasetPath + "cached_output/template.nc";
+  std::string templatePath =
+      fullDatasetPath + "cached_output/template_POSCAR.nc";
   if (File::exists(templatePath)) {
     int retval, ncid, varid;
     if ((retval =
@@ -428,24 +544,29 @@ void DatasetManager::initDataset() {
 
     templateData.resize(lenp);
 
+    /* Read the data. */
     if ((retval = nc_get_var(ncid, varid, templateData.data()))) {
       return /*false*/;
     }
+
+    /* Close the file, freeing all resources. */
     if ((retval = nc_close(ncid))) {
       return /*false*/;
     }
   }
 
-  // If there is a time space, don't use labeling script. Data is ready
-  if (mParameterSpace.getDimension("time")) {
-    labelProcessor.enabled = false;
+  // Configure diff generator
+  if (mParameterSpaces["time"]->size() > 0) {
     graphGenerator.enabled = false; // Graphing not working with kmc yet.
   } else {
-    labelProcessor.enabled = true;
     graphGenerator.enabled = true;
   }
 
   lk.unlock();
+  // Update data
+  // Not necessary as this is triggered automatically through change in
+  // mLoadedDataset
+  //  computeNewSample();
 }
 
 void DatasetManager::analyzeDataset() {
@@ -461,17 +582,45 @@ void DatasetManager::analyzeDataset() {
   mDataRanges.clear();
   mAvailableAtomsJson.clear();
 
+  for (auto &paramSpace : mParameterSpaces) {
+    paramSpace.second->lock();
+    bool isVariable = false;
+    if (paramSpace.second->size() > 0) {
+      auto previous = paramSpace.second->at(0);
+      for (auto &value : paramSpace.second->values()) {
+        if (value != previous) {
+          isVariable = true;
+          break;
+        }
+      }
+    }
+    mParameterIsVariable[paramSpace.first] = isVariable;
+    paramSpace.second->parameter().setHint(
+        "hide", paramSpace.second->size() > 0 ? 0.0 : 1.0);
+    paramSpace.second->unlock();
+  }
+
   mVacancyAtoms.clear();
   mShowAtomElements.clear();
 
   std::string str = readJsonResultsFile(datasetId, getSubDir());
   if (str.size() > 0) {
-    // Read the results file.
+    // Read the results file. This tells us which atoms are available
     auto resultsJson = json::parse(str);
 
+    std::string comp_prefix = "<comp_n(";
+    // Fill available atoms list from the available atoms in the <comp_n(XX)>
+    // tag
     for (json::iterator it = resultsJson.begin(); it != resultsJson.end();
          ++it) {
       std::string key = it.key();
+      //                // Look for available comp_n atom names
+      //                if (key.compare(0, comp_prefix.size(), comp_prefix) ==
+      //                0) {
+      //                    assert(key.find(")>") != string::npos);
+      //                    availableAtomsJson.push_back(key.substr(comp_prefix.size(),
+      //                    key.find(")>") - comp_prefix.size()));
+      //                }
       if (mDataRanges.find(key) == mDataRanges.end()) {
         mDataRanges[key] = std::pair<float, float>(FLT_MAX, FLT_MIN);
       }
@@ -615,17 +764,18 @@ void DatasetManager::preProcessDataset() {
 }
 
 bool DatasetManager::valid() {
+  //        return false; // force testing
   // TODO have a better validity check
-  bool valid = mParameterSpace.getDimension("chempotA") &&
-               mParameterSpace.getDimension("temperature");
+  bool valid = mParameterSpaces["chempotA"]->size() > 0 &&
+               mParameterSpaces["temperature"]->size() > 0;
   return valid;
 }
 
 std::string DatasetManager::currentDataset() { return mLoadedDataset; }
 
 std::string DatasetManager::getSubDir() {
-  if (mParameterSpace.mappedParameters.size() > 0) {
-    return mParameterSpace.mappedParameters[0]->getCurrentId();
+  if (mParameterForSubDir.size() > 0) {
+    return mParameterSpaces[mParameterForSubDir[0]]->getCurrentId();
   } else {
     return std::string();
   }
@@ -650,113 +800,113 @@ void DatasetManager::processTemplatePositions() {
   }
 }
 
-// bool DatasetManager::loadDiff(int timeIndex) {
-//  bool diffLoaded = false;
-//  //         Then accumulate all diffs until current time
-//  int targetIndex = mParameterSpaces["time"]->getCurrentIndex();
+bool DatasetManager::loadDiff(int timeIndex) {
+  bool diffLoaded = false;
+  //         Then accumulate all diffs until current time
+  int targetIndex = mParameterSpaces["time"]->getCurrentIndex();
 
-//  //      std::cout << timeIndex << " --> " << targetIndex << std::endl;
-//  if (timeIndex < targetIndex) {
+  //      std::cout << timeIndex << " --> " << targetIndex << std::endl;
+  if (timeIndex < targetIndex) {
 
-//    mHistory.clear();
-//    for (int i = timeIndex; i != targetIndex; i++) {
-//      std::cout << "applying diff " << i << std::endl;
-//      std::pair<Vec3f, Vec3f> historyPoint;
-//      auto this_diff = mDiffs[i];
-//      auto this_diff_indeces = this_diff[0];
-//      auto this_diff_labels = this_diff[1];
+    mHistory.clear();
+    for (int i = timeIndex; i != targetIndex; i++) {
+      std::cout << "applying diff " << i << std::endl;
+      std::pair<Vec3f, Vec3f> historyPoint;
+      auto this_diff = mDiffs[i];
+      auto this_diff_indeces = this_diff[0];
+      auto this_diff_labels = this_diff[1];
 
-//      for (int change = 0; change < this_diff_indeces.size(); change++) {
-//        int changeOffset = this_diff_indeces[change].get<int>() * 4;
-//        if (changeOffset < mEmptyTemplate.size()) {
-//          Vec3f pos(mEmptyTemplate[changeOffset],
-//                    mEmptyTemplate[changeOffset + 1],
-//                    mEmptyTemplate[changeOffset + 2]);
+      for (int change = 0; change < this_diff_indeces.size(); change++) {
+        int changeOffset = this_diff_indeces[change].get<int>() * 4;
+        if (changeOffset < mEmptyTemplate.size()) {
+          Vec3f pos(mEmptyTemplate[changeOffset],
+                    mEmptyTemplate[changeOffset + 1],
+                    mEmptyTemplate[changeOffset + 2]);
 
-//          int index = -1;
-//          std::string label;
-//          for (auto &positions : mTemplatePositions) {
-//            if (positions.first !=
-//                this_diff_labels[change]) { // Look only for changes
-//              for (int curIndex = 0; curIndex < positions.second.size();
-//                   curIndex += 4) {
-//                //                  float distance = (pos -
-//                //                  Vec3f(positions.second[curIndex],
-//                //                                 positions.second[curIndex +
-//                //                                 1],
-//                // positions.second[curIndex
-//                //                                                +
-//                2])).mag(); if ((pos - Vec3f(positions.second[curIndex],
-//                                 positions.second[curIndex + 1],
-//                                 positions.second[curIndex + 2]))
-//                        .mag() < 0.001f) {
-//                  label = positions.first;
-//                  index = curIndex;
+          int index = -1;
+          std::string label;
+          for (auto &positions : mTemplatePositions) {
+            if (positions.first !=
+                this_diff_labels[change]) { // Look only for changes
+              for (int curIndex = 0; curIndex < positions.second.size();
+                   curIndex += 4) {
+                //                  float distance = (pos -
+                //                  Vec3f(positions.second[curIndex],
+                //                                 positions.second[curIndex +
+                //                                 1],
+                //                                                positions.second[curIndex
+                //                                                + 2])).mag();
+                if ((pos - Vec3f(positions.second[curIndex],
+                                 positions.second[curIndex + 1],
+                                 positions.second[curIndex + 2]))
+                        .mag() < 0.001f) {
+                  label = positions.first;
+                  index = curIndex;
 
-//                  //                      std::cout << "match " <<
-//                  //                      this_diff_indeces[change] << " " <<
-//                  //                      pos.x << "," << pos.y << std::endl;
-//                  break;
-//                }
-//              }
-//            }
-//            if (index != -1) {
-//              break;
-//            }
-//          }
-//          if (label == "") {
-//            std::cout << "ERROR: Label not found for index " << timeIndex
-//                      << " label " << this_diff_labels[change] << std::endl;
-//            return false;
-//          }
-//          if (this_diff_labels[change] == "Va") { // Remove atom
-//            historyPoint.first = pos;
-//            //                std::cout << "remove index " << index <<
-//            //                std::endl;
-//            assert(index >= 0);
-//            mTemplatePositions[this_diff_labels[change]].insert(
-//                mTemplatePositions[this_diff_labels[change]].begin(),
-//                mTemplatePositions[label].begin() + index,
-//                mTemplatePositions[label].begin() + index + 4);
-//            mTemplatePositions[label].erase(
-//                mTemplatePositions[label].begin() + index,
-//                mTemplatePositions[label].begin() + index + 4);
-//          } else { // Add Atom
-//            historyPoint.second = pos;
-//            //                std::cout << "add index " << index << std::endl;
-//            mTemplatePositions[this_diff_labels[change]].push_back(pos.x);
-//            mTemplatePositions[this_diff_labels[change]].push_back(pos.y);
-//            mTemplatePositions[this_diff_labels[change]].push_back(pos.z);
-//            mTemplatePositions[this_diff_labels[change]].push_back(0.0);
-//            mTemplatePositions[label].erase(
-//                mTemplatePositions[label].begin() + index,
-//                mTemplatePositions[label].begin() + index + 4);
-//          }
-//        } else {
-//          std::cerr << " ERROR: diff index greater than template size."
-//                    << std::endl;
-//          break;
-//        }
-//      }
-//      mHistory.push_back(historyPoint);
-//    }
-//    diffLoaded = true;
-//  } else if (timeIndex > targetIndex) {
-//  }
-//  return diffLoaded;
-//}
+                  //                      std::cout << "match " <<
+                  //                      this_diff_indeces[change] << " " <<
+                  //                      pos.x << "," << pos.y << std::endl;
+                  break;
+                }
+              }
+            }
+            if (index != -1) {
+              break;
+            }
+          }
+          if (label == "") {
+            std::cout << "ERROR: Label not found for index " << timeIndex
+                      << " label " << this_diff_labels[change] << std::endl;
+            return false;
+          }
+          if (this_diff_labels[change] == "Va") { // Remove atom
+            historyPoint.first = pos;
+            //                std::cout << "remove index " << index <<
+            //                std::endl;
+            assert(index >= 0);
+            mTemplatePositions[this_diff_labels[change]].insert(
+                mTemplatePositions[this_diff_labels[change]].begin(),
+                mTemplatePositions[label].begin() + index,
+                mTemplatePositions[label].begin() + index + 4);
+            mTemplatePositions[label].erase(
+                mTemplatePositions[label].begin() + index,
+                mTemplatePositions[label].begin() + index + 4);
+          } else { // Add Atom
+            historyPoint.second = pos;
+            //                std::cout << "add index " << index << std::endl;
+            mTemplatePositions[this_diff_labels[change]].push_back(pos.x);
+            mTemplatePositions[this_diff_labels[change]].push_back(pos.y);
+            mTemplatePositions[this_diff_labels[change]].push_back(pos.z);
+            mTemplatePositions[this_diff_labels[change]].push_back(0.0);
+            mTemplatePositions[label].erase(
+                mTemplatePositions[label].begin() + index,
+                mTemplatePositions[label].begin() + index + 4);
+          }
+        } else {
+          std::cerr << " ERROR: diff index greater than template size."
+                    << std::endl;
+          break;
+        }
+      }
+      mHistory.push_back(historyPoint);
+    }
+    diffLoaded = true;
+  } else if (timeIndex > targetIndex) {
+  }
+  return diffLoaded;
+}
 
 // void DatasetManager::loadFromPOSCAR() {}
 
 void DatasetManager::computeNewSample() {
-  if (mParameterSpace.conditionParameters.size() == 0 || !mRunProcessors) {
+  if (mConditionsParameter == "" || !mRunProcessors) {
     return;
   }
   std::unique_lock<std::mutex> lk(mDataLock);
 
   sampleComputationChain.process();
 
-  if (mParameterSpace.getDimension("time")) {
+  if (mParameterSpaces["time"]->size() > 0) {
     occupationData.doneWriting(occupationData.getWritable());
   }
 

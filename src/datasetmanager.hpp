@@ -50,9 +50,9 @@ public:
   std::string metaText;
 
   // Template and diffs for time history computation
-  std::map<std::string, std::vector<float>> mTemplatePositions;
-  std::vector<float> mEmptyTemplate;
-  json mDiffs;
+  //  std::map<std::string, std::vector<float>> mTemplatePositions;
+  //  std::vector<float> mEmptyTemplate;
+  //  json mDiffs;
 
   std::vector<std::pair<Vec3f, Vec3f>>
       mHistory; // From ->to (first, second) of pair
@@ -134,7 +134,7 @@ public:
 
   // Processing functions for atom positions
   //  bool loadDiff(int timeIndex);
-  void processTemplatePositions();
+  //  void processTemplatePositions();
   //  void loadFromPOSCAR();
   void computeNewSample();
 

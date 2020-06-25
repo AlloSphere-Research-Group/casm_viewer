@@ -474,19 +474,27 @@ void DataDisplay::previousChempot() {
 }
 
 void DataDisplay::nextChempot2() {
-  mDatasetManager.mParameterSpace.getDimension("chempotB")->stepIncrement();
+  if (mDatasetManager.mParameterSpace.getDimension("chempotB")) {
+    mDatasetManager.mParameterSpace.getDimension("chempotB")->stepIncrement();
+  }
 }
 
 void DataDisplay::previousChempot2() {
-  mDatasetManager.mParameterSpace.getDimension("chempotB")->stepDecrease();
+  if (mDatasetManager.mParameterSpace.getDimension("chempotB")) {
+    mDatasetManager.mParameterSpace.getDimension("chempotB")->stepDecrease();
+  }
 }
 
 void DataDisplay::nextTime() {
-  mDatasetManager.mParameterSpace.getDimension("time")->stepIncrement();
+  if (mDatasetManager.mParameterSpace.getDimension("time")) {
+    mDatasetManager.mParameterSpace.getDimension("time")->stepIncrement();
+  }
 }
 
 void DataDisplay::previousTime() {
-  mDatasetManager.mParameterSpace.getDimension("time")->stepDecrease();
+  if (mDatasetManager.mParameterSpace.getDimension("time")) {
+    mDatasetManager.mParameterSpace.getDimension("time")->stepDecrease();
+  }
 }
 
 void DataDisplay::nextLayer() { atomrender.nextLayer(); }

@@ -43,7 +43,36 @@ DatasetManager::DatasetManager() {
 }
 
 void DatasetManager::initializeComputation() {
+  // Configure parameter space
+  mParameterSpace.parameterNameMap = {{"temperature", "T"},
+                                      {"chempotA", "param_chem_pot(a)"},
+                                      {"chempotB", "param_chem_pot(b)"}};
 
+  mParameterSpace.registerChangeCallback(
+      [&](float value, ParameterSpaceDimension *changed) {
+        if (changed->getCurrentId() !=
+            changed->idAt(changed->getIndexForValue(
+                value))) { // Only reload if id has changed
+
+          // To have the internal value already changed for the following
+          // functions. This throws away the previous value, but we don't
+          // need it now.
+          changed->parameter().setNoCalls(value);
+          std::cout << value << " : " << changed->getCurrentId() << "..."
+                    << changed->idAt(changed->getIndexForValue(value));
+          if (mParameterSpace.getDimension("time") &&
+              mParameterSpace.conditionParameters.size() > 0) {
+            if (changed->getName() ==
+                mParameterSpace.conditionParameters[0]->getName()) {
+              loadTrajectory();
+            }
+            computeNewSample();
+          }
+          updateText();
+        }
+      });
+
+  // Configure processing nodes and computation chains
   cacheManager.registerProcessor(labelProcessor);
   cacheManager.registerProcessor(graphGenerator);
 
@@ -251,6 +280,7 @@ void DatasetManager::initializeComputation() {
     }
   });
 
+  // Configure parameter callbacks
   mPlotYAxis.registerChangeCallback([this](float value) {
     if (mPlotYAxis.get() != value) {
       graphGenerator.process();
@@ -294,15 +324,7 @@ void DatasetManager::readParameterSpace() {
       File::conformPathToOS(buildRootPath() +
                             File::conformPathToOS(mCurrentDataset.get())) +
       "cached_output/_parameter_space.nc";
-  auto newParameterSpace = tinc::ParameterSpace::loadFromNetCDF(paramSpaceFile);
-  newParameterSpace.parameterNameMap = {{"temperature", "T"},
-                                        {"chempotA", "param_chem_pot(a)"},
-                                        {"chempotB", "param_chem_pot(b)"}};
-  // TODO sort chempot spaces??
-  if (newParameterSpace.getDimension("time")) {
-    newParameterSpace.getDimension("time")->setCurrentValue(
-        newParameterSpace.getDimension("time")->at(0));
-  }
+  mParameterSpace.loadFromNetCDF(paramSpaceFile);
 
   // TODO check below to see what is needed:
   //  for (auto pspace : mParameterSpaces) {
@@ -333,34 +355,6 @@ void DatasetManager::readParameterSpace() {
 
   //    mParameterSpaces["temperature"]->parameter().set(300);
   //  }
-
-  mParameterSpace = newParameterSpace;
-
-  mParameterSpace.registerChangeCallback(
-      [&](float value, ParameterSpaceDimension *changed) {
-        changed->lock();
-        if (changed->getCurrentId() !=
-            changed->idAt(changed->getIndexForValue(
-                value))) { // Only reload if id has changed
-
-          // To have the internal value already changed for the following
-          // functions. This throws away the previous value, but we don't need
-          // it now.
-          changed->parameter().setNoCalls(value);
-          std::cout << value << " : " << changed->getCurrentId() << "..."
-                    << changed->idAt(changed->getIndexForValue(value));
-          if (mParameterSpace.getDimension("time") &&
-              mParameterSpace.conditionParameters.size() > 0) {
-            if (changed->getName() ==
-                mParameterSpace.conditionParameters[0]->getName()) {
-              loadTrajectory();
-            }
-            computeNewSample();
-          }
-          updateText();
-          changed->unlock();
-        }
-      });
 }
 
 void DatasetManager::initDataset() {
@@ -626,24 +620,25 @@ std::string DatasetManager::getSubDir() {
   }
 }
 
-void DatasetManager::processTemplatePositions() {
-  //  std::unique_lock<std::mutex> lk(mDataLock);
-  auto templatePoscarName = labelProcessor.outputFile();
+// void DatasetManager::processTemplatePositions() {
+//  //  std::unique_lock<std::mutex> lk(mDataLock);
+//  auto templatePoscarName = labelProcessor.outputFile();
 
-  // Load POSCAR data
-  if (reader.loadFile(templatePoscarName)) {
-    mTemplatePositions = reader.getAllPositions();
-  } else {
-    std::cerr << "ERROR creating template at time 0 ----------- " << std::endl;
-  }
-  // Load empty template
-  VASPReader emptyTemplateReader;
-  if (emptyTemplateReader.loadFile(
-          File::conformPathToOS(buildRootPath() + mCurrentDataset.get() +
-                                "/cached_output/template_POSCAR"))) {
-    mEmptyTemplate = emptyTemplateReader.getElementPositions("X");
-  }
-}
+//  // Load POSCAR data
+//  if (reader.loadFile(templatePoscarName)) {
+//    mTemplatePositions = reader.getAllPositions();
+//  } else {
+//    std::cerr << "ERROR creating template at time 0 ----------- " <<
+//    std::endl;
+//  }
+//  // Load empty template
+//  VASPReader emptyTemplateReader;
+//  if (emptyTemplateReader.loadFile(
+//          File::conformPathToOS(buildRootPath() + mCurrentDataset.get() +
+//                                "/cached_output/template_POSCAR"))) {
+//    mEmptyTemplate = emptyTemplateReader.getElementPositions("X");
+//  }
+//}
 
 // bool DatasetManager::loadDiff(int timeIndex) {
 //  bool diffLoaded = false;
@@ -805,6 +800,9 @@ void DatasetManager::loadTrajectory() {
     }
 
     trajectoryData.resize(numTimeSteps * numAtoms);
+    if (numTimeSteps != mParameterSpace.getDimension("time")->size()) {
+      std::cout << "ERROR: Time dimension mismatch!" << std::endl;
+    }
 
     /* Read the data. */
     if ((retval = nc_get_var(ncid, varid, trajectoryData.data()))) {

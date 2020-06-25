@@ -1682,7 +1682,8 @@ public:
           auto conditionDirs = itemListInDir(element.filepath());
           for (FilePath &condDir : conditionDirs) {
             if (File::isDirectory(condDir.filepath())) {
-              if (File::exists(condDir.filepath() + "trajectory.json.gz")) {
+              if (File::exists(File::conformDirectory(condDir.filepath()) +
+                               "trajectory.json.gz")) {
                 trajectoryProcessor.setInputFileNames({"trajectory.json.gz"});
                 trajectoryProcessor.setOutputFileNames({"trajectory.nc"});
                 trajectoryProcessor.setDirectory(condDir.filepath());

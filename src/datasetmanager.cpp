@@ -340,20 +340,6 @@ void DatasetManager::readParameterSpace() {
   //                << std::endl;
   //    }
   //    mConditionsParameter = key;
-
-  //    mParameterSpaces["temperature"] =
-  //        new ParameterSpaceDimension("temperature");
-  //    mParameterSpaces["chempotA"] = new ParameterSpaceDimension("chempotA");
-  //    mParameterSpaces["chempotB"] = new ParameterSpaceDimension("chempotB");
-
-  //    mParameterSpaces["chempotA"]->addConnectedParameterSpace(
-  //        mParameterSpaces["chempotB"]);
-  //    mParameterSpaces["chempotB"]->addConnectedParameterSpace(
-  //        mParameterSpaces["chempotA"]);
-
-  //    mParameterSpaces["time"] = new ParameterSpaceDimension("time");
-
-  //    mParameterSpaces["temperature"]->parameter().set(300);
   //  }
 }
 
@@ -369,9 +355,8 @@ void DatasetManager::initDataset() {
   cacheManager.setRunningDirectory(fullDatasetPath);
 
   readParameterSpace();
+  loadTrajectory(); // The time parameter space is loaded here.
   analyzeDataset();
-
-  loadTrajectory();
 
   std::vector<std::string> parameterSpaceNames;
   parameterSpaceNames.push_back("temperature");
@@ -800,16 +785,55 @@ void DatasetManager::loadTrajectory() {
     }
 
     trajectoryData.resize(numTimeSteps * numAtoms);
-    if (numTimeSteps != mParameterSpace.getDimension("time")->size()) {
-      std::cout << "ERROR: Time dimension mismatch!" << std::endl;
-    }
 
-    /* Read the data. */
     if ((retval = nc_get_var(ncid, varid, trajectoryData.data()))) {
       return /*false*/;
     }
 
-    /* Close the file, freeing all resources. */
+    // Read time steps -------------------------
+    if ((retval = nc_inq_varid(ncid, "steps", &varid))) {
+      return /*false*/;
+    }
+
+    if ((retval = nc_inq_var(ncid, varid, name, &xtypep, &ndimsp, dimidsp,
+                             nattsp))) {
+      return /*false*/;
+    }
+    size_t lenp;
+    if ((retval = nc_inq_dimlen(ncid, dimidsp[0], &lenp))) {
+      return /*false*/;
+    }
+    std::vector<uint32_t> timeValues;
+    timeValues.resize(lenp);
+    if ((retval = nc_get_var(ncid, varid, timeValues.data()))) {
+      return /*false*/;
+    }
+
+    // Ensure organized
+    int offset = 0;
+    for (size_t i = 1; i < timeValues.size(); i++) {
+      if (timeValues[i] < timeValues[i - 1]) {
+        timeValues[i] += offset;
+      }
+      if (timeValues[i] < timeValues[i - 1]) {
+        offset += timeValues[i - 1];
+        timeValues[i] += timeValues[i - 1];
+        ;
+        while (timeValues[i] < timeValues[i - 1]) {
+          offset += 1;
+          timeValues[i] += 1;
+        }
+      }
+    }
+
+    mParameterSpace.getDimension("time")->clear();
+    mParameterSpace.getDimension("time")->append(timeValues.data(),
+                                                 timeValues.size());
+
+    if (numTimeSteps != mParameterSpace.getDimension("time")->size()) {
+      std::cout << "ERROR: Time dimension mismatch!" << std::endl;
+    }
+
     if ((retval = nc_close(ncid))) {
       return /*false*/;
     }

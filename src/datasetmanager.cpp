@@ -803,23 +803,23 @@ void DatasetManager::loadTrajectory() {
     if ((retval = nc_inq_dimlen(ncid, dimidsp[0], &lenp))) {
       return /*false*/;
     }
-    std::vector<uint32_t> timeValues;
+    std::vector<uint> timeValues;
     timeValues.resize(lenp);
-    if ((retval = nc_get_var(ncid, varid, timeValues.data()))) {
+    if ((retval = nc_get_var_uint(ncid, varid, timeValues.data()))) {
       return /*false*/;
     }
 
-    // Ensure organized
+    //     Ensure organized
     int offset = 0;
     for (size_t i = 1; i < timeValues.size(); i++) {
       if (timeValues[i] < timeValues[i - 1]) {
         timeValues[i] += offset;
       }
       if (timeValues[i] < timeValues[i - 1]) {
-        offset += timeValues[i - 1];
-        timeValues[i] += timeValues[i - 1];
-        ;
-        while (timeValues[i] < timeValues[i - 1]) {
+        timeValues[i] -= offset;
+        offset = timeValues[i - 1];
+        timeValues[i] += offset;
+        if (timeValues[i] == timeValues[i - 1]) {
           offset += 1;
           timeValues[i] += 1;
         }
@@ -829,6 +829,7 @@ void DatasetManager::loadTrajectory() {
     mParameterSpace.getDimension("time")->clear();
     mParameterSpace.getDimension("time")->append(timeValues.data(),
                                                  timeValues.size());
+    mParameterSpace.getDimension("time")->conform();
 
     if (numTimeSteps != mParameterSpace.getDimension("time")->size()) {
       std::cout << "ERROR: Time dimension mismatch!" << std::endl;

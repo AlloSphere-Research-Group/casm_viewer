@@ -199,7 +199,6 @@ public:
         mDataBoundaries.max.z - mDataBoundaries.min.z;
     atomrender.mSliceRotationRoll.set(0);
     atomrender.mSliceRotationPitch.set(0);
-    //      std::cout << mSlicingPlaneThickness.get() <<std::endl;
   }
 
 protected:
@@ -228,9 +227,9 @@ private:
 
   EasyFBO fbo_iso;
 
-  bool mNeedsProcessing{
-      false}; // Schedule processing for next frame to ensure drawing current
-              // frame and processing current window events
+  // Schedule processing for next frame to ensure drawing current
+  // frame and processing current window events
+  bool mNeedsProcessing{false};
 
   // For KMC datasets list of atoms added/removed with respect to previous time
   // step

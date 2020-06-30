@@ -66,8 +66,8 @@ void DatasetManager::initializeComputation() {
                 mParameterSpace.conditionParameters[0]->getName()) {
               loadTrajectory();
             }
-            computeNewSample();
           }
+          computeNewSample();
           updateText();
         }
       });
@@ -75,6 +75,24 @@ void DatasetManager::initializeComputation() {
   // Configure processing nodes and computation chains
   cacheManager.registerProcessor(labelProcessor);
   cacheManager.registerProcessor(graphGenerator);
+
+  //  for (FilePath &condDir : conditionDirs) {
+  //    if (File::isDirectory(condDir.filepath())) {
+  //      trajectoryProcessor.setDirectory(condDir.filepath());
+  //      trajectoryProcessor.process();
+  //    }
+  //  }
+
+  trajectoryProcessor.prepareFunction = [&]() -> bool {
+    trajectoryProcessor.configuration[""];
+    return File::exists(
+        File::conformDirectory(trajectoryProcessor.runningDirectory()) +
+        "trajectory.json.gz");
+  };
+
+  trajectoryProcessor.setInputFileNames({"trajectory.json.gz"});
+  trajectoryProcessor.setOutputFileNames({"trajectory.nc"});
+  trajectoryProcessor.verbose();
 
   //  setenv("HDF5_DISABLE_VERSION_CHECK", "2", 1);
   //  graphGenerator.verbose();
@@ -194,14 +212,6 @@ void DatasetManager::initializeComputation() {
 
     std::string folder = File::conformDirectory(getSubDir());
     std::string root_path = buildRootPath();
-    std::string template_pos_path = File::conformPathToOS(
-        root_path + mCurrentDataset.get() + "/cached_output/template_POSCAR");
-    // Try to find "template_POSCAR"
-    if (!File::exists(template_pos_path)) {
-      std::cerr << "Failed to find template file. Call it 'template_POSCAR'."
-                << std::endl;
-      return false;
-    }
     std::string prim_path;
     if (File::exists(root_path + mCurrentDataset.get() + "/prim_labels.json")) {
       prim_path = root_path + mCurrentDataset.get() + "/prim_labels.json";
@@ -216,8 +226,8 @@ void DatasetManager::initializeComputation() {
     labelProcessor.setRunningDirectory(mLoadedDataset);
 
     labelProcessor.setOutputFileNames(
-        {DataScript::sanitizeName(template_pos_path + mCurrentDataset.get() +
-                                  "_" + folder + "_" + condition)});
+        {labelProcessor.sanitizeName("positions_" + folder + "_" + condition) +
+         ".nc"});
 
     std::string conditionSubdir =
         File::conformPathToOS(folder + "conditions." + condition + "/");
@@ -232,51 +242,15 @@ void DatasetManager::initializeComputation() {
         root_path + mCurrentDataset.get() + "/" + final_state_path);
 
     labelProcessor.configuration["template_path"] = File::conformPathToOS(
-        root_path + mCurrentDataset.get() + "/cached_output/template_POSCAR");
+        root_path + mCurrentDataset.get() + "/cached_output/template.nc");
     labelProcessor.configuration["condition"] = condition;
     return true;
   };
 
   labelProcessor.registerDoneCallback([&](bool ok) {
     if (ok) {
+      // Propagate current atom positions to load
       currentPoscarName.set(labelProcessor.outputFile());
-      int ncid, retval;
-
-      std::string filename = currentPoscarName.get() + ".nc";
-      if ((retval = nc_open(filename.c_str(), NC_NOWRITE | NC_SHARE, &ncid))) {
-        return /*false*/;
-      }
-      int varid;
-      if ((retval = nc_inq_varid(ncid, "atoms_var", &varid))) {
-        return /*false*/;
-      }
-
-      nc_type xtypep;
-      char name[32];
-      int ndimsp;
-      int dimidsp[32];
-      int *nattsp = nullptr;
-      if ((retval = nc_inq_var(ncid, varid, name, &xtypep, &ndimsp, dimidsp,
-                               nattsp))) {
-        return /*false*/;
-      }
-
-      size_t lenp;
-      if ((retval = nc_inq_dimlen(ncid, dimidsp[0], &lenp))) {
-        return /*false*/;
-      }
-
-      auto newPositionData = occupationData.getWritable();
-      newPositionData->resize(lenp);
-
-      if ((retval = nc_get_var(ncid, varid, newPositionData->data()))) {
-        return /*false*/;
-      }
-      occupationData.doneWriting(newPositionData);
-
-      if ((retval = nc_close(ncid))) {
-        return /*false*/;
-      }
     }
   });
 
@@ -292,19 +266,62 @@ void DatasetManager::initializeComputation() {
       graphGenerator.process();
     }
   });
+
+  currentPoscarName.registerChangeCallback([&](std::string newName) {
+    int ncid, retval;
+
+    if ((retval = nc_open(newName.c_str(), NC_NOWRITE | NC_SHARE, &ncid))) {
+      return /*false*/;
+    }
+    int varid;
+    if ((retval = nc_inq_varid(ncid, "occupancy", &varid))) {
+      return /*false*/;
+    }
+
+    nc_type xtypep;
+    char name[32];
+    int ndimsp;
+    int dimidsp[32];
+    int *nattsp = nullptr;
+    if ((retval = nc_inq_var(ncid, varid, name, &xtypep, &ndimsp, dimidsp,
+                             nattsp))) {
+      return /*false*/;
+    }
+
+    size_t lenp;
+    if ((retval = nc_inq_dimlen(ncid, dimidsp[0], &lenp))) {
+      return /*false*/;
+    }
+
+    auto newPositionData = occupationData.getWritable();
+    newPositionData->resize(lenp);
+
+    if ((retval = nc_get_var(ncid, varid, newPositionData->data()))) {
+      return /*false*/;
+    }
+    occupationData.doneWriting(newPositionData);
+
+    if ((retval = nc_close(ncid))) {
+      return /*false*/;
+    }
+  });
 }
 
 void DatasetManager::setPythonBinary(std::string pythonBinaryPath) {
   //      std::unique_lock<std::mutex> lk(mProcessingLock);
   graphGenerator.setCommand(pythonBinaryPath);
   labelProcessor.setCommand(pythonBinaryPath);
+  trajectoryProcessor.setCommand(pythonBinaryPath);
 }
 
 void DatasetManager::setPythonScriptPath(std::string pythonScriptPath) {
   //      std::unique_lock<std::mutex> lk(mProcessingLock);
-  graphGenerator.setScriptName(pythonScriptPath + "/graphing/plot.py");
+  graphGenerator.setScriptName(File::conformDirectory(pythonScriptPath) +
+                               "graphing/plot.py");
   labelProcessor.setScriptName(File::conformDirectory(pythonScriptPath) +
-                               "/reassign_occs/reassign_occs.py");
+                               "reassign_occs/reassign_occs.py");
+  trajectoryProcessor.setScriptName(File::conformDirectory(pythonScriptPath) +
+                                    "reassign_occs/analyze_kmc.py");
 }
 
 std::string DatasetManager::buildRootPath() {
@@ -326,7 +343,7 @@ void DatasetManager::readParameterSpace() {
       "cached_output/_parameter_space.nc";
   mParameterSpace.loadFromNetCDF(paramSpaceFile);
 
-  // TODO check below to see what is needed:
+  // TODO check below to see what is still needed:
   //  for (auto pspace : mParameterSpaces) {
   //      labelProcessor << pspace.second->parameter();
   //      graphGenerator << pspace.second->parameter();
@@ -354,25 +371,7 @@ void DatasetManager::initDataset() {
   cacheManager.setOutputDirectory(fullDatasetPath + "/cached_output");
   cacheManager.setRunningDirectory(fullDatasetPath);
 
-  readParameterSpace();
-  loadTrajectory(); // The time parameter space is loaded here.
-  analyzeDataset();
-
-  std::vector<std::string> parameterSpaceNames;
-  parameterSpaceNames.push_back("temperature");
-
-  mPlotXAxis.setElements(parameterSpaceNames);
-  mPlotYAxis.setNoCalls(0);
-
-  auto dataNames = getDataNames();
-  mPlotYAxis.setElements(dataNames);
-  std::string defaultYAxis = "<comp_n(" + mAtomOfInterest.getCurrent() + ")>";
-  ptrdiff_t pos = std::find(dataNames.begin(), dataNames.end(), defaultYAxis) -
-                  dataNames.begin();
-  if (pos < (int)dataNames.size()) {
-    mPlotYAxis.setNoCalls((int)pos);
-  }
-
+  // Read template
   std::string templatePath = fullDatasetPath + "cached_output/template.nc";
   if (File::exists(templatePath)) {
     int retval, ncid, varid;
@@ -408,6 +407,26 @@ void DatasetManager::initDataset() {
     if ((retval = nc_close(ncid))) {
       return /*false*/;
     }
+  }
+
+  // ===
+  readParameterSpace();
+  loadTrajectory(); // The time parameter space is loaded here.
+  analyzeDataset();
+
+  std::vector<std::string> parameterSpaceNames;
+  parameterSpaceNames.push_back("temperature");
+
+  mPlotXAxis.setElements(parameterSpaceNames);
+  mPlotYAxis.setNoCalls(0);
+
+  auto dataNames = getDataNames();
+  mPlotYAxis.setElements(dataNames);
+  std::string defaultYAxis = "<comp_n(" + mAtomOfInterest.getCurrent() + ")>";
+  ptrdiff_t pos = std::find(dataNames.begin(), dataNames.end(), defaultYAxis) -
+                  dataNames.begin();
+  if (pos < (int)dataNames.size()) {
+    mPlotYAxis.setNoCalls((int)pos);
   }
 
   // If there is a time space, don't use labeling script. Data is ready

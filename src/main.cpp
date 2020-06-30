@@ -156,7 +156,6 @@ public:
   DataScript parameterSpaceProcessor{"ParameterSpaceProcessor"};
   DataScript transfmatExtractor{"TransfmatExtractor"};
   DataScript templateGen{"TemplateGenerator"};
-  DataScript trajectoryProcessor{"TrajectoryPreprocessor"};
 
   ProcessorServer processorServer; // To expose processor chains on the network
 
@@ -1213,13 +1212,6 @@ public:
     templateGen.setOutputFileNames({"cached_output/template.nc"});
     templateGen.verbose(true);
 
-    trajectoryProcessor.setCommand(pythonBinary);
-    trajectoryProcessor.setScriptName(pythonScriptPath.get() +
-                                      "/reassign_occs/analyze_kmc.py");
-
-    trajectoryProcessor.setOutputFileNames({"trajectory.nc"});
-    trajectoryProcessor.verbose();
-
     templateGen.prepareFunction = [&]() {
       if (File::exists(transfmatExtractor.outputFile())) {
         auto transfmatFile = transfmatExtractor.outputFile(false);
@@ -1244,7 +1236,7 @@ public:
     initRootComputationChain << parameterSpaceProcessor << transfmatExtractor
                              << templateGen /*<< trajectoryProcessor*/;
 
-    // Only the root chain needs to be
+    // Only the root chain needs to be exposed
     processorServer << initRootComputationChain
                     << dataDisplays[0]->mDatasetManager.sampleComputationChain;
     processorServer.exposeToNetwork(parameterServer());
@@ -1555,8 +1547,6 @@ public:
       mRecomputeSpace.registerChangeCallback([&](float value) {
         if (value == 1.0f) {
           if (mAvailableDatasets.getCurrent() != "") {
-            cleanParameterSpace(
-                File::conformPathToOS(mDataRootPath.getCurrent()));
             processNewDataRoot(
                 File::conformPathToOS(mDataRootPath.getCurrent()));
           }
@@ -1625,42 +1615,6 @@ public:
     });
   }
 
-  void cleanParameterSpace(string datasetPath) {
-    // FIXME implement clearing cache for parameter spaces and computation
-    // chains in tinc
-    //    if (File::isDirectory(dataRoot + datasetPath)) {
-    //      FileList subDirs =
-    //          filterInDir(dataRoot + datasetPath, [&](FilePath const &fp) {
-    //            std::cout << fp.filepath() << std::endl;
-    //            return File::isDirectory(fp.filepath());
-    //          });
-    //      subDirs.add(FilePath(dataRoot + datasetPath));
-    //      for (auto subDir : subDirs) {
-    //        std::string cachedOutputDir = subDir.filepath() +
-    //        "/cached_output/"; if (File::exists(cachedOutputDir) &&
-    //            File::isDirectory(cachedOutputDir)) {
-    //          if (!Dir::removeRecursively(cachedOutputDir)) {
-    //            std::cerr << "ERROR cleaning cache at " << cachedOutputDir
-    //                      << std::endl;
-    //          }
-    //        }
-    //        // FIXME This should be removed once no files are generated
-    //        outside
-    //        // the cache directory
-    //        std::vector<std::string> additionalCacheFiles = {"transfmat",
-    //                                                         "template_POSCAR"};
-    //        for (auto fileToRemove : additionalCacheFiles) {
-    //          if (File::exists(subDir.filepath() + fileToRemove)) {
-    //            if (!File::remove(subDir.filepath() + fileToRemove)) {
-    //              std::cerr << "ERROR deleting cache file: "
-    //                        << subDir.filepath() + fileToRemove << std::endl;
-    //            }
-    //          }
-    //        }
-    //      }
-    //    }
-  }
-
   void processNewDataRoot(string rootPath) {
     auto filelist = itemListInDir(dataRoot + rootPath);
 
@@ -1670,7 +1624,7 @@ public:
 
         auto subdirs = itemListInDir(element.filepath());
 
-        // Determine if folder conatins CASM dataset.
+        // Determine if folder contains CASM dataset.
         bool isDataset = false;
         for (FilePath &subdir : subdirs) {
           if (subdir.file() == "results.json" || subdir.file() == "prim.json") {
@@ -1679,18 +1633,7 @@ public:
           }
         }
         if (isDataset) {
-          auto conditionDirs = itemListInDir(element.filepath());
-          for (FilePath &condDir : conditionDirs) {
-            if (File::isDirectory(condDir.filepath())) {
-              if (File::exists(File::conformDirectory(condDir.filepath()) +
-                               "trajectory.json.gz")) {
-                trajectoryProcessor.setInputFileNames({"trajectory.json.gz"});
-                trajectoryProcessor.setOutputFileNames({"trajectory.nc"});
-                trajectoryProcessor.setDirectory(condDir.filepath());
-                trajectoryProcessor.process();
-              }
-            }
-          }
+
           parameterSpaceProcessor.setRunningDirectory(element.filepath());
           parameterSpaceProcessor.setOutputDirectory(element.filepath() +
                                                      "/cached_output");

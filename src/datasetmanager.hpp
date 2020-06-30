@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "tinc/ComputationChain.hpp"
+#include "tinc/CppProcessor.hpp"
 #include "tinc/ImageDiskBuffer.hpp"
 #include "tinc/ParameterSpace.hpp"
 #include "tinc/VASPReader.hpp"
@@ -65,7 +66,9 @@ public:
 
   ComputationChain atomPositionChain{"AtomPositionComputation"};
 
+  DataScript trajectoryProcessor{"TrajectoryPreprocessor"};
   DataScript labelProcessor{"AtomLabelProcessor"};
+  CppProcessor kmcOccupation{"KMCOccupationExtractor"};
   DataScript graphGenerator{"GraphGenerator"};
 
   // TINC Buffers.

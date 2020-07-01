@@ -58,8 +58,10 @@ void DatasetManager::initializeComputation() {
           // functions. This throws away the previous value, but we don't
           // need it now.
           changed->parameter().setNoCalls(value);
-          std::cout << value << " : " << changed->getCurrentId() << "..."
-                    << changed->idAt(changed->getIndexForValue(value));
+          //          std::cout << value << " : " << changed->getCurrentId() <<
+          //          "..."
+          //                    <<
+          //                    changed->idAt(changed->getIndexForValue(value));
           if (mParameterSpace.getDimension("time") &&
               mParameterSpace.conditionParameters.size() > 0) {
             if (changed->getName() ==
@@ -72,16 +74,10 @@ void DatasetManager::initializeComputation() {
         }
       });
 
-  // Configure processing nodes and computation chains
-  cacheManager.registerProcessor(labelProcessor);
-  cacheManager.registerProcessor(graphGenerator);
+  mParameterSpace.generateRelativePath =
+      [&](std::map<std::string, size_t> indeces) { return ""; };
 
-  //  for (FilePath &condDir : conditionDirs) {
-  //    if (File::isDirectory(condDir.filepath())) {
-  //      trajectoryProcessor.setDirectory(condDir.filepath());
-  //      trajectoryProcessor.process();
-  //    }
-  //  }
+  // Configure processing nodes and computation chains
 
   trajectoryProcessor.prepareFunction = [&]() -> bool {
     trajectoryProcessor.configuration[""];
@@ -94,7 +90,6 @@ void DatasetManager::initializeComputation() {
   trajectoryProcessor.setOutputFileNames({"trajectory.nc"});
   trajectoryProcessor.verbose();
 
-  //  setenv("HDF5_DISABLE_VERSION_CHECK", "2", 1);
   //  graphGenerator.verbose();
   labelProcessor.verbose();
 
@@ -205,6 +200,7 @@ void DatasetManager::initializeComputation() {
       std::cerr << "Graph generation failed." << std::endl;
     }
   });
+  graphGenerator.ignoreFail = true;
 
   labelProcessor.prepareFunction = [&]() {
     std::string condition = std::to_string(
@@ -224,6 +220,8 @@ void DatasetManager::initializeComputation() {
     }
 
     labelProcessor.setRunningDirectory(mLoadedDataset);
+    labelProcessor.setOutputDirectory(root_path + mCurrentDataset.get() +
+                                      "/cached_output");
 
     labelProcessor.setOutputFileNames(
         {labelProcessor.sanitizeName("positions_" + folder + "_" + condition) +
@@ -246,13 +244,6 @@ void DatasetManager::initializeComputation() {
     labelProcessor.configuration["condition"] = condition;
     return true;
   };
-
-  labelProcessor.registerDoneCallback([&](bool ok) {
-    if (ok) {
-      // Propagate current atom positions to load
-      currentPoscarName.set(labelProcessor.outputFile());
-    }
-  });
 
   // Configure parameter callbacks
   mPlotYAxis.registerChangeCallback([this](float value) {
@@ -362,14 +353,11 @@ void DatasetManager::readParameterSpace() {
 
 void DatasetManager::initDataset() {
   std::unique_lock<std::mutex> lk(mDataLock);
+  mParameterSpace.stopSweep();
 
   std::string fullDatasetPath = File::conformPathToOS(
       buildRootPath() + File::conformPathToOS(mCurrentDataset.get()));
   mLoadedDataset = fullDatasetPath;
-
-  // Update processors configuration
-  cacheManager.setOutputDirectory(fullDatasetPath + "/cached_output");
-  cacheManager.setRunningDirectory(fullDatasetPath);
 
   // Read template
   std::string templatePath = fullDatasetPath + "cached_output/template.nc";
@@ -428,7 +416,8 @@ void DatasetManager::initDataset() {
   if (pos < (int)dataNames.size()) {
     mPlotYAxis.setNoCalls((int)pos);
   }
-
+  graphGenerator.setRunningDirectory(fullDatasetPath);
+  // Update processors configuration
   // If there is a time space, don't use labeling script. Data is ready
   if (mParameterSpace.getDimension("time")) {
     labelProcessor.enabled = false;
@@ -439,6 +428,7 @@ void DatasetManager::initDataset() {
   }
 
   lk.unlock();
+  //  mParameterSpace.sweepAsync(sampleComputationChain);
 }
 
 void DatasetManager::analyzeDataset() {
@@ -755,6 +745,8 @@ void DatasetManager::computeNewSample() {
 
   if (mParameterSpace.getDimension("time")) {
     occupationData.doneWriting(occupationData.getWritable());
+  } else {
+    currentPoscarName.set(labelProcessor.outputFile());
   }
 
   updateText();
@@ -845,7 +837,12 @@ void DatasetManager::loadTrajectory() {
       }
     }
 
-    mParameterSpace.getDimension("time")->clear();
+    if (mParameterSpace.getDimension("time")) {
+      mParameterSpace.getDimension("time")->clear();
+    } else {
+      mParameterSpace.registerParameter(
+          std::make_shared<ParameterSpaceDimension>("time"));
+    }
     mParameterSpace.getDimension("time")->append(timeValues.data(),
                                                  timeValues.size());
     mParameterSpace.getDimension("time")->conform();

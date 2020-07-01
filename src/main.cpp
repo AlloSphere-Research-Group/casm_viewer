@@ -21,8 +21,7 @@
 
 #include "tinc/DeferredComputation.hpp"
 #include "tinc/PeriodicTask.hpp"
-
-#include "tinc/ProcessorServer.hpp"
+#include "tinc/TincServer.hpp"
 
 #undef AL_BUILD_MPI
 
@@ -157,7 +156,7 @@ public:
   DataScript transfmatExtractor{"TransfmatExtractor"};
   DataScript templateGen{"TemplateGenerator"};
 
-  ProcessorServer processorServer; // To expose processor chains on the network
+  TincServer processorServer; // To expose processor chains on the network
 
   // --------
   std::vector<DataDisplay *> dataDisplays;

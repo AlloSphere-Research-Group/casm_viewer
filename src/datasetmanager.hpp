@@ -59,10 +59,8 @@ public:
       mHistory; // From ->to (first, second) of pair
 
   // TINC Computation
-  CacheManager cacheManager;
 
-  ComputationChain sampleComputationChain{ComputationChain::PROCESS_ASYNC,
-                                          "SampleComputation"};
+  ComputationChain sampleComputationChain{"SampleComputation"};
 
   ComputationChain atomPositionChain{"AtomPositionComputation"};
 

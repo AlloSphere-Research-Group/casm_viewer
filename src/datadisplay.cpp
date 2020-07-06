@@ -127,14 +127,20 @@ void DataDisplay::init() {
 
   atomrender.mSlicingPlaneThickness.registerChangeCallback([this](float v) {
     auto m = slicePickable.bb.max;
-    m.z = v;
+    m.z = perspectivePickable.bb.min.z + v;
     slicePickable.bb.set(slicePickable.bb.min, m);
+  });
+  
+  atomrender.mSlicingPlanePoint.registerChangeCallback([this](Vec3f v) {
+    auto p = Pose(v - slicePickable.bb.min, slicePickable.pose.get().quat());
+    slicePickable.pose.setNoCalls(p);
   });
 
   atomrender.init();
 
   slicePickable.pose.registerChangeCallback([this](Pose pose) {
-    atomrender.mSlicingPlanePoint.setNoCalls(pose.pos());
+    auto p = pose.pos() + slicePickable.bb.min;
+    atomrender.mSlicingPlanePoint.setNoCalls(p);
   });
 
   backgroundColor.setHint("showAlpha", 1.0);
@@ -411,7 +417,7 @@ void DataDisplay::draw(Graphics &g) { // Load data after drawing frame to allow
 
   std::unique_lock<std::mutex> lk(mDrawLock);
   // g.depthTesting(false);
-  gl::blendAdd();
+  g.blendAdd();
 
   g.lens().eyeSep(0.2);
 
@@ -423,13 +429,13 @@ void DataDisplay::draw(Graphics &g) { // Load data after drawing frame to allow
   // set view to identity, effectively putting coord in eye space
   // g.pushViewMatrix(Matrix4f::identity());
   g.texture();
-  gl::blendTrans();
+  g.blendTrans();
 
   if (mShowParallel.get() == 1.0f) {
     drawParallelProjection(g);
   }
 
-  gl::blending(false);
+  g.blending(false);
   if (mShowGraph.get() == 1.0f) {
     drawGraph(g);
   }
@@ -633,7 +639,7 @@ void DataDisplay::updateDisplayBuffers() {
     perspectivePickable.bb.set(Vec3f(b.min.x, b.min.y, b.min.z),
                                Vec3f(b.max.x, b.max.y, b.max.z));
     slicePickable.bb.set(Vec3f(b.min.x, b.min.y, b.min.z),
-                         Vec3f(b.max.x, b.max.y, (b.max.z - b.min.z) * 0.5f));
+                         Vec3f(b.max.x, b.max.y, (b.max.z - b.min.z) * 0.25f));
     // rh.pose.pos().set(perspectivePickable.bb.cen);
     atomrender.setDataBoundaries(b);
   }
@@ -642,7 +648,7 @@ void DataDisplay::updateDisplayBuffers() {
 void DataDisplay::drawHistory(Graphics &g) {
   g.pushMatrix();
   g.meshColor();
-  gl::polygonFill();
+  g.polygonFill();
   if (mIndividualTrajectory.get() != 0.0f) {
     g.draw(mHistoryMesh);
   }
@@ -697,14 +703,14 @@ void DataDisplay::prepareParallelProjection(Graphics &g,
 
   // save for later
   GLboolean last_enable_scissor_test = glIsEnabled(GL_SCISSOR_TEST);
-  gl::scissorTest(true);
+  g.scissorTest(true);
   int w = fbo_iso.width() / 2;
   int h = fbo_iso.height() / 2;
-  gl::polygonFill();
-  gl::depthMask(true); // for axis rendering
+  g.polygonFill();
+  g.depthMask(true); // for axis rendering
 
   g.pushViewport(0, 0, 2 * w, 2 * h);
-  gl::scissorArea(0, 0, 2 * w, 2 * h);
+  g.scissorArea(0, 0, 2 * w, 2 * h);
   g.clear(backgroundColor);
 
   g.pushViewMatrix();
@@ -716,8 +722,8 @@ void DataDisplay::prepareParallelProjection(Graphics &g,
                              atomrender.mSlicingPlaneNormal.get().normalized(),
                          {0.0f, 1.0f, 0.0f}));
 
-  gl::blending(false);
-  gl::depthTesting(true);
+  g.blending(false);
+  g.depthTesting(true);
   g.meshColor();
   g.draw(axis);
 
@@ -769,9 +775,9 @@ void DataDisplay::prepareParallelProjection(Graphics &g,
     }
   }
 
-  gl::blending(true);
-  gl::blendTrans();
-  gl::depthTesting(false);
+  g.blending(true);
+  g.blendTrans();
+  g.depthTesting(false);
   g.pushMatrix();
 
   /*if (atomPropertiesProj.size() > 0) */ {
@@ -822,7 +828,7 @@ void DataDisplay::prepareParallelProjection(Graphics &g,
   }
 
   // put back scissoring
-  gl::scissorTest(last_enable_scissor_test);
+  g.scissorTest(last_enable_scissor_test);
   g.popProjMatrix();
   g.popViewMatrix();
   g.popModelMatrix();
@@ -861,8 +867,8 @@ void DataDisplay::drawPerspective(Graphics &g) {
     // g.scale(1/(mDataBoundaries.maxy - mDataBoundaries.miny));
     // g.rotate(mPerspectiveRotY.get(), 0, 1.0, 0);
 
-    gl::blendAdd();
-    gl::depthTesting(false);
+    g.blendAdd();
+    g.depthTesting(false);
 
     g.meshColor();
 
@@ -873,8 +879,8 @@ void DataDisplay::drawPerspective(Graphics &g) {
 
     atomrender.draw(g, perspectivePickable.scale, mAtomData, mAligned4fData);
 
-    gl::depthTesting(true);
-    gl::blending(true);
+    g.depthTesting(true);
+    g.blending(true);
 
     {
       g.pushMatrix();
@@ -893,10 +899,12 @@ void DataDisplay::drawPerspective(Graphics &g) {
       //        float D =  -mSlicingPlanePoint.get().dot(mSlicingPlaneNormal);
       // Line Equation
 
-      const float x[2] = {mDataBoundaries.max.x, mDataBoundaries.min.x};
-      const float y[2] = {mDataBoundaries.max.y, mDataBoundaries.min.y};
-
-      const float z[2] = {0.0, (atomrender.mSlicingPlaneThickness)};
+      // const float x[2] = {mDataBoundaries.max.x, mDataBoundaries.min.x};
+      // const float y[2] = {mDataBoundaries.max.y, mDataBoundaries.min.y};
+      // const float z[2] = {0.0, (atomrender.mSlicingPlaneThickness)};
+      const float x[2] = {slicePickable.bb.max.x, slicePickable.bb.min.x};
+      const float y[2] = {slicePickable.bb.max.y, slicePickable.bb.min.y};
+      const float z[2] = {slicePickable.bb.max.z, slicePickable.bb.min.z};
 
       for (int k = 0; k <= 1; k++) {
         for (int j = 0; j <= 1; j++) {
@@ -918,16 +926,17 @@ void DataDisplay::drawPerspective(Graphics &g) {
                              g.eye() / 2.0f);
 
       glLineWidth(5);
-      gl::polygonLine();
+      g.polygonLine();
       g.color(0.8f, 0.8f, 1.0f, 0.9f);
       g.scale(1.0, 1.0, 1.0f + atomrender.mLayerSeparation);
-      g.translate(atomrender.mSlicingPlanePoint.get());
+      // g.translate(atomrender.mSlicingPlanePoint.get());
+      g.translate(slicePickable.pose.get().pos());
       g.rotate(atomrender.mSliceRotationPitch * 360.0f / (M_2PI), 1.0, 0.0,
                0.0);
       g.rotate(atomrender.mSliceRotationRoll * 360.0f / (M_2PI), 0.0, -1.0,
                0.0);
       g.draw(boxMesh);
-      gl::polygonFill();
+      g.polygonFill();
       glLineWidth(1);
 
       //  -----------
@@ -940,10 +949,10 @@ void DataDisplay::drawPerspective(Graphics &g) {
     { // Draw change markers
       g.pushMatrix();
 
-      gl::depthTesting(true);
-      gl::blendDisable();
+      g.depthTesting(true);
+      g.blending(false);
       //  g.scale(perspectivePickable.scale);
-      gl::polygonLine();
+      g.polygonLine();
       for (auto added : atomAdded) {
         for (auto addedPos : added.second) {
           g.pushMatrix();
@@ -966,9 +975,9 @@ void DataDisplay::drawPerspective(Graphics &g) {
     g.popMatrix(); // pickable
   }
 
-  gl::polygonFill();
-  gl::depthTesting(false);
-  gl::blendAdd();
+  g.polygonFill();
+  g.depthTesting(false);
+  g.blendAdd();
   g.pushMatrix();
   // TODO billboard this text
   perspectivePickable.updateAABB();
@@ -1028,12 +1037,12 @@ void DataDisplay::drawParallelProjection(Graphics &g) {
     Quatf rot = Quatf::getBillboardRotation(-forward, Vec3f{0.0, 1.0f, 0.0f});
     g.rotate(rot);
   }
-  gl::depthTesting(true);
+  g.depthTesting(true);
   g.draw(m);
   // Draw label
   if (mDrawLabels == 1.0f) {
-    gl::depthTesting(false);
-    gl::blendAdd();
+    g.depthTesting(false);
+    g.blendAdd();
     g.translate(-1.0, -2.0, 0.0);
     if (mSmallLabel == 1.0f) {
       g.scale(0.15f);
@@ -1066,13 +1075,13 @@ void DataDisplay::drawGraph(Graphics &g) {
     g.rotate(rot);
   }
 
-  gl::depthTesting(true);
+  g.depthTesting(true);
   g.quad(mGraphTexture, -1.2f, 0.9f, 2.4f, -1.8f);
   // Draw label
 
   if (mDrawLabels == 1.0f) {
-    gl::depthTesting(false);
-    gl::blendAdd();
+    g.depthTesting(false);
+    g.blendAdd();
     g.translate(-1.0, -1.0, 0.0);
     if (mSmallLabel == 1.0f) {
       g.scale(0.1f);

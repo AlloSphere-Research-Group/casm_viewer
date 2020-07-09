@@ -193,7 +193,7 @@ public:
   }
 
   void resetSlicing() {
-    atomrender.mSlicingPlanePoint.set({0, 0, mDataBoundaries.min.z});
+    atomrender.mSlicingPlanePoint.set(slicePickable.bb.min);
 
     atomrender.mSlicingPlaneThickness =
         mDataBoundaries.max.z - mDataBoundaries.min.z;

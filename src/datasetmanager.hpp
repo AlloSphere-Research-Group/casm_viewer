@@ -146,19 +146,20 @@ public:
     metaText += "Root: " + mRootPath.get() + "\n";
     metaText += "Dataset: " + mCurrentDataset.get() + "\n";
     metaText += "Subdir: " + getSubDir() + "\n";
-    metaText += "Condition Param: " +
-                mParameterSpace.conditionParameters[0]->getName() +
-                " condition: " +
-                std::to_string(
-                    mParameterSpace.conditionParameters[0]->getCurrentIndex()) +
-                "\n";
 
     metaText += " ----- Parameters -----\n";
-    for (auto param : mParameterSpace.parameters) {
-      metaText += param->getName() + " : " + param->getCurrentId() + "\n";
-    }
-    for (auto param : mParameterSpace.mappedParameters) {
-      metaText += param->getName() + " : " + param->getCurrentId() + "\n";
+    for (auto dimension : mParameterSpace.dimensions) {
+      if (dimension->type == ParameterSpaceDimension::MAPPED ||
+          dimension->type == ParameterSpaceDimension::INTERNAL) {
+        metaText +=
+            dimension->getName() + " : " + dimension->getCurrentId() + "\n";
+      } else {
+
+        metaText +=
+            "Condition Param: " + dimension->getName() +
+            " condition: " + std::to_string(dimension->getCurrentIndex()) +
+            "\n";
+      }
     }
     metaText += " ----- Data -----\n";
     for (auto compData : getCurrentCompositions()) {
@@ -190,18 +191,23 @@ public:
         std::string key = it.key();
         //                // Look for available comp_n atom names
         if (key.compare(0, comp_prefix.size(), comp_prefix) == 0) {
-          if (mParameterSpace.conditionParameters.size() > 0) {
-            auto index =
-                mParameterSpace.conditionParameters[0]->getCurrentIndex();
-            if (it.value().size() > index) {
-              compositions.push_back({key, it.value()[index].get<float>()});
-            } else {
-              std::cerr
-                  << "Warning: conditions parameter index out of range in "
-                     "json results"
-                  << std::endl;
+
+          for (auto ps : mParameterSpace.dimensions) {
+            if (ps->type == ParameterSpaceDimension::INDEX) {
+              if (ps->size() > 0) {
+                auto index = ps->getCurrentIndex();
+                if (it.value().size() > index) {
+                  compositions.push_back({key, it.value()[index].get<float>()});
+                } else {
+                  std::cerr
+                      << "Warning: conditions parameter index out of range in "
+                         "json results"
+                      << std::endl;
+                }
+              } else {
+              }
+              break;
             }
-          } else {
           }
         }
       }

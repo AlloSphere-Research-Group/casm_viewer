@@ -62,11 +62,15 @@ void DatasetManager::initializeComputation() {
           //          "..."
           //                    <<
           //                    changed->idAt(changed->getIndexForValue(value));
-          if (mParameterSpace.getDimension("time") &&
-              mParameterSpace.conditionParameters.size() > 0) {
-            if (changed->getName() ==
-                mParameterSpace.conditionParameters[0]->getName()) {
-              loadTrajectory();
+
+          for (auto ps : mParameterSpace.dimensions) {
+            if (ps->type == ParameterSpaceDimension::INDEX) {
+              if (mParameterSpace.getDimension("time") && ps->size() > 0) {
+                if (changed->getName() == ps->getName()) {
+                  loadTrajectory();
+                  break;
+                }
+              }
             }
           }
           computeNewSample();
@@ -203,8 +207,13 @@ void DatasetManager::initializeComputation() {
   graphGenerator.ignoreFail = true;
 
   labelProcessor.prepareFunction = [&]() {
-    std::string condition = std::to_string(
-        mParameterSpace.conditionParameters[0]->getCurrentIndex());
+    std::string condition;
+    for (auto ps : mParameterSpace.dimensions) {
+      if (ps->type == ParameterSpaceDimension::MAPPED) {
+        condition = std::to_string(ps->getCurrentIndex());
+        break;
+      }
+    }
 
     std::string folder = File::conformDirectory(getSubDir());
     std::string root_path = buildRootPath();
@@ -321,10 +330,16 @@ std::string DatasetManager::buildRootPath() {
 }
 
 std::string DatasetManager::fullConditionPath() {
-  std::string condition =
-      std::to_string(mParameterSpace.conditionParameters[0]->getCurrentIndex());
-  return File::conformPathToOS(buildRootPath() + mCurrentDataset.get() + "/" +
-                               getSubDir() + "/conditions." + condition + "/");
+
+  for (auto ps : mParameterSpace.dimensions) {
+    if (ps->type == ParameterSpaceDimension::INDEX) {
+      std::string condition = std::to_string(ps->getCurrentIndex());
+      return File::conformPathToOS(buildRootPath() + mCurrentDataset.get() +
+                                   "/" + getSubDir() + "/conditions." +
+                                   condition + "/");
+    }
+  }
+  return std::string();
 }
 
 void DatasetManager::readParameterSpace() {
@@ -332,7 +347,7 @@ void DatasetManager::readParameterSpace() {
       File::conformPathToOS(buildRootPath() +
                             File::conformPathToOS(mCurrentDataset.get())) +
       "cached_output/_parameter_space.nc";
-  mParameterSpace.loadFromNetCDF(paramSpaceFile);
+  mParameterSpace.readFromNetCDF(paramSpaceFile);
 
   // TODO check below to see what is still needed:
   //  for (auto pspace : mParameterSpaces) {
@@ -607,11 +622,12 @@ bool DatasetManager::valid() {
 std::string DatasetManager::currentDataset() { return mLoadedDataset; }
 
 std::string DatasetManager::getSubDir() {
-  if (mParameterSpace.mappedParameters.size() > 0) {
-    return mParameterSpace.mappedParameters[0]->getCurrentId();
-  } else {
-    return std::string();
+  for (auto ps : mParameterSpace.dimensions) {
+    if (ps->type == ParameterSpaceDimension::MAPPED) {
+      return ps->getCurrentId();
+    }
   }
+  return std::string();
 }
 
 // void DatasetManager::processTemplatePositions() {
@@ -736,7 +752,13 @@ std::string DatasetManager::getSubDir() {
 // void DatasetManager::loadFromPOSCAR() {}
 
 void DatasetManager::computeNewSample() {
-  if (mParameterSpace.conditionParameters.size() == 0 || !mRunProcessors) {
+  bool hasIndexDimension = false;
+  for (auto ps : mParameterSpace.dimensions) {
+    if (ps->type == ParameterSpaceDimension::MAPPED && ps->size() > 0) {
+      hasIndexDimension = true;
+    }
+  }
+  if (!hasIndexDimension || !mRunProcessors) {
     return;
   }
   std::unique_lock<std::mutex> lk(mDataLock);
@@ -814,7 +836,7 @@ void DatasetManager::loadTrajectory() {
     if ((retval = nc_inq_dimlen(ncid, dimidsp[0], &lenp))) {
       return /*false*/;
     }
-    std::vector<uint> timeValues;
+    std::vector<uint32_t> timeValues;
     timeValues.resize(lenp);
     if ((retval = nc_get_var_uint(ncid, varid, timeValues.data()))) {
       return /*false*/;
@@ -840,12 +862,14 @@ void DatasetManager::loadTrajectory() {
     if (mParameterSpace.getDimension("time")) {
       mParameterSpace.getDimension("time")->clear();
     } else {
-      mParameterSpace.registerParameter(
+      mParameterSpace.registerDimension(
           std::make_shared<ParameterSpaceDimension>("time"));
     }
     mParameterSpace.getDimension("time")->append(timeValues.data(),
                                                  timeValues.size());
     mParameterSpace.getDimension("time")->conform();
+    mParameterSpace.getDimension("time")->type =
+        ParameterSpaceDimension::INTERNAL;
 
     if (numTimeSteps != mParameterSpace.getDimension("time")->size()) {
       std::cout << "ERROR: Time dimension mismatch!" << std::endl;

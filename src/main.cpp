@@ -778,26 +778,9 @@ public:
         showLoadingWindow = !showLoadingWindow;
       }
       if (mAutoAdvance == 0.0) {
-        for (auto &paramSpaces :
-             this->dataDisplays[vdvBundle.currentBundle()]
-                 ->mDatasetManager.mParameterSpace.conditionParameters) {
-          ParameterMeta *param = &paramSpaces->parameter();
-          if (param->getHint("hide") != 1.0f) {
-            ParameterGUI::drawParameterMeta(param);
-          }
-        }
-        for (auto &paramSpaces :
-             this->dataDisplays[vdvBundle.currentBundle()]
-                 ->mDatasetManager.mParameterSpace.mappedParameters) {
-          ParameterMeta *param = &paramSpaces->parameter();
-          if (param->getHint("hide") != 1.0f) {
-            ParameterGUI::drawParameterMeta(param);
-          }
-        }
-        for (auto &paramSpaces :
-             this->dataDisplays[vdvBundle.currentBundle()]
-                 ->mDatasetManager.mParameterSpace.parameters) {
-          ParameterMeta *param = &paramSpaces->parameter();
+        for (auto dim : this->dataDisplays[vdvBundle.currentBundle()]
+                            ->mDatasetManager.mParameterSpace.dimensions) {
+          ParameterMeta *param = &dim->parameter();
           if (param->getHint("hide") != 1.0f) {
             ParameterGUI::drawParameterMeta(param);
           }
@@ -1637,8 +1620,8 @@ public:
           parameterSpaceProcessor.setOutputDirectory(element.filepath() +
                                                      "/cached_output");
 
-          transfmatExtractor.setDirectory(element.filepath());
-          templateGen.setDirectory(element.filepath());
+          transfmatExtractor.setDataDirectory(element.filepath());
+          templateGen.setDataDirectory(element.filepath());
 
           initRootComputationChain.process();
 

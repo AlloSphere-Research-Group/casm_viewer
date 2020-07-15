@@ -32,7 +32,7 @@
 #include "al/ui/al_PickableRotateHandle.hpp"
 
 #include "tinc/AtomRenderer.hpp"
-#include "tinc/DataScript.hpp"
+#include "tinc/ScriptProcessor.hpp"
 #include "tinc/VASPReader.hpp"
 
 #include "datasetmanager.hpp"

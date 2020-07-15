@@ -152,9 +152,9 @@ public:
   // TINC computation chains
   ComputationChain initRootComputationChain{"PrepareDataset"};
 
-  DataScript parameterSpaceProcessor{"ParameterSpaceProcessor"};
-  DataScript transfmatExtractor{"TransfmatExtractor"};
-  DataScript templateGen{"TemplateGenerator"};
+  ScriptProcessor parameterSpaceProcessor{"ParameterSpaceProcessor"};
+  ScriptProcessor transfmatExtractor{"TransfmatExtractor"};
+  ScriptProcessor templateGen{"TemplateGenerator"};
 
   TincServer processorServer; // To expose processor chains on the network
 

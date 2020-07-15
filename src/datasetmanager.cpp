@@ -78,7 +78,7 @@ void DatasetManager::initializeComputation() {
         }
       });
 
-  mParameterSpace.generateRelativePath =
+  mParameterSpace.generateRelativeRunPath =
       [&](std::map<std::string, size_t> indeces) { return ""; };
 
   // Configure processing nodes and computation chains
@@ -186,7 +186,7 @@ void DatasetManager::initializeComputation() {
                                         "/cached_output");
       graphGenerator.setOutputFileNames({datasetId + "_" + highlightValue +
                                          "_" +
-                                         DataScript::sanitizeName(subDir) +
+                                         ScriptProcessor::sanitizeName(subDir) +
                                          "_" + yLabelSanitized + "_graph.png"});
     } else {
       return false;

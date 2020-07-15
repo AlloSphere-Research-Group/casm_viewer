@@ -64,10 +64,10 @@ public:
 
   ComputationChain atomPositionChain{"AtomPositionComputation"};
 
-  DataScript trajectoryProcessor{"TrajectoryPreprocessor"};
-  DataScript labelProcessor{"AtomLabelProcessor"};
+  ScriptProcessor trajectoryProcessor{"TrajectoryPreprocessor"};
+  ScriptProcessor labelProcessor{"AtomLabelProcessor"};
   CppProcessor kmcOccupation{"KMCOccupationExtractor"};
-  DataScript graphGenerator{"GraphGenerator"};
+  ScriptProcessor graphGenerator{"GraphGenerator"};
 
   // TINC Buffers.
   //  BufferManager<std::map<std::string, std::vector<float>>>

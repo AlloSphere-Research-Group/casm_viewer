@@ -1,10 +1,7 @@
 #!/bin/bash
 
-#allolib/run.sh vdv_group/simulator.cpp
-
 CMAKE_BINARY=cmake
 GENERATOR="Unix Makefiles"
-
 
 mkdir -p build
 cd build
@@ -29,7 +26,7 @@ if [ -d "C:\Program Files (x86)\Microsoft Visual Studio\2017" ]; then
     "${CMAKE_BINARY}" -G "${GENERATOR}" -DCMAKE_GENERATOR_INSTANCE="C:\Program Files (x86)\Microsoft Visual Studio\2017\Community" -DCMAKE_BUILD_TYPE="Release" ../..
 else
     set -x
-    "${CMAKE_BINARY}" -G "${GENERATOR}" -DCMAKE_BUILD_TYPE="Release" ../..
+    "${CMAKE_BINARY}" -G "${GENERATOR}" -DTINC_BUILD_EXAMPLES=ON -DCMAKE_BUILD_TYPE="Release" ../..
 
 
 fi

@@ -92,7 +92,7 @@ public:
 
   // These are internal parameters to propagate data and triggering
   // computation, not for direct user control
-  ParameterString mRootPath{"rootPath"};
+  //  ParameterString mRootPath{"rootPath"};
   ParameterString mCurrentDataset{"currentDataset"}; // sub directory
   ParameterString currentGraphName{"currentGraphName", "internal", ""};
   ParameterString currentPoscarName{"currentPoscarName", "internal", ""};
@@ -139,36 +139,7 @@ public:
   //  void loadFromPOSCAR();
   void computeNewSample();
 
-  void updateText() {
-    // Meta data texts
-    metaText = "Global Root: " + mGlobalRoot + "\n";
-
-    metaText += "Root: " + mRootPath.get() + "\n";
-    metaText += "Dataset: " + mCurrentDataset.get() + "\n";
-    metaText += "Subdir: " + getSubDir() + "\n";
-
-    metaText += " ----- Parameters -----\n";
-    for (auto dimension : mParameterSpace.dimensions) {
-      if (dimension->type == ParameterSpaceDimension::MAPPED ||
-          dimension->type == ParameterSpaceDimension::INTERNAL) {
-        metaText +=
-            dimension->getName() + " : " + dimension->getCurrentId() + "\n";
-      } else {
-
-        metaText +=
-            "Condition Param: " + dimension->getName() +
-            " condition: " + std::to_string(dimension->getCurrentIndex()) +
-            "\n";
-      }
-    }
-    metaText += " ----- Data -----\n";
-    for (auto compData : getCurrentCompositions()) {
-      metaText +=
-          compData.first + " = " + std::to_string(compData.second) + "\n";
-    }
-    metaText += "Current POSCAR :";
-    metaText += labelProcessor.outputFile();
-  }
+  void updateText();
 
   std::vector<std::string> getDataNames();
 

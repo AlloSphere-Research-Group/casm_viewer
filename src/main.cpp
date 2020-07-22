@@ -25,16 +25,9 @@
 
 #undef AL_BUILD_MPI
 
-//#define STB_IMAGE_WRITE_STATIC
-//#define STB_IMAGE_WRITE_IMPLEMENTATION
-//#include "module/img/stb_image_write.h"
-
 #include "datadisplay.hpp"
 
 #ifdef AL_WINDOWS
-#include <direct.h> // for _chdir() and _getcwd()
-#define chdir _chdir
-#define getcwd _getcwd
 #undef rank
 #undef CIEXYZ
 #endif
@@ -112,13 +105,13 @@ public:
   Trigger mSaveGraphics{"SaveScreenshot"};
   Trigger mAlignTemperatures{"AlignTemperatures"};
   Trigger mAlignChempots{"AlignChempots"};
-  Trigger mRecomputeSpace{"RecomputeSpace"};
+  //  Trigger mRecomputeSpace{"RecomputeSpace"};
 
   ParameterBool mAutoAdvance{"autoAdvance"};
   Parameter mAutoAdvanceFreq{"autoAdvanceFreq", "", 2, "", 0.25, 3.0};
 
   // File selection
-  ParameterMenu mDataRootPath{"datarootPath"};
+  //  ParameterMenu mDataRootPath{"datarootPath"};
   ParameterMenu mAvailableDatasets{"availableDatasets"};
 
   // 3D nav parameters
@@ -143,6 +136,7 @@ public:
   std::unique_ptr<PresetServer> presetServer;
 
   BundleGUIManager vdvBundle;
+  FileSelector *mDatasetSelector;
 
   std::mutex mScreenshotMutex;
   std::string mScreenshotPrefix;
@@ -197,7 +191,9 @@ public:
       dataDisplays.push_back(new DataDisplay);
       dataDisplays.back()->init();
       dataDisplays.back()->mDatasetManager.mRunProcessors = rank == 0;
-      dataDisplays.back()->mDatasetManager.mGlobalRoot = dataRoot;
+      if (dataRoot.size() > 0) {
+        dataDisplays.back()->mDatasetManager.mGlobalRoot = dataRoot;
+      }
     }
 
     // Initialize default view.
@@ -226,7 +222,7 @@ public:
     setupParameterServer();
     readElementsIni();
 
-    mDataRootPath.set(0); // Force loading available
+    //    mDataRootPath.set(0); // Force loading available
 
     if (isPrimary()) {
       for (auto *display : dataDisplays) {
@@ -286,6 +282,10 @@ public:
         cursorHide(false);
       }
     }
+
+    std::string cwdString = File::currentPath();
+    mDatasetSelector = new FileSelector(dataRoot, File::isDirectory);
+    mDatasetSelector->start(cwdString);
 
 #ifdef AL_EXT_OPENVR
     openVRDomain = OpenVRDomain::enableVR(this);
@@ -388,7 +388,8 @@ public:
       std::string newTitle = "CASM Viewer ";
       for (auto *display : dataDisplays) {
         if (display->mVisible == 1.0f) {
-          newTitle += display->mDatasetManager.mRootPath.get() + " : ";
+          //          newTitle += display->mDatasetManager.mRootPath.get() + " :
+          //          ";
           newTitle += display->mDatasetManager.mCurrentDataset;
           newTitle += " -- ";
         }
@@ -709,159 +710,146 @@ public:
 #endif
 
   // Display parameters GUI. This is called by drawGUI()
-  void drawDisplayGui(bool &showLoadingWindow) {
-    if (showLoadingWindow) {
-      //        if (parameterSpaceProcessor.runningAsync()) {
-      //          ImGui::Text("Recalculating parameter space");
-      //        }
-
+  void drawDisplayGui() {
+    if (mDatasetSelector) {
       if (dataRoot.size() > 0) {
         ImGui::Text("Data root: %s", dataRoot.c_str());
       }
-      ParameterGUI::draw(&mDataRootPath);
-      ImGui::SameLine();
-      if (ImGui::Button("Remove")) {
-        auto elements = mDataRootPath.getElements();
-        int index = mDataRootPath.get();
-        if (index >= 0) {
-          elements.erase(elements.begin() + index);
-        }
-        mDataRootPath.setElements(elements);
-        auto current = mDataRootPath.get();
-        if (current < 0 && elements.size() > 0) {
-          mDataRootPath.set(current); // Force calling callbacks.
-        }
-      }
       ParameterGUI::draw(&mAvailableDatasets);
-      ImGui::SameLine();
-      ParameterGUI::draw(&mRecomputeSpace);
-
-      if (ImGui::Button("Load")) {
-        std::string conformedPath =
-            File::conformDirectory(mDataRootPath.getCurrent());
-        std::replace(conformedPath.begin(), conformedPath.end(), '\\', '/');
-        int currentBundle = vdvBundle.currentBundle();
-        assert(currentBundle < dataDisplays.size());
-        if (currentBundle >= 0) {
-          dataDisplays[currentBundle]->mDatasetManager.mRootPath.set(
-              conformedPath);
-          dataDisplays[currentBundle]->mDatasetManager.mCurrentDataset.set(
-              mAvailableDatasets.getCurrent());
-        }
-        showLoadingWindow = false;
-      }
-      ImGui::SameLine();
-      if (ImGui::Button("Cancel##Loading")) {
-        showLoadingWindow = false;
-      }
-      ImGui::Separator();
+      //      ParameterGUI::draw(&mRecomputeSpace);
+      //      ImGui::Separator();
       // Directory GUI
-      static FileSelector *selector;
-      if (ImGui::Button("Add directory")) {
-        selector = new FileSelector(dataRoot, File::isDirectory);
-        selector->start(mDataRootPath.getCurrent());
-      }
-      if (selector && selector->drawFileSelector()) {
-        auto elements = mDataRootPath.getElements();
+      if (mDatasetSelector->isActive()) {
+        if (mDatasetSelector->drawFileSelector()) { // Selection has been made
+          auto selectedItems = mDatasetSelector->getSelection();
+          if (selectedItems.count() > 0) {
+            auto selection = selectedItems[0];
+            std::string conformedPath = File::conformDirectory(dataRoot);
+            std::replace(conformedPath.begin(), conformedPath.end(), '\\', '/');
+            int currentBundle = vdvBundle.currentBundle();
+            assert(currentBundle < dataDisplays.size());
 
-        auto selectedItems = selector->getSelection();
-        if (selectedItems.count() > 0) {
-          auto selection = selectedItems[0];
-          elements.push_back(selection.filepath());
+            parameterSpaceProcessor.setRunningDirectory(selection.filepath());
+            parameterSpaceProcessor.setOutputDirectory(selection.filepath() +
+                                                       "/cached_output");
+
+            transfmatExtractor.setDataDirectory(selection.filepath());
+            templateGen.setDataDirectory(selection.filepath());
+
+            initRootComputationChain.process();
+
+            if (currentBundle >= 0) {
+              //              dataDisplays[currentBundle]->mDatasetManager.mRootPath.set(
+              //                  conformedPath);
+              dataDisplays[currentBundle]->mDatasetManager.mCurrentDataset.set(
+                  selection.filepath());
+            }
+          }
+          delete mDatasetSelector;
+          mDatasetSelector = nullptr;
         }
-        delete selector;
-        selector = nullptr;
-        mDataRootPath.setElements(elements);
+      } else {
+        delete mDatasetSelector;
+        mDatasetSelector = nullptr;
       }
+
     } else {
       if (ImGui::Button("Load dataset")) {
-        showLoadingWindow = !showLoadingWindow;
+        mDatasetSelector = new FileSelector(dataRoot, File::isDirectory);
+        mDatasetSelector->start();
       }
-      if (mAutoAdvance == 0.0) {
-        for (auto dim : this->dataDisplays[vdvBundle.currentBundle()]
-                            ->mDatasetManager.mParameterSpace.dimensions) {
-          ParameterMeta *param = &dim->parameter();
-          if (param->getHint("hide") != 1.0f) {
-            ParameterGUI::drawParameterMeta(param);
+      if (this->dataDisplays[vdvBundle.currentBundle()]
+              ->mDatasetManager.mParameterSpace.dimensions.size() > 0) {
+        if (mAutoAdvance == 0.0) {
+          for (auto dim : this->dataDisplays[vdvBundle.currentBundle()]
+                              ->mDatasetManager.mParameterSpace.dimensions) {
+            ParameterMeta *param = &dim->parameter();
+            if (param->getHint("hide") != 1.0f) {
+              ParameterGUI::drawParameterMeta(param);
+            }
           }
         }
-      }
-      ParameterGUI::drawParameterMeta(
-          &this->dataDisplays[vdvBundle.currentBundle()]
-               ->atomrender.mAtomMarkerSize);
-      if (this->dataDisplays[vdvBundle.currentBundle()]
-              ->mDatasetManager.mParameterSpace.getDimension("time")) {
-        ParameterGUI::drawParameterMeta(&mAutoAdvance);
-        if (mAutoAdvance == 0.0) {
-          ParameterGUI::drawParameterMeta(&mAutoAdvanceFreq);
-        } else {
-          std::string text = "Incrementing time with freq: " +
-                             std::to_string(mAutoAdvanceFreq);
-          ImGui::Text("%s", text.c_str());
+        ParameterGUI::drawParameterMeta(
+            &this->dataDisplays[vdvBundle.currentBundle()]
+                 ->atomrender.mAtomMarkerSize);
+        if (this->dataDisplays[vdvBundle.currentBundle()]
+                ->mDatasetManager.mParameterSpace.getDimension("time")) {
+          ParameterGUI::drawParameterMeta(&mAutoAdvance);
+          if (mAutoAdvance == 0.0) {
+            ParameterGUI::drawParameterMeta(&mAutoAdvanceFreq);
+          } else {
+            std::string text = "Incrementing time with freq: " +
+                               std::to_string(mAutoAdvanceFreq);
+            ImGui::Text("%s", text.c_str());
+          }
+          ParameterGUI::drawParameterMeta(
+              &this->dataDisplays[vdvBundle.currentBundle()]
+                   ->mCumulativeTrajectory);
+          ParameterGUI::drawParameterMeta(
+              &this->dataDisplays[vdvBundle.currentBundle()]
+                   ->mIndividualTrajectory);
         }
-        ParameterGUI::drawParameterMeta(
-            &this->dataDisplays[vdvBundle.currentBundle()]
-                 ->mCumulativeTrajectory);
-        ParameterGUI::drawParameterMeta(
-            &this->dataDisplays[vdvBundle.currentBundle()]
-                 ->mIndividualTrajectory);
-      }
-      //          ImGui::Separator();
-      //          ParameterGUI::drawParameterMeta(&mViewMenu);
-      ParameterGUI::drawTrigger(&mSaveGraphics);
-      ImGui::SameLine();
-      ParameterGUI::drawParameterMeta(&ResetSlicing);
-
-      ImGui::Text("%s", dataDisplays[vdvBundle.currentBundle()]
-                            ->mDatasetManager.metaText.c_str());
-
-      if (ImGui::CollapsingHeader("Slicing")) {
-        ImGui::Indent(20.0);
-        ParameterGUI::drawParameterMeta(&dataDisplays[vdvBundle.currentBundle()]
-                                             ->atomrender.mSlicingPlaneNormal);
-        ParameterGUI::drawParameterMeta(
-            &dataDisplays[vdvBundle.currentBundle()]
-                 ->atomrender.mSlicingPlaneThickness);
-
-        ParameterGUI::drawParameterMeta(&mJumpLayerNeg);
+        //          ImGui::Separator();
+        //          ParameterGUI::drawParameterMeta(&mViewMenu);
+        ParameterGUI::drawTrigger(&mSaveGraphics);
         ImGui::SameLine();
-        ParameterGUI::drawParameterMeta(&mJumpLayerPos);
-        //        ParameterGUI::drawParameterMeta(&CalculateSlicing);
-        ImGui::SameLine();
-        ParameterGUI::drawParameterMeta(&pitchAngleStep);
-        ParameterGUI::drawParameterMeta(&stepPitchAngleNeg);
-        ImGui::SameLine();
-        ParameterGUI::drawParameterMeta(&stepPitchAnglePos);
+        ParameterGUI::drawParameterMeta(&ResetSlicing);
 
-        ParameterGUI::drawParameterMeta(&rollAngleStep);
-        ParameterGUI::drawParameterMeta(&stepRollAngleNeg);
-        ImGui::SameLine();
-        ParameterGUI::drawParameterMeta(&stepRollAnglePos);
-        ImGui::Unindent(20.0);
-      }
+        ImGui::Text("%s", dataDisplays[vdvBundle.currentBundle()]
+                              ->mDatasetManager.metaText.c_str());
 
-      if (ImGui::CollapsingHeader("Graphics")) {
-        ImGui::Indent(20.0);
-        ParameterGUI::drawParameterMeta(&backgroundColor);
-        ParameterGUI::drawParameterMeta(&sliceBackground);
-        ParameterGUI::drawParameterMeta(&font);
-        ImGui::SameLine();
-        ParameterGUI::drawParameterMeta(&fontSize);
-        ImGui::Unindent(20.0);
-      }
+        if (ImGui::CollapsingHeader("Slicing")) {
+          ImGui::Indent(20.0);
+          ParameterGUI::drawParameterMeta(
+              &dataDisplays[vdvBundle.currentBundle()]
+                   ->atomrender.mSlicingPlaneNormal);
+          ParameterGUI::drawParameterMeta(
+              &dataDisplays[vdvBundle.currentBundle()]
+                   ->atomrender.mSlicingPlaneThickness);
 
-      if (ImGui::CollapsingHeader("Elements")) {
-        ImGui::Indent(20.0);
-        ParameterGUI::drawBundle(
-            &dataDisplays[vdvBundle.currentBundle()]->graphPickable.bundle);
-        ParameterGUI::drawBundle(
-            &dataDisplays[vdvBundle.currentBundle()]->parallelPickable.bundle);
-        ParameterGUI::drawBundle(&dataDisplays[vdvBundle.currentBundle()]
-                                      ->perspectivePickable.bundle);
-        //          ParameterGUI::drawBundle(&dataDisplays[vdvBundle.currentBundle()]->slicePickable.bundle);
-        //          // Slice pickable is already exposed enough above
+          ParameterGUI::drawParameterMeta(&mJumpLayerNeg);
+          ImGui::SameLine();
+          ParameterGUI::drawParameterMeta(&mJumpLayerPos);
+          //        ParameterGUI::drawParameterMeta(&CalculateSlicing);
+          ImGui::SameLine();
+          ParameterGUI::drawParameterMeta(&pitchAngleStep);
+          ParameterGUI::drawParameterMeta(&stepPitchAngleNeg);
+          ImGui::SameLine();
+          ParameterGUI::drawParameterMeta(&stepPitchAnglePos);
 
-        ImGui::Unindent(20.0);
+          ParameterGUI::drawParameterMeta(&rollAngleStep);
+          ParameterGUI::drawParameterMeta(&stepRollAngleNeg);
+          ImGui::SameLine();
+          ParameterGUI::drawParameterMeta(&stepRollAnglePos);
+          ImGui::Unindent(20.0);
+        }
+
+        if (ImGui::CollapsingHeader("Graphics")) {
+          ImGui::Indent(20.0);
+          ParameterGUI::drawParameterMeta(&backgroundColor);
+          ParameterGUI::drawParameterMeta(&sliceBackground);
+          ParameterGUI::drawParameterMeta(&font);
+          ImGui::SameLine();
+          ParameterGUI::drawParameterMeta(&fontSize);
+          ImGui::Unindent(20.0);
+        }
+
+        if (ImGui::CollapsingHeader("Elements")) {
+          ImGui::Indent(20.0);
+          ParameterGUI::drawBundle(
+              &dataDisplays[vdvBundle.currentBundle()]->graphPickable.bundle);
+          ParameterGUI::drawBundle(&dataDisplays[vdvBundle.currentBundle()]
+                                        ->parallelPickable.bundle);
+          ParameterGUI::drawBundle(&dataDisplays[vdvBundle.currentBundle()]
+                                        ->perspectivePickable.bundle);
+          //          ParameterGUI::drawBundle(&dataDisplays[vdvBundle.currentBundle()]->slicePickable.bundle);
+          //          // Slice pickable is already exposed enough above
+
+          ImGui::Unindent(20.0);
+        }
+      } else {
+
+        ImGui::Text("No dataset loaded");
       }
     }
   }
@@ -881,59 +869,33 @@ public:
     ImGui::PushID("CASMViewer");
     ParameterGUI::beginPanel("CASM Viewer");
 
-    ImGui::Columns(4, nullptr, true);
     static int selected = 0;
-    if (ImGui::Selectable("Display", selected == 0)) {
-      selected = 0;
-    }
-    ImGui::NextColumn();
-    if (ImGui::Selectable("Data", selected == 1)) {
-      selected = 1;
-    }
-    ImGui::NextColumn();
-    if (ImGui::Selectable("Presets", selected == 2)) {
-      selected = 2;
-    }
-    ImGui::NextColumn();
-    if (ImGui::Selectable("Help", selected == 3)) {
-      selected = 3;
-    }
-    ImGui::NextColumn();
-    ImGui::Columns(1);
-    ImGui::Separator();
-
-    static bool showLoadingWindow = true;
-    if (selected == 0) {
-      drawDisplayGui(showLoadingWindow);
-    } else if (selected == 1) {
-      if (showLoadingWindow) {
-        ParameterGUI::drawParameterMeta(&mDataRootPath);
-        ParameterGUI::drawParameterMeta(&mAvailableDatasets);
-
-        if (ImGui::Button("Load")) {
-          std::string conformedPath =
-              File::conformDirectory(mDataRootPath.getCurrent());
-          std::replace(conformedPath.begin(), conformedPath.end(), '\\', '/');
-          int currentBundle = vdvBundle.currentBundle();
-          assert(currentBundle < dataDisplays.size());
-          if (currentBundle >= 0) {
-            dataDisplays[currentBundle]->mDatasetManager.mRootPath.set(
-                conformedPath);
-            dataDisplays[currentBundle]->mDatasetManager.mCurrentDataset.set(
-                mAvailableDatasets.getCurrent());
-          }
-          showLoadingWindow = false;
-        }
-        if (ImGui::Button("Cancel")) {
-          showLoadingWindow = false;
-        }
-      } else {
-        if (ImGui::Button("Load dataset")) {
-          showLoadingWindow = !showLoadingWindow;
-        }
-        ParameterGUI::drawBundleManager(&vdvBundle);
+    if (!mDatasetSelector) {
+      ImGui::Columns(4, nullptr, true);
+      if (ImGui::Selectable("Display", selected == 0)) {
+        selected = 0;
       }
+      ImGui::NextColumn();
+      if (ImGui::Selectable("Data", selected == 1)) {
+        selected = 1;
+      }
+      ImGui::NextColumn();
+      if (ImGui::Selectable("Presets", selected == 2)) {
+        selected = 2;
+      }
+      ImGui::NextColumn();
+      if (ImGui::Selectable("Help", selected == 3)) {
+        selected = 3;
+      }
+      ImGui::NextColumn();
+      ImGui::Columns(1);
+      ImGui::Separator();
+    }
 
+    if (selected == 0) {
+      drawDisplayGui();
+    } else if (selected == 1) {
+      ParameterGUI::drawBundleManager(&vdvBundle);
     } else if (selected == 2) {
       ParameterGUI::drawPresetHandler(presetHandler.get(), 10, 4);
       ParameterGUI::draw(&recallPositions);
@@ -1025,11 +987,10 @@ public:
 
     std::string scriptPath = configLoader2.gets("pythonScriptsPath");
     if (scriptPath.substr(0, 2) == "..") { // Make path absolute
-      char cwd[256];
-      getcwd(cwd, sizeof(cwd));
-      std::string cwdString = cwd;
+      std::string cwdString = File::currentPath();
       scriptPath =
-          cwdString.substr(0, cwdString.rfind('/')) + scriptPath.substr(2);
+          cwdString.substr(0, cwdString.rfind('/', cwdString.size() - 2)) +
+          scriptPath.substr(2);
     }
     vector<double> bgRGB = configLoader2.getVector<double>("background");
     if (bgRGB.size() == 4) {
@@ -1054,7 +1015,6 @@ public:
     //      //        processParameterSpace(path);
     //      //      }
     //    }
-    mDataRootPath.setElements(paths);
 
     std::string fontPath = configLoader2.gets("font");
     std::replace(fontPath.begin(), fontPath.end(), '\\', '/');
@@ -1063,8 +1023,7 @@ public:
   }
 
   void storeConfiguration() {
-    char currentDir[512];
-    getcwd(currentDir, 512);
+    auto currentDir = File::currentPath();
     std::cout << "Writing config in " << currentDir << std::endl;
 
     TomlLoader configLoader2;
@@ -1088,8 +1047,8 @@ public:
     configLoader2.set<std::string>("font", font.get());
     configLoader2.set<float>("fontSize", fontSize.get());
 
-    configLoader2.setVector<std::string>("dataRootPaths",
-                                         mDataRootPath.getElements());
+    //    configLoader2.setVector<std::string>("dataRootPaths",
+    //                                         mDataRootPath.getElements());
 
     configLoader2.writeFile();
   }
@@ -1179,20 +1138,21 @@ public:
     parameterSpaceProcessor.setScriptName(pythonScriptPath.get() +
                                           "/analyze_parameter_space.py");
 
-    parameterSpaceProcessor.setOutputFileNames({"_parameter_space.nc"});
-    parameterSpaceProcessor.verbose(true);
+    parameterSpaceProcessor.setOutputFileNames({"parameter_space.nc"});
 
     transfmatExtractor.setCommand(pythonBinary);
     transfmatExtractor.setScriptName(pythonScriptPath.get() +
                                      "/extract_transfmat.py");
     transfmatExtractor.setOutputFileNames({"transfmat"});
-    transfmatExtractor.verbose(true);
 
     templateGen.setCommand(pythonBinary);
     templateGen.setScriptName(pythonScriptPath.get() +
                               "/reassign_occs/template_creator.py");
     templateGen.setOutputFileNames({"cached_output/template.nc"});
-    templateGen.verbose(true);
+
+    //    parameterSpaceProcessor.verbose(true);
+    //    transfmatExtractor.verbose(true);
+    //    templateGen.verbose(true);
 
     templateGen.prepareFunction = [&]() {
       if (File::exists(transfmatExtractor.outputFile())) {
@@ -1526,14 +1486,14 @@ public:
         }
       });
 
-      mRecomputeSpace.registerChangeCallback([&](float value) {
-        if (value == 1.0f) {
-          if (mAvailableDatasets.getCurrent() != "") {
-            processNewDataRoot(
-                File::conformPathToOS(mDataRootPath.getCurrent()));
-          }
-        }
-      });
+      //      mRecomputeSpace.registerChangeCallback([&](float value) {
+      //        if (value == 1.0f) {
+      //          if (mAvailableDatasets.getCurrent() != "") {
+      //            processNewDataRoot(
+      //                File::conformPathToOS(mDataRootPath.getCurrent()));
+      //          }
+      //        }
+      //      });
     }
 
     resetView.registerChangeCallback(
@@ -1590,11 +1550,11 @@ public:
       }
     });
 
-    mDataRootPath.registerChangeCallback([&](int index) {
-      if (this->rank == 0) {
-        processNewDataRoot(mDataRootPath.getElements()[index]);
-      }
-    });
+    //    mDataRootPath.registerChangeCallback([&](int index) {
+    //      if (this->rank == 0) {
+    //        processNewDataRoot(mDataRootPath.getElements()[index]);
+    //      }
+    //    });
   }
 
   void processNewDataRoot(string rootPath) {
@@ -1607,6 +1567,9 @@ public:
         auto subdirs = itemListInDir(element.filepath());
 
         // Determine if folder contains CASM dataset.
+        // FIXME there should be no need to test this, only check if parameter
+        // space is presen. the python scripts should be the ones to determine a
+        // dataset
         bool isDataset = false;
         for (FilePath &subdir : subdirs) {
           if (subdir.file() == "results.json" || subdir.file() == "prim.json") {
@@ -1641,8 +1604,8 @@ public:
 
     std::vector<std::string> directories;
     for (auto entry : entries) {
-      auto spaceFileFullPath = File::conformPathToOS(entry.filepath()) +
-                               "/cached_output/_parameter_space.nc";
+      auto spaceFileFullPath =
+          File::conformPathToOS(entry.filepath()) + "/parameter_space.nc";
       if (File::exists(spaceFileFullPath)) {
         directories.push_back(entry.file());
       }

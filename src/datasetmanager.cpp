@@ -58,18 +58,12 @@ void DatasetManager::initializeComputation() {
           // functions. This throws away the previous value, but we don't
           // need it now.
           changed->parameter().setNoCalls(value);
-          //          std::cout << value << " : " << changed->getCurrentId() <<
-          //          "..."
-          //                    <<
-          //                    changed->idAt(changed->getIndexForValue(value));
 
           for (auto ps : mParameterSpace.dimensions) {
             if (ps->type == ParameterSpaceDimension::INDEX) {
               if (mParameterSpace.getDimension("time") && ps->size() > 0) {
-                if (changed->getName() == ps->getName()) {
-                  loadTrajectory();
-                  break;
-                }
+                loadTrajectory();
+                break;
               }
             }
           }
@@ -79,7 +73,21 @@ void DatasetManager::initializeComputation() {
       });
 
   mParameterSpace.generateRelativeRunPath =
-      [&](std::map<std::string, size_t> indeces) { return ""; };
+      [&](std::map<std::string, size_t> indeces) {
+        std::string relPath;
+        if (mParameterSpace.getDimension("dir")) {
+          relPath = mParameterSpace.getDimension("dir")->idAt(indeces["dir"]);
+        }
+        std::string condition;
+        for (auto dim : mParameterSpace.dimensions) {
+          if (dim->type == ParameterSpaceDimension::INDEX) {
+            condition = std::to_string(indeces[dim->getName()]);
+          }
+        }
+        relPath += "condition." + condition + "/";
+
+        return relPath;
+      };
 
   // Configure processing nodes and computation chains
 
@@ -209,32 +217,47 @@ void DatasetManager::initializeComputation() {
   labelProcessor.prepareFunction = [&]() {
     std::string condition;
     for (auto ps : mParameterSpace.dimensions) {
-      if (ps->type == ParameterSpaceDimension::MAPPED) {
+      if (ps->type == ParameterSpaceDimension::MAPPED &&
+          ps->getName() != "dir") {
         condition = std::to_string(ps->getCurrentIndex());
         break;
       }
     }
+    if (condition.size() == 0) {
+      condition = "0";
+    }
 
     std::string folder = File::conformDirectory(getSubDir());
     std::string root_path = buildRootPath();
+
+    std::vector<std::string> possiblePrims = {
+        root_path + mCurrentDataset.get() + "/prim_labels.json",
+        root_path + mCurrentDataset.get() + "/prim.json",
+        root_path + "prim_labels.json",
+        root_path + "prim.json",
+        root_path + mCurrentDataset.get() + "/../prim_labels.json",
+        root_path + mCurrentDataset.get() + "/../prim.json"};
     std::string prim_path;
-    if (File::exists(root_path + mCurrentDataset.get() + "/prim_labels.json")) {
-      prim_path = root_path + mCurrentDataset.get() + "/prim_labels.json";
-    } else if (File::exists(root_path + mCurrentDataset.get() + "/prim.json")) {
-      prim_path = root_path + mCurrentDataset.get() + "/prim.json";
-    } else if (File::exists(root_path + "prim_labels.json")) {
-      prim_path = root_path + "prim_labels.json";
-    } else if (File::exists(root_path + "prim.json")) {
-      prim_path = root_path + "prim.json";
+    for (auto possiblePrim : possiblePrims) {
+
+      if (File::exists(possiblePrim)) {
+        prim_path = possiblePrim;
+        break;
+      }
     }
 
     labelProcessor.setRunningDirectory(mLoadedDataset);
     labelProcessor.setOutputDirectory(root_path + mCurrentDataset.get() +
                                       "/cached_output");
 
+    std::string positionOutputName = "positions_" + folder + "_" + condition;
+    if (mParameterSpace.getDimension("time")) {
+      positionOutputName +=
+          "_" + std::to_string(
+                    mParameterSpace.getDimension("time")->getCurrentIndex());
+    }
     labelProcessor.setOutputFileNames(
-        {labelProcessor.sanitizeName("positions_" + folder + "_" + condition) +
-         ".nc"});
+        {labelProcessor.sanitizeName(positionOutputName) + ".nc"});
 
     std::string conditionSubdir =
         File::conformPathToOS(folder + "conditions." + condition + "/");
@@ -325,8 +348,7 @@ void DatasetManager::setPythonScriptPath(std::string pythonScriptPath) {
 }
 
 std::string DatasetManager::buildRootPath() {
-  return File::conformPathToOS(File::conformPathToOS(mGlobalRoot) +
-                               File::conformPathToOS(mRootPath));
+  return File::conformPathToOS(File::conformPathToOS(mGlobalRoot));
 }
 
 std::string DatasetManager::fullConditionPath() {
@@ -343,27 +365,9 @@ std::string DatasetManager::fullConditionPath() {
 }
 
 void DatasetManager::readParameterSpace() {
-  std::string paramSpaceFile =
-      File::conformPathToOS(buildRootPath() +
-                            File::conformPathToOS(mCurrentDataset.get())) +
-      "cached_output/_parameter_space.nc";
-  mParameterSpace.readFromNetCDF(paramSpaceFile);
-
-  // TODO check below to see what is still needed:
-  //  for (auto pspace : mParameterSpaces) {
-  //      labelProcessor << pspace.second->parameter();
-  //      graphGenerator << pspace.second->parameter();
-  //  }
-  //  {
-  //    // set to current value to clamp if needed
-  //    mParameterSpaces[key]->parameter().setNoCalls(
-  //        mParameterSpaces[key]->parameter().get());
-  //    if (mConditionsParameter.size() > 0) {
-  //      std::cerr << "ERROR conditions parameter already set. Overwriting."
-  //                << std::endl;
-  //    }
-  //    mConditionsParameter = key;
-  //  }
+  mParameterSpace.rootPath = File::conformPathToOS(
+      buildRootPath() + File::conformPathToOS(mCurrentDataset.get()));
+  mParameterSpace.readFromNetCDF("parameter_space.nc");
 }
 
 void DatasetManager::initDataset() {
@@ -686,8 +690,7 @@ std::string DatasetManager::getSubDir() {
 //                //                                 + 1],
 //                // positions.second[curIndex
 //                //                                                +
-//                //                                                2])).mag();
-//                if ((pos - Vec3f(positions.second[curIndex],
+//                // 2])).mag(); if ((pos - Vec3f(positions.second[curIndex],
 //                                 positions.second[curIndex + 1],
 //                                 positions.second[curIndex + 2]))
 //                        .mag() < 0.001f) {
@@ -752,15 +755,15 @@ std::string DatasetManager::getSubDir() {
 // void DatasetManager::loadFromPOSCAR() {}
 
 void DatasetManager::computeNewSample() {
-  bool hasIndexDimension = false;
-  for (auto ps : mParameterSpace.dimensions) {
-    if (ps->type == ParameterSpaceDimension::MAPPED && ps->size() > 0) {
-      hasIndexDimension = true;
-    }
-  }
-  if (!hasIndexDimension || !mRunProcessors) {
-    return;
-  }
+  //  bool hasIndexDimension = false;
+  //  for (auto ps : mParameterSpace.dimensions) {
+  //    if (ps->type == ParameterSpaceDimension::MAPPED && ps->size() > 0) {
+  //      hasIndexDimension = true;
+  //    }
+  //  }
+  //  if (!hasIndexDimension || !mRunProcessors) {
+  //    return;
+  //  }
   std::unique_lock<std::mutex> lk(mDataLock);
 
   sampleComputationChain.process();
@@ -772,6 +775,34 @@ void DatasetManager::computeNewSample() {
   }
 
   updateText();
+}
+
+void DatasetManager::updateText() {
+  // Meta data texts
+  metaText = "Global Root: " + mGlobalRoot + "\n";
+
+  //    metaText += "Root: " + mRootPath.get() + "\n";
+  metaText += "Dataset: " + mCurrentDataset.get() + "\n";
+  metaText += "Subdir: " + getSubDir() + "\n";
+
+  metaText += " ----- Parameters -----\n";
+  for (auto dimension : mParameterSpace.dimensions) {
+    if (dimension->type == ParameterSpaceDimension::MAPPED ||
+        dimension->type == ParameterSpaceDimension::INTERNAL) {
+      metaText +=
+          dimension->getName() + " : " + dimension->getCurrentId() + "\n";
+    } else {
+
+      metaText += "Condition Param: " + dimension->getName() + " condition: " +
+                  std::to_string(dimension->getCurrentIndex()) + "\n";
+    }
+  }
+  metaText += " ----- Data -----\n";
+  for (auto compData : getCurrentCompositions()) {
+    metaText += compData.first + " = " + std::to_string(compData.second) + "\n";
+  }
+  metaText += "Current POSCAR :";
+  metaText += labelProcessor.outputFile();
 }
 
 std::vector<std::string> DatasetManager::getDataNames() {
@@ -791,7 +822,7 @@ void DatasetManager::loadTrajectory() {
              nc_open(trajectoryFile.c_str(), NC_NOWRITE | NC_SHARE, &ncid))) {
       return /*false*/;
     }
-    if ((retval = nc_inq_varid(ncid, "occupation", &varid))) {
+    if ((retval = nc_inq_varid(ncid, "occupation_dofs", &varid))) {
       return /*false*/;
     }
 
@@ -903,7 +934,9 @@ std::string DatasetManager::findJsonFile(std::string datasetId,
                                          std::string fileName) {
   std::vector<std::string> paths = {
       buildRootPath() + "/" + datasetId + "/" + subDir + "/",
-      buildRootPath() + "/" + datasetId + "/", buildRootPath() + "/"};
+      buildRootPath() + "/" + datasetId + "/", buildRootPath() + "/",
+      buildRootPath() + "/" + datasetId,
+      buildRootPath() + "/" + datasetId + "/../"};
 
   for (auto possiblePath : paths) {
     //            std::cout << "Looking for " << fileName << " in " <<

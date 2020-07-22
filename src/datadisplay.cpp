@@ -130,7 +130,7 @@ void DataDisplay::init() {
     m.z = perspectivePickable.bb.min.z + v;
     slicePickable.bb.set(slicePickable.bb.min, m);
   });
-  
+
   atomrender.mSlicingPlanePoint.registerChangeCallback([this](Vec3f v) {
     auto p = Pose(v - slicePickable.bb.min, slicePickable.pose.get().quat());
     slicePickable.pose.setNoCalls(p);
@@ -197,7 +197,7 @@ void DataDisplay::init() {
 
   mLabelFont.alignLeft();
 
-  bundle << mDatasetManager.mRootPath;
+  //  bundle << mDatasetManager.mRootPath;
   bundle << mDatasetManager.mCurrentDataset;
   bundle << mVisible;
   //  bundle << mDatasetManager.mParameterSpaces["temperature"]->parameter();

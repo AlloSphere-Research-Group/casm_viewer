@@ -20,6 +20,7 @@
 #include "al_ext/openvr/al_OpenVRDomain.hpp"
 
 #include "tinc/DeferredComputation.hpp"
+#include "tinc/GUI.hpp"
 #include "tinc/PeriodicTask.hpp"
 #include "tinc/TincServer.hpp"
 
@@ -112,7 +113,7 @@ public:
 
   // File selection
   //  ParameterMenu mDataRootPath{"datarootPath"};
-  ParameterMenu mAvailableDatasets{"availableDatasets"};
+  ParameterMenu mRecentDatasets{"recentDatasets"};
 
   // 3D nav parameters
   Parameter Z{"Z", "", 2.8f, "", -15, 15};
@@ -709,13 +710,37 @@ public:
   }
 #endif
 
-  // Display parameters GUI. This is called by drawGUI()
-  void drawDisplayGui() {
+  void loadDataset(std::string path, size_t index) {
+
+    assert(index < dataDisplays.size());
+    parameterSpaceProcessor.setRunningDirectory(path);
+    parameterSpaceProcessor.setOutputDirectory(path + "/cached_output");
+
+    transfmatExtractor.setDataDirectory(path);
+    templateGen.setDataDirectory(path);
+
+    initRootComputationChain.process();
+
+    if (index >= 0) {
+      dataDisplays[index]->mDatasetManager.mCurrentDataset.set(path);
+      auto previousDatasets = mRecentDatasets.getElements();
+      if (std::find(previousDatasets.begin(), previousDatasets.end(), path) ==
+          previousDatasets.end()) {
+        previousDatasets.insert(previousDatasets.begin(), path);
+        mRecentDatasets.setElements(previousDatasets);
+        mRecentDatasets.setNoCalls(0);
+      }
+
+    } else {
+    }
+  }
+
+  void prepareDisplayGui() {
     if (mDatasetSelector) {
       if (dataRoot.size() > 0) {
         ImGui::Text("Data root: %s", dataRoot.c_str());
       }
-      ParameterGUI::draw(&mAvailableDatasets);
+      ParameterGUI::draw(&mRecentDatasets);
       //      ParameterGUI::draw(&mRecomputeSpace);
       //      ImGui::Separator();
       // Directory GUI
@@ -724,26 +749,7 @@ public:
           auto selectedItems = mDatasetSelector->getSelection();
           if (selectedItems.count() > 0) {
             auto selection = selectedItems[0];
-            std::string conformedPath = File::conformDirectory(dataRoot);
-            std::replace(conformedPath.begin(), conformedPath.end(), '\\', '/');
-            int currentBundle = vdvBundle.currentBundle();
-            assert(currentBundle < dataDisplays.size());
-
-            parameterSpaceProcessor.setRunningDirectory(selection.filepath());
-            parameterSpaceProcessor.setOutputDirectory(selection.filepath() +
-                                                       "/cached_output");
-
-            transfmatExtractor.setDataDirectory(selection.filepath());
-            templateGen.setDataDirectory(selection.filepath());
-
-            initRootComputationChain.process();
-
-            if (currentBundle >= 0) {
-              //              dataDisplays[currentBundle]->mDatasetManager.mRootPath.set(
-              //                  conformedPath);
-              dataDisplays[currentBundle]->mDatasetManager.mCurrentDataset.set(
-                  selection.filepath());
-            }
+            loadDataset(selection.filepath(), vdvBundle.currentBundle());
           }
           delete mDatasetSelector;
           mDatasetSelector = nullptr;
@@ -761,13 +767,11 @@ public:
       if (this->dataDisplays[vdvBundle.currentBundle()]
               ->mDatasetManager.mParameterSpace.dimensions.size() > 0) {
         if (mAutoAdvance == 0.0) {
-          for (auto dim : this->dataDisplays[vdvBundle.currentBundle()]
-                              ->mDatasetManager.mParameterSpace.dimensions) {
-            ParameterMeta *param = &dim->parameter();
-            if (param->getHint("hide") != 1.0f) {
-              ParameterGUI::drawParameterMeta(param);
-            }
-          }
+          ImGui::Separator();
+          ImGui::Text("Parameter Space");
+          gui::drawControls(this->dataDisplays[vdvBundle.currentBundle()]
+                                ->mDatasetManager.mParameterSpace);
+          ImGui::Separator();
         }
         ParameterGUI::drawParameterMeta(
             &this->dataDisplays[vdvBundle.currentBundle()]
@@ -893,7 +897,7 @@ public:
     }
 
     if (selected == 0) {
-      drawDisplayGui();
+      prepareDisplayGui();
     } else if (selected == 1) {
       ParameterGUI::drawBundleManager(&vdvBundle);
     } else if (selected == 2) {
@@ -1008,8 +1012,8 @@ public:
     pythonScriptPath.set(scriptPath);
     pythonBinary.set(pythonBinaryConf);
 
-    std::string joinedRootPaths;
-    auto paths = configLoader2.getVector<string>("dataRootPaths");
+    auto paths = configLoader2.getVector<string>("openedDatasets");
+    mRecentDatasets.setElements(paths);
     //    if (rank == 0) {
     //      //      for (auto path: paths) {
     //      //        processParameterSpace(path);
@@ -1047,8 +1051,8 @@ public:
     configLoader2.set<std::string>("font", font.get());
     configLoader2.set<float>("fontSize", fontSize.get());
 
-    //    configLoader2.setVector<std::string>("dataRootPaths",
-    //                                         mDataRootPath.getElements());
+    configLoader2.setVector<std::string>("openedDatasets",
+                                         mRecentDatasets.getElements());
 
     configLoader2.writeFile();
   }
@@ -1376,33 +1380,6 @@ public:
         mScreenshotMutex.unlock();
       });
 
-      //      mAlignTemperatures.registerChangeCallback([this](float value) {
-      //        float baseTemp = dataDisplays[0]
-      //                             ->mDatasetManager.mParameterSpaces["temperature"]
-      //                             ->parameter();
-      //        for (size_t i = 1; i < dataDisplays.size(); i++) {
-      //          dataDisplays[i]
-      //              ->mDatasetManager.mParameterSpaces["temperature"]
-      //              ->parameter() = baseTemp;
-      //          for (size_t j = 0; j < i; j++) {
-      //            dataDisplays[i]->nextTemp();
-      //          }
-      //        }
-      //      });
-
-      //      mAlignChempots.registerChangeCallback([this](float value) {
-      //        float baseChempot = dataDisplays[0]
-      //                                ->mDatasetManager.mParameterSpaces["chempotA"]
-      //                                ->parameter();
-      //        for (size_t i = 1; i < dataDisplays.size(); i++) {
-      //          dataDisplays[i]
-      //              ->mDatasetManager.mParameterSpaces["chempotA"]
-      //              ->parameter() = baseChempot;
-      //          for (size_t j = 0; j < i; j++) {
-      //            dataDisplays[i]->nextChempot();
-      //          }
-      //        }
-      //      });
       stepPitchAngleNeg.registerChangeCallback([this](float value) {
         if (vdvBundle.bundleGlobal()) {
           float newAngle = dataDisplays[vdvBundle.currentBundle()]
@@ -1485,15 +1462,13 @@ public:
           });
         }
       });
-
-      //      mRecomputeSpace.registerChangeCallback([&](float value) {
-      //        if (value == 1.0f) {
-      //          if (mAvailableDatasets.getCurrent() != "") {
-      //            processNewDataRoot(
-      //                File::conformPathToOS(mDataRootPath.getCurrent()));
-      //          }
-      //        }
-      //      });
+      mRecentDatasets.registerChangeCallback([&](int index) {
+        loadDataset(mRecentDatasets.getElements()[index],
+                    vdvBundle.currentBundle());
+        if (mDatasetSelector) {
+          mDatasetSelector->cancel();
+        }
+      });
     }
 
     resetView.registerChangeCallback(
@@ -1549,12 +1524,6 @@ public:
         }
       }
     });
-
-    //    mDataRootPath.registerChangeCallback([&](int index) {
-    //      if (this->rank == 0) {
-    //        processNewDataRoot(mDataRootPath.getElements()[index]);
-    //      }
-    //    });
   }
 
   void processNewDataRoot(string rootPath) {
@@ -1610,7 +1579,7 @@ public:
         directories.push_back(entry.file());
       }
     }
-    mAvailableDatasets.setElements(directories);
+    mRecentDatasets.setElements(directories);
   }
 
   Rayd rayTransformAllosphere(Rayd r) {

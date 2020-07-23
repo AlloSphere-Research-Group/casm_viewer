@@ -126,6 +126,9 @@ void DatasetManager::initializeComputation() {
                        resultsJson[yLabel].end());
         } catch (std::exception &) {
         }
+      } else {
+        std::cerr << "Results file not suitable for graphing" << std::endl;
+        return false;
       }
       std::string highlightValue = "0.0";
 
@@ -139,6 +142,9 @@ void DatasetManager::initializeComputation() {
               int(mParameterSpace.getDimension(xLabel)->getCurrentValue()));
         } catch (std::exception &) {
         }
+      } else {
+        std::cerr << "Results file not suitable for graphing" << std::endl;
+        return false;
       }
 
       std::string fullDatasetPath = File::conformPathToOS(
@@ -785,18 +791,19 @@ void DatasetManager::updateText() {
   metaText += "Dataset: " + mCurrentDataset.get() + "\n";
   metaText += "Subdir: " + getSubDir() + "\n";
 
-  metaText += " ----- Parameters -----\n";
-  for (auto dimension : mParameterSpace.dimensions) {
-    if (dimension->type == ParameterSpaceDimension::MAPPED ||
-        dimension->type == ParameterSpaceDimension::INTERNAL) {
-      metaText +=
-          dimension->getName() + " : " + dimension->getCurrentId() + "\n";
-    } else {
+  //  metaText += " ----- Parameters -----\n";
+  //  for (auto dimension : mParameterSpace.dimensions) {
+  //    if (dimension->type == ParameterSpaceDimension::MAPPED ||
+  //        dimension->type == ParameterSpaceDimension::INTERNAL) {
+  //      metaText +=
+  //          dimension->getName() + " : " + dimension->getCurrentId() + "\n";
+  //    } else {
 
-      metaText += "Condition Param: " + dimension->getName() + " condition: " +
-                  std::to_string(dimension->getCurrentIndex()) + "\n";
-    }
-  }
+  //      metaText += "Condition Param: " + dimension->getName() + " condition:
+  //      " +
+  //                  std::to_string(dimension->getCurrentIndex()) + "\n";
+  //    }
+  //  }
   metaText += " ----- Data -----\n";
   for (auto compData : getCurrentCompositions()) {
     metaText += compData.first + " = " + std::to_string(compData.second) + "\n";

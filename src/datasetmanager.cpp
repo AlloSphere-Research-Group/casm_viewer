@@ -72,22 +72,22 @@ void DatasetManager::initializeComputation() {
         }
       });
 
-  mParameterSpace.generateRelativeRunPath =
-      [&](std::map<std::string, size_t> indeces) {
-        std::string relPath;
-        if (mParameterSpace.getDimension("dir")) {
-          relPath = mParameterSpace.getDimension("dir")->idAt(indeces["dir"]);
-        }
-        std::string condition;
-        for (auto dim : mParameterSpace.dimensions) {
-          if (dim->type == ParameterSpaceDimension::INDEX) {
-            condition = std::to_string(indeces[dim->getName()]);
-          }
-        }
-        relPath += "condition." + condition + "/";
+  mParameterSpace.generateRelativeRunPath = [&](
+      std::map<std::string, size_t> indeces) {
+    std::string relPath;
+    if (mParameterSpace.getDimension("dir")) {
+      relPath = mParameterSpace.getDimension("dir")->idAt(indeces["dir"]);
+    }
+    std::string condition;
+    for (auto dim : mParameterSpace.dimensions) {
+      if (dim->type == ParameterSpaceDimension::INDEX) {
+        condition = std::to_string(indeces[dim->getName()]);
+      }
+    }
+    relPath += "condition." + condition + "/";
 
-        return relPath;
-      };
+    return relPath;
+  };
 
   // Configure processing nodes and computation chains
 
@@ -354,7 +354,7 @@ void DatasetManager::setPythonScriptPath(std::string pythonScriptPath) {
 }
 
 std::string DatasetManager::buildRootPath() {
-  return File::conformPathToOS(File::conformPathToOS(mGlobalRoot));
+  return File::conformPathToOS(mGlobalRoot);
 }
 
 std::string DatasetManager::fullConditionPath() {
@@ -511,8 +511,9 @@ void DatasetManager::analyzeDataset() {
                       labelString) == mShowAtomElements.end()) {
           mShowAtomElements.push_back(labelString);
         }
-        if (isVacancy && std::find(mVacancyAtoms.begin(), mVacancyAtoms.end(),
-                                   labelString) == mVacancyAtoms.end()) {
+        if (isVacancy &&
+            std::find(mVacancyAtoms.begin(), mVacancyAtoms.end(),
+                      labelString) == mVacancyAtoms.end()) {
           mVacancyAtoms.push_back(labelString);
         }
       }
@@ -592,30 +593,30 @@ void DatasetManager::preProcessDataset() {
               numProcessesSlice, MPI::UNSIGNED, 0, MPI_COMM_WORLD);
   std::cout << processor_name << "--" << numProcessesSlice
             << " node indeces start:::  " << nodeIndeces[0] << std::endl;
-  //        if (mParameterSpaces["chempot2"]->size() > 0) {
-  //            for (auto chempot: mParameterSpaces["chempotA"]->values()) {
-  //                for (auto chempot2:
-  //                mParameterSpaces["chempotB"]->values())
-  //                {
-  //                    for (int i = 0; i < numProcessesSlice; i++) {
-  //                        int temp = nodeIndeces[i];
-  //                        labelProcessor.setParams(chempot.first,
-  //                        chempot2.first, std::to_string(temp),
-  //                        datasetId); labelProcessor.processAsync();
-  //                    }
-  //                }
-  //            }
-  //            labelProcessor.waitForAsyncDone();
-  //        } else {
-  //            for (auto chempot: mParameterSpaces["chempotA"]->values()) {
-  //                for (int i = 0; i < numProcessesSlice; i++) {
-  //                    int temp = nodeIndeces[i];
-  //                    labelProcessor.setParams(chempot.first, "",
-  //                    std::to_string(temp), datasetId);
-  //                    labelProcessor.processAsync();
-  //                }
-  //            }
-  //        }
+//        if (mParameterSpaces["chempot2"]->size() > 0) {
+//            for (auto chempot: mParameterSpaces["chempotA"]->values()) {
+//                for (auto chempot2:
+//                mParameterSpaces["chempotB"]->values())
+//                {
+//                    for (int i = 0; i < numProcessesSlice; i++) {
+//                        int temp = nodeIndeces[i];
+//                        labelProcessor.setParams(chempot.first,
+//                        chempot2.first, std::to_string(temp),
+//                        datasetId); labelProcessor.processAsync();
+//                    }
+//                }
+//            }
+//            labelProcessor.waitForAsyncDone();
+//        } else {
+//            for (auto chempot: mParameterSpaces["chempotA"]->values()) {
+//                for (int i = 0; i < numProcessesSlice; i++) {
+//                    int temp = nodeIndeces[i];
+//                    labelProcessor.setParams(chempot.first, "",
+//                    std::to_string(temp), datasetId);
+//                    labelProcessor.processAsync();
+//                }
+//            }
+//        }
 #else
   std::cout << "preProcessDataset() not supported without MPI" << std::endl;
 
@@ -903,8 +904,8 @@ void DatasetManager::loadTrajectory() {
       mParameterSpace.registerDimension(
           std::make_shared<ParameterSpaceDimension>("time"));
     }
-    mParameterSpace.getDimension("time")->append(timeValues.data(),
-                                                 timeValues.size());
+    mParameterSpace.getDimension("time")
+        ->append(timeValues.data(), timeValues.size());
     mParameterSpace.getDimension("time")->conform();
     mParameterSpace.getDimension("time")->type =
         ParameterSpaceDimension::INTERNAL;
@@ -939,11 +940,15 @@ DatasetManager::SpeciesLabelMap DatasetManager::getAvailableSpecies() {
 std::string DatasetManager::findJsonFile(std::string datasetId,
                                          std::string subDir,
                                          std::string fileName) {
+
+  std::string prefix = buildRootPath();
+  if (prefix.size() > 0) {
+    prefix += AL_FILE_DELIMITER_STR;
+  }
+
   std::vector<std::string> paths = {
-      buildRootPath() + "/" + datasetId + "/" + subDir + "/",
-      buildRootPath() + "/" + datasetId + "/", buildRootPath() + "/",
-      buildRootPath() + "/" + datasetId,
-      buildRootPath() + "/" + datasetId + "/../"};
+      prefix + datasetId + "/" + subDir + "/", prefix + datasetId + "/",
+      buildRootPath() + "/", prefix + datasetId, prefix + datasetId + "/../"};
 
   for (auto possiblePath : paths) {
     //            std::cout << "Looking for " << fileName << " in " <<

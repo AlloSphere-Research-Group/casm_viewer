@@ -711,7 +711,6 @@ public:
 #endif
 
   void loadDataset(std::string path, size_t index) {
-
     assert(index < dataDisplays.size());
     parameterSpaceProcessor.setRunningDirectory(path);
     parameterSpaceProcessor.setOutputDirectory(path + "/cached_output");
@@ -852,7 +851,6 @@ public:
           ImGui::Unindent(20.0);
         }
       } else {
-
         ImGui::Text("No dataset loaded");
       }
     }
@@ -957,7 +955,7 @@ public:
   void loadConfiguration() {
     TomlLoader configLoader2;
     configLoader2.setFile("casm_viewer.toml");
-    // Set default values
+// Set default values
 #ifdef AL_WINDOWS
     configLoader2.setDefaultValue("font",
                                   string("C:\\Windows\\Fonts\\arial.ttf"));
@@ -1193,25 +1191,24 @@ public:
       display->mVisible.registerChangeCallback(
           [this](float) { updateTitle(); });
 
-      display->mDatasetManager.mCurrentDataset.registerChangeCallback(
-          [this, display](std::string value) {
-            std::string path = value;
-            path = path.substr(path.rfind('/') + 1);
-            if (display->mDatasetManager.buildRootPath().size() > 0) {
-              presetHandler->setRootPath(
-                  display->mDatasetManager.buildRootPath());
-              if (!File::exists(display->mDatasetManager.buildRootPath() +
-                                value + "/presets")) {
-                Dir::make(value + "/presets");
-              }
-              presetHandler->setSubDirectory(value + "/presets");
-              presetHandler->setCurrentPresetMap("default", true);
-              std::cout << "Preset Handler sub dir set to " << value
-                        << std::endl;
-            }
-            updateTitle();
-            mAutoAdvance = 0.0; // Turn off auto advance
-          });
+      display->mDatasetManager.mCurrentDataset.registerChangeCallback([this,
+                                                                       display](
+          std::string value) {
+        std::string path = value;
+        path = path.substr(path.rfind('/') + 1);
+        if (display->mDatasetManager.buildRootPath().size() > 0) {
+          presetHandler->setRootPath(display->mDatasetManager.buildRootPath());
+          if (!File::exists(display->mDatasetManager.buildRootPath() + value +
+                            "/presets")) {
+            Dir::make(value + "/presets");
+          }
+          presetHandler->setSubDirectory(value + "/presets");
+          presetHandler->setCurrentPresetMap("default", true);
+          std::cout << "Preset Handler sub dir set to " << value << std::endl;
+        }
+        updateTitle();
+        mAutoAdvance = 0.0; // Turn off auto advance
+      });
     }
 
     // Triggers and callbacks that should only be handled by rank 0
@@ -1547,7 +1544,6 @@ public:
           }
         }
         if (isDataset) {
-
           parameterSpaceProcessor.setRunningDirectory(element.filepath());
           parameterSpaceProcessor.setOutputDirectory(element.filepath() +
                                                      "/cached_output");

@@ -907,7 +907,7 @@ public:
     } else if (selected == 3) {
       static std::string helpText;
       if (helpText.size() == 0) {
-        std::ifstream t("help.txt");
+        std::ifstream t("../readme.md");
         if (t.is_open()) {
           t.seekg(0, std::ios::end);
           helpText.reserve(t.tellg());
@@ -921,6 +921,14 @@ public:
         }
       }
 
+      char buf[512];
+      auto currentPython = pythonBinary.get();
+      strncpy(buf, currentPython.c_str(), currentPython.size() + 1);
+      if (ImGui::InputText("Python executable", buf, 512)) {
+        pythonBinary.set(std::string(buf));
+      }
+
+      ImGui::Separator();
       ImGui::Text("%s", helpText.c_str());
     }
 
@@ -1051,6 +1059,8 @@ public:
 
     configLoader2.setVector<std::string>("openedDatasets",
                                          mRecentDatasets.getElements());
+
+    configLoader2.set<std::string>("pythonBinary", pythonBinary.get());
 
     configLoader2.writeFile();
   }

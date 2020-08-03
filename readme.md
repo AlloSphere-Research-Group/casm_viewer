@@ -1,11 +1,3 @@
-# Configuration
-The *vdv.toml* file is used to configure the application. There you can set system specific paths and dataset paths and settings.
-
-    folderTemplate = "mu_$" - Determines the folder structure within the dataset. The $ is replaced for the chempot values
-    datasets = ["cooling", "heating_12"] - The list of datasets to explore
-    pythonScriptsPath - The path to the python scripts folder for this project 
-    dataRootPath = "/alloshare/vdv group/NaxCoO2" - The root path for the dataset
-
 # Keyboard Commands
 
     1-9    - Change View
@@ -20,6 +12,18 @@ The *vdv.toml* file is used to configure the application. There you can set syst
     Shift-A, (Shift-)S - Start/stop record
     SPACE - Toggle GUI visibility
 
+# Configuration
+The *casm_viewer.toml* file is used to configure the application. There you can set system specific paths and dataset paths and settings.
+
+    datasets = ["cooling", "heating_12"] - The list of datasets to explore
+    pythonScriptsPath - The path to the python scripts folder for this project
+    pythonBinary - The python binary to be sued for scripts
+
+View options:
+
+    sliceBackground - Background color for slice (RGBA)
+    fontSize = 32.000000000000000
+    background - General bakcgroun color (RGBA)
 
 # Downloading
 

@@ -12,12 +12,12 @@ cd Release
 if [ -d "C:\Program Files (x86)\Microsoft Visual Studio\2017" ]; then
   GENERATOR='Visual Studio 15 2017 Win64'
   
-  CMAKE_BINARY="C:/Program Files (x86)/Microsoft Visual Studio/2017/BuildTools/Common7/IDE/CommonExtensions/Microsoft/CMake/CMake/bin/cmake.exe"
+  VS_CMAKE_BINARY="C:/Program Files (x86)/Microsoft Visual Studio/2017/BuildTools/Common7/IDE/CommonExtensions/Microsoft/CMake/CMake/bin/cmake.exe"
   GENERATOR="Visual Studio 15 2017 Win64"
   echo Tryng VS 2017 build.
-  if [ ! -f "${CMAKE_BINARY}" ]; then
-    echo Trying to use cmake on PATH as Visual Studio Cmake not found
-    CMAKE_BINARY="cmake.exe"
+  if [ -f "${VS_CMAKE_BINARY}" ]; then
+    echo Using VS 2017 CMaake
+    CMAKE_BINARY=$VS_CMAKE_BINARY
   fi
 
   set -x
@@ -25,12 +25,12 @@ if [ -d "C:\Program Files (x86)\Microsoft Visual Studio\2017" ]; then
   set +x
 elif [ -d "C:\Program Files (x86)\Microsoft Visual Studio\2019" ]; then
 
-  CMAKE_BINARY="C:/Program Files (x86)/Microsoft Visual Studio/2019/Community/Common7/IDE/CommonExtensions/Microsoft/CMake/CMake/bin/cmake.exe"
+  VS_CMAKE_BINARY="C:/Program Files (x86)/Microsoft Visual Studio/2019/Community/Common7/IDE/CommonExtensions/Microsoft/CMake/CMake/bin/cmake.exe"
   GENERATOR="Visual Studio 16 2019"
   echo Tryng VS 2019 build.
     if [ ! -f "${CMAKE_BINARY}" ]; then
-    echo Trying to use cmake on PATH as Visual Studio Cmake not found
-    CMAKE_BINARY="cmake.exe"
+    echo Using VS 2019 CMaake
+    CMAKE_BINARY=$VS_CMAKE_BINARY
   fi
   set -x
   "${CMAKE_BINARY}" -G "${GENERATOR}" -DTINC_BUILD_EXAMPLES=ON -DCMAKE_BUILD_TYPE="Release" ../..

@@ -116,7 +116,7 @@ public:
 
   void setPythonScriptPath(std::string pythonScriptPath);
 
-  std::string buildRootPath();
+  std::string getGlobalRootPath();
   std::string fullConditionPath();
 
   void initDataset();

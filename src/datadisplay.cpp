@@ -165,7 +165,7 @@ void DataDisplay::init() {
   mDatasetManager.currentGraphName.registerChangeCallback(
       [this](std::string value) {
         std::string fullDatasetPath = File::conformPathToOS(
-            mDatasetManager.buildRootPath() +
+            mDatasetManager.getGlobalRootPath() +
             File::conformPathToOS(mDatasetManager.mCurrentDataset.get()));
 
         std::cout << "loading graph " << value << " at " << fullDatasetPath
@@ -533,7 +533,8 @@ void DataDisplay::updateDisplayBuffers() {
     }
   }
 
-  if (mDatasetManager.mParameterSpace.getDimension("time")) {
+  if (mDatasetManager.mParameterSpace.getDimension("time") &&
+      mDatasetManager.mParameterSpace.getDimension("time")->size() > 0) {
     // This is a Kinetic MC dataset.
     auto currentIndex =
         mDatasetManager.mParameterSpace.getDimension("time")->getCurrentIndex();

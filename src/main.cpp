@@ -734,7 +734,7 @@ public:
     }
   }
 
-  void prepareDisplayGui() {
+  void prepareMainGui() {
     if (mDatasetSelector) {
       if (dataRoot.size() > 0) {
         ImGui::Text("Data root: %s", dataRoot.c_str());
@@ -766,10 +766,17 @@ public:
       if (this->dataDisplays[vdvBundle.currentBundle()]
               ->mDatasetManager.mParameterSpace.dimensions.size() > 0) {
         if (mAutoAdvance == 0.0) {
+          int currentBundle = vdvBundle.currentBundle();
+
           ImGui::Separator();
           ImGui::Text("Parameter Space");
           gui::drawControls(this->dataDisplays[vdvBundle.currentBundle()]
                                 ->mDatasetManager.mParameterSpace);
+          // auto &ps = this->dataDisplays[vdvBundle.currentBundle()]
+          //    ->mDatasetManager.mParameterSpace;
+          // for (size_t i = 0; i < ps.dimensions.size(); i++) {
+          //    gui::drawControl(ps.dimensions[i]);
+          //}
           ImGui::Separator();
         }
         ParameterGUI::drawParameterMeta(
@@ -857,7 +864,7 @@ public:
   }
 
   void prepareGui() {
-    if (parameterSpaceProcessor.runningAsync()) {
+    if (parameterSpaceProcessor.isRunning()) {
       imguiBeginFrame();
       ParameterGUI::beginPanel("Loading");
       ImGui::Text("Processing parameter space... Please wait.");
@@ -895,7 +902,7 @@ public:
     }
 
     if (selected == 0) {
-      prepareDisplayGui();
+      prepareMainGui();
     } else if (selected == 1) {
       ParameterGUI::drawBundleManager(&vdvBundle);
     } else if (selected == 2) {
@@ -1129,12 +1136,11 @@ public:
       unsigned char *pixs = &mPixels[0];
       // FIXME this can be done more efficiently
       glReadPixels(1, 1, width(), height(), GL_RGB, GL_UNSIGNED_BYTE, pixs);
-      std::string dumpDirectory =
-          File::conformPathToOS(dataDisplays[vdvBundle.currentBundle()]
-                                    ->mDatasetManager.buildRootPath() +
-                                dataDisplays[vdvBundle.currentBundle()]
-                                    ->mDatasetManager.mCurrentDataset.get() +
-                                "/graphics/");
+      std::string dumpDirectory = File::conformPathToOS(
+          dataDisplays[vdvBundle.currentBundle()]->mDatasetManager.mGlobalRoot +
+          dataDisplays[vdvBundle.currentBundle()]
+              ->mDatasetManager.mCurrentDataset.get() +
+          "/graphics/");
       std::string imagePath = dumpDirectory + mScreenshotPrefix + "_screen.png";
 
       //      stbi_flip_vertically_on_write(1);
@@ -1174,7 +1180,7 @@ public:
       } else if (File::exists(templateGen.runningDirectory() +
                               "cached_output/transfmat")) {
         templateGen.configuration["transfmat"] =
-            Flag("cached_output/transfmat");
+            VariantValue("cached_output/transfmat");
       } else if (File::exists(templateGen.runningDirectory() + "transfmat")) {
         templateGen.configuration["transfmat"] = "transfmat";
       } else if (File::exists(templateGen.runningDirectory() +
@@ -1201,24 +1207,24 @@ public:
       display->mVisible.registerChangeCallback(
           [this](float) { updateTitle(); });
 
-      display->mDatasetManager.mCurrentDataset.registerChangeCallback([this,
-                                                                       display](
-          std::string value) {
-        std::string path = value;
-        path = path.substr(path.rfind('/') + 1);
-        if (display->mDatasetManager.buildRootPath().size() > 0) {
-          presetHandler->setRootPath(display->mDatasetManager.buildRootPath());
-          if (!File::exists(display->mDatasetManager.buildRootPath() + value +
-                            "/presets")) {
-            Dir::make(value + "/presets");
-          }
-          presetHandler->setSubDirectory(value + "/presets");
-          presetHandler->setCurrentPresetMap("default", true);
-          std::cout << "Preset Handler sub dir set to " << value << std::endl;
-        }
-        updateTitle();
-        mAutoAdvance = 0.0; // Turn off auto advance
-      });
+      display->mDatasetManager.mCurrentDataset.registerChangeCallback(
+          [this, display](std::string value) {
+            std::string path = value;
+            path = path.substr(path.rfind('/') + 1);
+            if (display->mDatasetManager.mGlobalRoot.size() > 0) {
+              presetHandler->setRootPath(display->mDatasetManager.mGlobalRoot);
+              if (!File::exists(display->mDatasetManager.mGlobalRoot + value +
+                                "/presets")) {
+                Dir::make(value + "/presets");
+              }
+              presetHandler->setSubDirectory(value + "/presets");
+              presetHandler->setCurrentPresetMap("default", true);
+              std::cout << "Preset Handler sub dir set to " << value
+                        << std::endl;
+            }
+            updateTitle();
+            mAutoAdvance = 0.0; // Turn off auto advance
+          });
     }
 
     // Triggers and callbacks that should only be handled by rank 0

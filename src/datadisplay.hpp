@@ -108,6 +108,8 @@ public:
   Parameter mGridYOffset{"GridYOffset", "", 0.0, "", 0.0, 5.0};
 
   ParameterBundle bundle{"CASMDataset"};
+
+  ParameterInt currentSelection{"currentSelection"};
 };
 
 // -----------------------------------------------------------------
@@ -128,6 +130,7 @@ public:
   PickableBB perspectivePickable{"perspective"};
   PickableBB slicePickable{"slice"};
   // PickableRotateHandle rh;
+  Vec3f selectedPosition{FLT_MIN, FLT_MIN, FLT_MIN};
 
   std::string mParamText;
 

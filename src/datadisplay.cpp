@@ -39,21 +39,7 @@ void DataDisplay::init() {
   perspectivePickable.testChildren = false;
   perspectivePickable.containChildren = true;
 
-  //        mPerspectiveScale.registerChangeCallback([this](float s){
-  //        perspectivePickable.scaleVec.set(s); });
-  mPerspectiveRotY.registerChangeCallback([this](float d) {
-    perspectivePickable.pose = Pose(perspectivePickable.pose.get().pos(),
-                                    Quatf().fromEuler(-d * M_DEG2RAD, 0, 0));
-  });
-
-  // Initialization of graphics objects
-  // #INSTANCED_RENDERING: init
-  //  {
-  //    addSphere(orthoMesh0);
-  //    orthoMesh0.update();
-  //  }
-
-  addSphere(mMarker);
+  addSphere(mMarker, 1, 6, 6);
   mMarker.update();
 
   EasyFBOSetting setting;
@@ -137,6 +123,18 @@ void DataDisplay::init() {
   });
 
   atomrender.init();
+
+  mPerspectiveRotY.registerChangeCallback([this](float d) {
+    perspectivePickable.pose = Pose(perspectivePickable.pose.get().pos(),
+                                    Quatf().fromEuler(-d * M_DEG2RAD, 0, 0));
+  });
+
+  currentSelection.registerChangeCallback([this](int32_t value) {
+    auto pos = mDatasetManager.templateData[value];
+    selectedPosition.x = pos.x;
+    selectedPosition.y = pos.y;
+    selectedPosition.z = pos.z;
+  });
 
   slicePickable.pose.registerChangeCallback([this](Pose pose) {
     auto p = pose.pos() + slicePickable.bb.min;
@@ -231,6 +229,8 @@ void DataDisplay::initDataset() {
   mDatasetManager.mLoadedDataset = "";
 
   mDatasetManager.initDataset();
+
+  currentSelection.max(mDatasetManager.templateData.size() - 1);
 
   DatasetManager::SpeciesLabelMap labelMap =
       mDatasetManager.getAvailableSpecies();
@@ -594,6 +594,9 @@ void DataDisplay::updateDisplayBuffers() {
                 atomAdded[atomName] = std::vector<DatasetManager::position_t>();
               }
               atomAdded[atomName].push_back(*templateDataIt);
+
+              currentSelection.set(std::distance(
+                  mDatasetManager.templateData.begin(), templateDataIt));
             }
           }
         }
@@ -610,7 +613,6 @@ void DataDisplay::updateDisplayBuffers() {
       occupationPtr++;
       templateDataIt++;
     }
-
   } else {
     // Dataset is Grand Canonical MC
     auto templateDataIt = mDatasetManager.templateData.begin();
@@ -838,19 +840,6 @@ void DataDisplay::prepareParallelProjection(Graphics &g,
 }
 
 void DataDisplay::drawPerspective(Graphics &g) {
-  //  g.camera(Viewpoint::ORTHO_FOR_2D);
-
-  //  float rpd =
-  //      getCurrentWindowPixelDensity();  // reciprocal of pixel density
-  //  auto v = viewport();                 // viewport in framebuffer unit
-  //  mViewStack.setIdentity();
-  //  mProjStack.set(Matrix4f::ortho(v.l * rpd, v.w * rpd,  // left, right
-  //                                 v.b * rpd, v.h * rpd,  // bottom, top
-  //                                 0, 1                   // near, far
-  //                                 ));
-
-  //        Vec3d normVector = reader.getNormalizingVector();
-  //        Vec3d centeringVector = reader.getCenteringVector();
   if (mAligned4fData.size() == 0) {
     return; // No data has been loaded
   }
@@ -858,15 +847,6 @@ void DataDisplay::drawPerspective(Graphics &g) {
   g.lens().far(2000);
   {
     perspectivePickable.pushMatrix(g);
-
-    // move to center
-    // g.translate(-(mDataBoundaries.maxx -
-    // mDataBoundaries.minx)/2,-(mDataBoundaries.maxy -
-    // mDataBoundaries.miny)/2,-(mDataBoundaries.maxz -
-    // mDataBoundaries.minz)/2); g.translate(0,0,-7
-    // -(mDataBoundaries.minz+mDataBoundaries.maxz)/2);
-    // g.scale(1/(mDataBoundaries.maxy - mDataBoundaries.miny));
-    // g.rotate(mPerspectiveRotY.get(), 0, 1.0, 0);
 
     g.blendAdd();
     g.depthTesting(false);
@@ -929,18 +909,16 @@ void DataDisplay::drawPerspective(Graphics &g) {
       glLineWidth(5);
       g.polygonLine();
       g.color(0.8f, 0.8f, 1.0f, 0.9f);
-      g.scale(1.0, 1.0, 1.0f + atomrender.mLayerSeparation);
+      g.scale(1.0f, 1.0f, 1.0f + atomrender.mLayerSeparation);
       // g.translate(atomrender.mSlicingPlanePoint.get());
       g.translate(slicePickable.pose.get().pos());
-      g.rotate(atomrender.mSliceRotationPitch * 360.0f / (M_2PI), 1.0, 0.0,
+      g.rotate(atomrender.mSliceRotationPitch * 360.0f / (M_2PI), 1.0f, 0.0,
                0.0);
-      g.rotate(atomrender.mSliceRotationRoll * 360.0f / (M_2PI), 0.0, -1.0,
+      g.rotate(atomrender.mSliceRotationRoll * 360.0f / (M_2PI), 0.0, -1.0f,
                0.0);
       g.draw(boxMesh);
       g.polygonFill();
       glLineWidth(1);
-
-      //  -----------
 
       g.popMatrix();
     }
@@ -951,7 +929,7 @@ void DataDisplay::drawPerspective(Graphics &g) {
       g.pushMatrix();
 
       g.depthTesting(true);
-      g.blending(false);
+      g.blending(true);
       //  g.scale(perspectivePickable.scale);
       g.polygonLine();
       for (auto added : atomAdded) {
@@ -959,6 +937,7 @@ void DataDisplay::drawPerspective(Graphics &g) {
           g.pushMatrix();
           g.translate(addedPos.x, addedPos.y, addedPos.z);
           g.color(1, 1, 1);
+          g.scale(1.7);
           g.draw(mMarker);
           g.popMatrix();
         }
@@ -966,13 +945,30 @@ void DataDisplay::drawPerspective(Graphics &g) {
       for (auto removed : atomRemoved) {
         g.pushMatrix();
         g.translate(removed.x, removed.y, removed.z);
-        g.color(0, 0, 0);
+        g.color(0.4, 0.4, 0.4);
+        g.scale(1.7);
         g.draw(mMarker);
         g.popMatrix();
       }
 
       g.popMatrix();
     }
+
+    { // Draw selected atom
+      g.pushMatrix();
+
+      g.depthTesting(true);
+      g.blending(true);
+      //  g.scale(perspectivePickable.scale);
+      g.polygonLine();
+      g.pushMatrix();
+      g.translate(selectedPosition);
+      g.color(0.2f, 1.f, 0.2f);
+      g.scale(2.8);
+      g.draw(mMarker);
+      g.popMatrix();
+    }
+
     g.popMatrix(); // pickable
   }
 

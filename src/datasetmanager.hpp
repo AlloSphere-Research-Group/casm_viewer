@@ -85,7 +85,14 @@ public:
   };
   std::vector<position_t> templateData;
 
+  typedef struct {
+    std::vector<uint16_t> shell_sites;
+    std::vector<uint8_t> occ_ref;
+  } shell_site_t;
+
   std::vector<uint8_t> trajectoryData;
+  std::map<std::string, shell_site_t> shellSiteMap;
+  std::vector<int8_t> shellSiteTypes; // matches for current time step
   size_t numTimeSteps, numAtoms;
 
   // ----------------
@@ -98,7 +105,6 @@ public:
   ParameterString currentPoscarName{"currentPoscarName", "internal", ""};
   ParameterBool processing{"processing", "internal", false};
 
-  //  std::map<std::string, ParameterSpaceDimension *> mParameterSpaces;
   ParameterSpace mParameterSpace;
 
   // Plot axes
@@ -106,6 +112,7 @@ public:
   ParameterMenu mPlotXAxis{"PlotXAxis"};
 
   ParameterMenu mAtomOfInterest{"AtomOfInterest", "", 0};
+  ParameterChoice mShellSiteTypes{"ShellSiteTypes"};
 
   // Functions --------------
   DatasetManager();
@@ -120,7 +127,6 @@ public:
   std::string fullConditionPath();
 
   void initDataset();
-
   void analyzeDataset();
 
   // Run processing scripts across all the dataset prior to starting application
@@ -145,46 +151,14 @@ public:
 
   void loadTrajectory();
 
+  void loadShellSiteData();
+
   typedef std::map<std::string, std::vector<std::string>> SpeciesLabelMap;
 
   SpeciesLabelMap getAvailableSpecies();
 
-  std::vector<std::pair<std::string, float>> getCurrentCompositions() {
-    std::vector<std::pair<std::string, float>> compositions;
-    std::string str = readJsonResultsFile(mCurrentDataset.get(), getSubDir());
-    if (str.size() > 0) {
-      // Read the results file. This tells us which atoms are available
-      auto resultsJson = json::parse(str);
-
-      std::string comp_prefix = "<comp_n(";
-      for (json::iterator it = resultsJson.begin(); it != resultsJson.end();
-           ++it) {
-        std::string key = it.key();
-        //                // Look for available comp_n atom names
-        if (key.compare(0, comp_prefix.size(), comp_prefix) == 0) {
-
-          for (auto ps : mParameterSpace.dimensions) {
-            if (ps->type == ParameterSpaceDimension::INDEX) {
-              if (ps->size() > 0) {
-                auto index = ps->getCurrentIndex();
-                if (it.value().size() > index) {
-                  compositions.push_back({key, it.value()[index].get<float>()});
-                } else {
-                  std::cerr
-                      << "Warning: conditions parameter index out of range in "
-                         "json results"
-                      << std::endl;
-                }
-              } else {
-              }
-              break;
-            }
-          }
-        }
-      }
-    }
-    return compositions;
-  }
+  std::vector<std::pair<std::string, float>> getCurrentCompositions();
+  std::vector<int8_t> getShellSiteTypes(size_t atomIndex);
 
   // Processing functions ----------------------------------------------
 

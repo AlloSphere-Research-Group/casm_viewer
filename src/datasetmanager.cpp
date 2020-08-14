@@ -48,30 +48,18 @@ void DatasetManager::initializeComputation() {
                                       {"chempotA", "param_chem_pot(a)"},
                                       {"chempotB", "param_chem_pot(b)"}};
 
-  mParameterSpace.onValueChange = [&](
-      float oldValue, ParameterSpaceDimension *changedDimension) {
-    computeNewSample();
-
-    if (changedDimension->getName() == "dir" &&
-        changedDimension->getCurrentId() !=
-            changedDimension->idAt(changedDimension->getIndexForValue(
-                oldValue))) { // Only reload if id has changed
-                              //      mParameterSpace.stopSweep();
-      loadTrajectory();
-      //      mParameterSpace.sweepAsync(sampleComputationChain, {"time"});
-    }
-  };
-
-  mParameterSpace.updateConfiguration = [&]() {
+  mParameterSpace.onValueChange = [&](float oldValue,
+                                      ParameterSpaceDimension *changedDimension,
+                                      ParameterSpace *ps) {
     std::string condition;
     std::string folder;
-    for (auto ps : mParameterSpace.dimensions) {
-      if (ps->type == ParameterSpaceDimension::MAPPED) {
-        if (ps->getName() != "dir") {
-          condition = std::to_string(ps->getCurrentIndex());
+    for (auto dim : ps->dimensions) {
+      if (dim->type == ParameterSpaceDimension::MAPPED) {
+        if (dim->getName() != "dir") {
+          condition = std::to_string(dim->getCurrentIndex());
           break;
         } else {
-          folder = ps->getCurrentId();
+          folder = dim->getCurrentId();
         }
       }
     }
@@ -81,20 +69,41 @@ void DatasetManager::initializeComputation() {
     labelProcessor.configuration["condition"] = condition;
     labelProcessor.configuration["dir"] = folder;
 
-    if (mParameterSpace.getDimension("time")) {
-      labelProcessor.configuration["time"] =
-          (int64_t)mParameterSpace.getDimension("time")->getCurrentIndex();
+    if (changedDimension->getName() == "dir" &&
+        changedDimension->getCurrentId() !=
+            changedDimension->idAt(changedDimension->getIndexForValue(
+                oldValue))) { // Only reload if id has changed
+                              //      ps->stopSweep();
+      loadTrajectory();
+      loadShellSiteData();
+      //      ps->sweep(sampleComputationChain, {"time"});
     }
+
+    if (ps->getDimension("time")) {
+      labelProcessor.configuration["time"] =
+          (int64_t)ps->getDimension("time")->getCurrentIndex();
+    }
+
+    computeNewSample();
+
+    if (ps->getDimension("time")) {
+      // Has to be analyzed after the sample has been computed.
+      shellSiteTypes =
+          getShellSiteTypes(ps->getDimension("time")->getCurrentIndex());
+
+      mShellSiteTypes.set(shellSiteTypes);
+    }
+
   };
 
   mParameterSpace.generateRelativeRunPath = [&](
-      std::map<std::string, size_t> indeces) {
+      std::map<std::string, size_t> indeces, ParameterSpace *ps) {
     std::string relPath;
-    if (mParameterSpace.getDimension("dir")) {
-      relPath = mParameterSpace.getDimension("dir")->idAt(indeces["dir"]);
+    if (ps->getDimension("dir")) {
+      relPath = ps->getDimension("dir")->idAt(indeces["dir"]);
     }
     std::string condition;
-    for (auto dim : mParameterSpace.dimensions) {
+    for (auto dim : ps->dimensions) {
       if (dim->type == ParameterSpaceDimension::INDEX) {
         condition = std::to_string(indeces[dim->getName()]);
       }
@@ -425,6 +434,7 @@ void DatasetManager::initDataset() {
   // ===
   readParameterSpace();
   loadTrajectory(); // The time parameter space is loaded here.
+  loadShellSiteData();
   analyzeDataset();
 
   std::vector<std::string> parameterSpaceNames;
@@ -928,12 +938,8 @@ void DatasetManager::loadTrajectory() {
       }
     }
 
-    if (mParameterSpace.getDimension("time")) {
-      mParameterSpace.getDimension("time")->clear();
-    } else {
-      mParameterSpace.registerDimension(
-          std::make_shared<ParameterSpaceDimension>("time"));
-    }
+    assert(mParameterSpace.getDimension("time"));
+    mParameterSpace.getDimension("time")->clear();
     mParameterSpace.getDimension("time")
         ->append(timeValues.data(), timeValues.size());
     mParameterSpace.getDimension("time")->conform();
@@ -948,6 +954,72 @@ void DatasetManager::loadTrajectory() {
       return /*false*/;
     }
   }
+}
+
+void DatasetManager::loadShellSiteData() {
+  auto datasetPath =
+      getGlobalRootPath() + mCurrentDataset.get() + "/" + getSubDir();
+  auto shellSiteFiles = datasetPath + "shell_site_files.json";
+  std::ifstream shellSitesFileStream;
+  shellSitesFileStream.open(shellSiteFiles, std::ofstream::in);
+  shellSiteMap.clear();
+  std::vector<std::string> siteTypes;
+  if (shellSitesFileStream.good()) {
+    auto j = json::parse(shellSitesFileStream);
+    if (j.is_object()) {
+      for (auto filename : j["files"]) {
+
+        int ncid, retval;
+        int stepsid, shellsizeid;
+        size_t steps, shellsize;
+        if ((retval =
+                 nc_open((datasetPath + filename.get<std::string>()).c_str(),
+                         NC_NOWRITE | NC_SHARE, &ncid))) {
+          std::cerr << "Error opening file: " << filename << std::endl;
+          continue;
+        }
+        siteTypes.push_back(filename.get<std::string>());
+        shellSiteMap[filename.get<std::string>()] = {};
+        std::vector<uint16_t> &shell_sites =
+            shellSiteMap[filename.get<std::string>()].shell_sites;
+        std::vector<uint8_t> &occ_ref =
+            shellSiteMap[filename.get<std::string>()].occ_ref;
+        if ((retval = nc_inq_dimid(ncid, "steps", &stepsid))) {
+          continue;
+        }
+        if ((retval = nc_inq_dimlen(ncid, stepsid, &steps))) {
+          continue;
+        }
+        if ((retval = nc_inq_dimid(ncid, "shell_size", &shellsizeid))) {
+          continue;
+        }
+        if ((retval = nc_inq_dimlen(ncid, shellsizeid, &shellsize))) {
+          continue;
+        }
+
+        shell_sites.resize(shellsize * steps);
+        int shell_sites_id;
+        if ((retval = nc_inq_varid(ncid, "shell_sites", &shell_sites_id))) {
+          continue;
+        }
+
+        if ((retval = nc_get_var(ncid, shell_sites_id, shell_sites.data()))) {
+          continue;
+        }
+
+        occ_ref.resize(shellsize);
+        int occ_ref_id;
+        if ((retval = nc_inq_varid(ncid, "occ_ref", &occ_ref_id))) {
+          continue;
+        }
+        if ((retval = nc_get_var(ncid, occ_ref_id, occ_ref.data()))) {
+          continue;
+        }
+      }
+    }
+  }
+  mShellSiteTypes.setElements(siteTypes);
+  mShellSiteTypes.setNoCalls(0);
 }
 
 DatasetManager::SpeciesLabelMap DatasetManager::getAvailableSpecies() {
@@ -965,6 +1037,83 @@ DatasetManager::SpeciesLabelMap DatasetManager::getAvailableSpecies() {
   }
   labelMap["Va"] = mVacancyAtoms;
   return labelMap;
+}
+
+std::vector<std::pair<std::string, float>>
+DatasetManager::getCurrentCompositions() {
+  std::vector<std::pair<std::string, float>> compositions;
+  std::string str = readJsonResultsFile(mCurrentDataset.get(), getSubDir());
+  if (str.size() > 0) {
+    // Read the results file. This tells us which atoms are available
+    auto resultsJson = json::parse(str);
+
+    std::string comp_prefix = "<comp_n(";
+    for (json::iterator it = resultsJson.begin(); it != resultsJson.end();
+         ++it) {
+      std::string key = it.key();
+      //                // Look for available comp_n atom names
+      if (key.compare(0, comp_prefix.size(), comp_prefix) == 0) {
+
+        for (auto ps : mParameterSpace.dimensions) {
+          if (ps->type == ParameterSpaceDimension::INDEX) {
+            if (ps->size() > 0) {
+              auto index = ps->getCurrentIndex();
+              if (it.value().size() > index) {
+                compositions.push_back({key, it.value()[index].get<float>()});
+              } else {
+                std::cerr
+                    << "Warning: conditions parameter index out of range in "
+                       "json results"
+                    << std::endl;
+              }
+            } else {
+            }
+            break;
+          }
+        }
+      }
+    }
+  }
+  return compositions;
+}
+
+std::vector<int8_t> DatasetManager::getShellSiteTypes(size_t atomIndex) {
+  std::vector<int8_t> matches;
+  int8_t count = 0;
+  for (auto &neighborhoodGroups : shellSiteMap) {
+    std::vector<int16_t> sites;
+    auto *p =
+        &neighborhoodGroups.second
+             .shell_sites[atomIndex * neighborhoodGroups.second.occ_ref.size()];
+    for (size_t i = 0; i < neighborhoodGroups.second.occ_ref.size(); i++) {
+      if (*p != UINT16_MAX) {
+        sites.push_back(*p);
+      }
+      p++;
+    }
+
+    auto siteIt = sites.begin();
+    bool isMatch = true;
+    assert(sites.size() == 0 ||
+           sites.size() == neighborhoodGroups.second.occ_ref.size());
+    if (sites.size() > 0) {
+
+      for (auto occ_ref : neighborhoodGroups.second.occ_ref) {
+        size_t index =
+            numAtoms * mParameterSpace.getDimension("time")->getCurrentIndex() +
+            *siteIt;
+        if (trajectoryData[index] != occ_ref) {
+          isMatch = false;
+          break;
+        }
+      }
+      if (isMatch) {
+        matches.push_back(count);
+      }
+    }
+    count++;
+  }
+  return matches;
 }
 
 std::string DatasetManager::findJsonFile(std::string datasetId,

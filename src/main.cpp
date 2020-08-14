@@ -138,6 +138,7 @@ public:
 
   BundleGUIManager vdvBundle;
   FileSelector *mDatasetSelector;
+  std::string mPreviousBrowseDir; // Previously selected dir
 
   std::mutex mScreenshotMutex;
   std::string mScreenshotPrefix;
@@ -148,6 +149,7 @@ public:
   ComputationChain initRootComputationChain{"PrepareDataset"};
 
   ScriptProcessor parameterSpaceProcessor{"ParameterSpaceProcessor"};
+  ScriptProcessor shellSiteFileAnalyzer{"ShellSiteFileAnalyzer"};
   ScriptProcessor transfmatExtractor{"TransfmatExtractor"};
   ScriptProcessor templateGen{"TemplateGenerator"};
 
@@ -715,6 +717,8 @@ public:
     parameterSpaceProcessor.setRunningDirectory(path);
     parameterSpaceProcessor.setOutputDirectory(path + "/cached_output");
 
+    shellSiteFileAnalyzer.setRunningDirectory(path);
+
     transfmatExtractor.setDataDirectory(path);
     templateGen.setDataDirectory(path);
 
@@ -749,6 +753,7 @@ public:
           if (selectedItems.count() > 0) {
             auto selection = selectedItems[0];
             loadDataset(selection.filepath(), vdvBundle.currentBundle());
+            mPreviousBrowseDir = selection.path();
           }
           delete mDatasetSelector;
           mDatasetSelector = nullptr;
@@ -761,7 +766,7 @@ public:
     } else {
       if (ImGui::Button("Load dataset")) {
         mDatasetSelector = new FileSelector(dataRoot, File::isDirectory);
-        mDatasetSelector->start();
+        mDatasetSelector->start(mPreviousBrowseDir);
       }
       if (this->dataDisplays[vdvBundle.currentBundle()]
               ->mDatasetManager.mParameterSpace.dimensions.size() > 0) {
@@ -807,7 +812,11 @@ public:
 
         ImGui::Text("%s", dataDisplays[vdvBundle.currentBundle()]
                               ->mDatasetManager.metaText.c_str());
-
+        ParameterGUI::drawParameterMeta(
+            &this->dataDisplays[vdvBundle.currentBundle()]->currentSelection);
+        ParameterGUI::drawParameterMeta(
+            &this->dataDisplays[vdvBundle.currentBundle()]
+                 ->mDatasetManager.mShellSiteTypes);
         if (ImGui::CollapsingHeader("Slicing")) {
           ImGui::Indent(20.0);
           ParameterGUI::drawParameterMeta(
@@ -1037,6 +1046,9 @@ public:
     std::replace(fontPath.begin(), fontPath.end(), '\\', '/');
     font.set(fontPath);
     fontSize = configLoader2.getd("fontSize");
+
+    configLoader2.setDefaultValue("previousBrowseDir", std::string(""));
+    mPreviousBrowseDir = configLoader2.gets("previousBrowseDir");
   }
 
   void storeConfiguration() {
@@ -1069,6 +1081,7 @@ public:
 
     configLoader2.set<std::string>("pythonBinary", pythonBinary.get());
 
+    configLoader2.set<std::string>("previousBrowseDir", mPreviousBrowseDir);
     configLoader2.writeFile();
   }
 
@@ -1155,7 +1168,11 @@ public:
     parameterSpaceProcessor.setCommand(pythonBinary);
     parameterSpaceProcessor.setScriptName(pythonScriptPath.get() +
                                           "/analyze_parameter_space.py");
+    parameterSpaceProcessor.setOutputFileNames({"parameter_space.nc"});
 
+    shellSiteFileAnalyzer.setCommand(pythonBinary);
+    shellSiteFileAnalyzer.setScriptName(pythonScriptPath.get() +
+                                        "/analyze_shell_site_files.py");
     parameterSpaceProcessor.setOutputFileNames({"parameter_space.nc"});
 
     transfmatExtractor.setCommand(pythonBinary);
@@ -1193,7 +1210,8 @@ public:
       return true;
     };
 
-    initRootComputationChain << parameterSpaceProcessor << transfmatExtractor
+    initRootComputationChain << parameterSpaceProcessor << shellSiteFileAnalyzer
+                             << transfmatExtractor
                              << templateGen /*<< trajectoryProcessor*/;
 
     // Only the root chain needs to be exposed
@@ -1564,6 +1582,7 @@ public:
           parameterSpaceProcessor.setOutputDirectory(element.filepath() +
                                                      "/cached_output");
 
+          shellSiteFileAnalyzer.setRunningDirectory(element.filepath());
           transfmatExtractor.setDataDirectory(element.filepath());
           templateGen.setDataDirectory(element.filepath());
 

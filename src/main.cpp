@@ -109,7 +109,7 @@ public:
   //  Trigger mRecomputeSpace{"RecomputeSpace"};
 
   ParameterBool mAutoAdvance{"autoAdvance"};
-  Parameter mAutoAdvanceFreq{"autoAdvanceFreq", "", 2, "", 0.25, 3.0};
+  Parameter mAutoAdvanceFreq{"autoAdvanceFreq", "", 2, "", 0.25, 5.0};
 
   // File selection
   //  ParameterMenu mDataRootPath{"datarootPath"};
@@ -634,6 +634,9 @@ public:
     //    static double phase {0};
     //    double phaseIncrement = 440.0 / io.framesPerSecond();
 
+    for (auto *display : dataDisplays) {
+      display->synth.render(io);
+    }
     //    while(io()){
     //      phase += phaseIncrement;
     //      if(phase > 1) phase -= 1;

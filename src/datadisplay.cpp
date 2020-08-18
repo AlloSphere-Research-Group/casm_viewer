@@ -10,6 +10,7 @@
 #include <condition_variable>
 
 #include "datadisplay.hpp"
+#include "modalsynth.hpp"
 #include "imgui.h"
 
 void DataDisplay::init() {
@@ -100,6 +101,73 @@ void DataDisplay::init() {
         resetSlicing();
         //        }
       });
+
+  mDatasetManager.mShellSiteTypes.registerChangeCallback([&](uint16_t value) {
+    auto voice = synth.getVoice<ModalVoice>();
+    if (value & 1) {
+      voice->fundamentalFreq = 1500;
+      voice->setFrequencies(voice->smallHandBell, 0.0004);
+    }
+    if (value & 1 << 2) {
+      voice->fundamentalFreq = 1200;
+      voice->setFrequencies(voice->xylo, 0.0004);
+    }
+    if (value & 1 << 3) {
+      voice->fundamentalFreq = 800;
+      voice->setFrequencies(voice->smallHandBell, 0.0004);
+    }
+    if (value & 1 << 4) {
+      voice->fundamentalFreq = 650;
+      voice->setFrequencies(voice->xylo, 0.004);
+    }
+    if (value & 1 << 5) {
+      voice->fundamentalFreq = 420;
+      voice->setFrequencies(voice->smallHandBell, 0.0004);
+    }
+    if (value & 1 << 6) {
+      voice->fundamentalFreq = 300;
+      voice->setFrequencies(voice->xylo, 0.004);
+    }
+    if (value & 1 << 7) {
+      voice->fundamentalFreq = 280;
+      voice->setFrequencies(voice->smallHandBell, 0.0004);
+    }
+    if (value & 1 << 8) {
+      voice->fundamentalFreq = 210;
+      voice->setFrequencies(voice->xylo, 0.004);
+    }
+    if (value & 1 << 9) {
+      voice->fundamentalFreq = 1100;
+      voice->setFrequencies(voice->xylo, 0.0004);
+    }
+    if (value & 1 << 10) {
+      voice->fundamentalFreq = 800;
+      voice->setFrequencies(voice->smallHandBell, 0.004);
+    }
+    if (value & 1 << 11) {
+      voice->fundamentalFreq = 570;
+      voice->setFrequencies(voice->xylo, 0.0004);
+    }
+    if (value & 1 << 12) {
+      voice->fundamentalFreq = 400;
+      voice->setFrequencies(voice->smallHandBell, 0.004);
+    }
+    if (value & 1 << 13) {
+      voice->fundamentalFreq = 3180;
+      voice->setFrequencies(voice->xylo, 0.0004);
+    }
+    if (value & 1 << 15) {
+      voice->fundamentalFreq = 259;
+      voice->setFrequencies(voice->smallHandBell, 0.004);
+    }
+    if (value & 1 << 15) {
+      voice->fundamentalFreq = 223;
+      voice->setFrequencies(voice->xylo, 0.0004);
+    } else {
+    }
+    synth.triggerOn(voice);
+    std::cout << "set" << std::endl;
+  });
 
   mShowAtoms.registerChangeCallback([this](uint16_t value) {
     if (mShowAtoms.get() != value) {

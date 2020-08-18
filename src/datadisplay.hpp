@@ -144,6 +144,9 @@ public:
       Color(1.0, 0.0, 1.0, 1.0), Color(0.5, 1.0, 0.5, 1.0),
       Color(1.0, 1.0, 0.0, 1.0), Color(0.0, 0.0, 1.0, 1.0)};
 
+  // Sonification
+  PolySynth synth;
+
   void init();
 
   void initDataset();

@@ -11,10 +11,13 @@ add_executable(${APP_NAME}
   src/datadisplay.cpp
   src/datasetmanager.cpp
   src/slice.cpp
+  src/modalsynth.cpp
 
   src/datadisplay.hpp
   src/datasetmanager.hpp
-  src/slice.hpp)
+  src/slice.hpp
+  src/modalsynth.hpp
+  )
 
 # add allolib as a subdirectory to the project
 add_subdirectory(external/tinc)

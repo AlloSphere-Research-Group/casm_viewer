@@ -88,6 +88,7 @@ public:
   typedef struct {
     std::vector<uint16_t> shell_sites;
     std::vector<uint8_t> occ_ref;
+    std::vector<uint8_t> flag;
   } shell_site_t;
 
   std::vector<uint8_t> trajectoryData;

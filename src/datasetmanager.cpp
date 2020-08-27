@@ -973,6 +973,8 @@ void DatasetManager::loadShellSiteData() {
             shellSiteMap[filename.get<std::string>()].shell_sites;
         std::vector<uint8_t> &occ_ref =
             shellSiteMap[filename.get<std::string>()].occ_ref;
+        std::vector<uint8_t> &flag =
+            shellSiteMap[filename.get<std::string>()].flag;
         if ((retval = nc_inq_dimid(ncid, "steps", &stepsid))) {
           continue;
         }
@@ -993,6 +995,15 @@ void DatasetManager::loadShellSiteData() {
         }
 
         if ((retval = nc_get_var(ncid, shell_sites_id, shell_sites.data()))) {
+          continue;
+        }
+
+        flag.resize(steps);
+        int flag_id;
+        if ((retval = nc_inq_varid(ncid, "flag", &flag_id))) {
+          continue;
+        }
+        if ((retval = nc_get_var(ncid, flag_id, flag.data()))) {
           continue;
         }
 
@@ -1084,18 +1095,28 @@ std::vector<int8_t> DatasetManager::getShellSiteTypes(size_t timeIndex) {
     assert(sites.size() == 0 ||
            sites.size() == neighborhoodGroups.second.occ_ref.size());
     if (sites.size() > 0) {
-      auto siteIt = sites.begin();
-      bool isMatch = true;
+      // Previous algorithm that found matches from occupancy. This algorithm
+      // has issues
+      // because it doesn't include transpositions of the site shapes.
+      //      auto siteIt = sites.begin();
+      //      bool isMatch = true;
+      //      for (auto occ_ref : neighborhoodGroups.second.occ_ref) {
+      //        size_t index = numAtoms * timeIndex + *siteIt;
+      //        auto occ_dof = trajectoryData[index];
+      //        if (occ_dof != occ_ref) {
+      //          isMatch = false;
+      //          break;
+      //        }
+      //        siteIt++;
+      //      }
 
-      for (auto occ_ref : neighborhoodGroups.second.occ_ref) {
-        size_t index = numAtoms * timeIndex + *siteIt;
-        auto occ_dof = trajectoryData[index];
-        if (occ_dof != occ_ref) {
-          isMatch = false;
-          break;
+      bool isMatch = false;
+      if (neighborhoodGroups.second.flag.size() > timeIndex) {
+        if (neighborhoodGroups.second.flag[timeIndex] == 1) {
+          isMatch = true;
         }
-        siteIt++;
       }
+
       if (isMatch) {
         matches.push_back(count);
       }

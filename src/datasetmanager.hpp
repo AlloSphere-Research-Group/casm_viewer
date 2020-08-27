@@ -140,10 +140,6 @@ public:
   std::string getSubDir();
 
   // Processing functions for atom positions
-  //  bool loadDiff(int timeIndex);
-  //  void processTemplatePositions();
-  //  void loadFromPOSCAR();
-  void computeNewSample();
 
   void updateText();
 
@@ -158,7 +154,7 @@ public:
   SpeciesLabelMap getAvailableSpecies();
 
   std::vector<std::pair<std::string, float>> getCurrentCompositions();
-  std::vector<int8_t> getShellSiteTypes(size_t atomIndex);
+  std::vector<int8_t> getShellSiteTypes(size_t timeIndex);
 
   // Processing functions ----------------------------------------------
 

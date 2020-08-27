@@ -48,9 +48,9 @@ void DatasetManager::initializeComputation() {
                                       {"chempotA", "param_chem_pot(a)"},
                                       {"chempotB", "param_chem_pot(b)"}};
 
-  mParameterSpace.onValueChange = [&](float oldValue,
-                                      ParameterSpaceDimension *changedDimension,
-                                      ParameterSpace *ps) {
+  mParameterSpace.updateComputationSettings = [&](
+      float oldValue, ParameterSpaceDimension *changedDimension,
+      ParameterSpace *ps) {
     std::string condition;
     std::string folder;
     for (auto dim : ps->dimensions) {
@@ -73,9 +73,13 @@ void DatasetManager::initializeComputation() {
         changedDimension->getCurrentId() !=
             changedDimension->idAt(changedDimension->getIndexForValue(
                 oldValue))) { // Only reload if id has changed
-                              //      ps->stopSweep();
+      //      ps->stopSweep();
       loadTrajectory();
       loadShellSiteData();
+      shellSiteTypes =
+          getShellSiteTypes(ps->getDimension("time")->getCurrentIndex());
+
+      mShellSiteTypes.set(shellSiteTypes);
       //      ps->sweep(sampleComputationChain, {"time"});
     }
 
@@ -83,17 +87,25 @@ void DatasetManager::initializeComputation() {
       labelProcessor.configuration["time"] =
           (int64_t)ps->getDimension("time")->getCurrentIndex();
     }
+  };
 
-    computeNewSample();
+  mParameterSpace.onValueChange = [&](float oldValue,
+                                      ParameterSpaceDimension *changedDimension,
+                                      ParameterSpace *ps) {
 
-    if (ps->getDimension("time")) {
-      // Has to be analyzed after the sample has been computed.
+    sampleComputationChain.process();
+
+    if (mParameterSpace.getDimension("time")) {
+      occupationData.doneWriting(occupationData.getWritable());
       shellSiteTypes =
           getShellSiteTypes(ps->getDimension("time")->getCurrentIndex());
 
       mShellSiteTypes.set(shellSiteTypes);
+    } else {
+      currentPoscarName.set(labelProcessor.outputFile());
     }
 
+    updateText();
   };
 
   mParameterSpace.generateRelativeRunPath = [&](
@@ -801,29 +813,6 @@ std::string DatasetManager::getSubDir() {
 
 // void DatasetManager::loadFromPOSCAR() {}
 
-void DatasetManager::computeNewSample() {
-  //  bool hasIndexDimension = false;
-  //  for (auto ps : mParameterSpace.dimensions) {
-  //    if (ps->type == ParameterSpaceDimension::MAPPED && ps->size() > 0) {
-  //      hasIndexDimension = true;
-  //    }
-  //  }
-  //  if (!hasIndexDimension || !mRunProcessors) {
-  //    return;
-  //  }
-  std::unique_lock<std::mutex> lk(mDataLock);
-
-  sampleComputationChain.process();
-
-  if (mParameterSpace.getDimension("time")) {
-    occupationData.doneWriting(occupationData.getWritable());
-  } else {
-    currentPoscarName.set(labelProcessor.outputFile());
-  }
-
-  updateText();
-}
-
 void DatasetManager::updateText() {
   // Meta data texts
   metaText = "Global Root: " + mGlobalRoot + "\n";
@@ -1077,14 +1066,14 @@ DatasetManager::getCurrentCompositions() {
   return compositions;
 }
 
-std::vector<int8_t> DatasetManager::getShellSiteTypes(size_t atomIndex) {
+std::vector<int8_t> DatasetManager::getShellSiteTypes(size_t timeIndex) {
   std::vector<int8_t> matches;
   int8_t count = 0;
   for (auto &neighborhoodGroups : shellSiteMap) {
     std::vector<int16_t> sites;
     auto *p =
         &neighborhoodGroups.second
-             .shell_sites[atomIndex * neighborhoodGroups.second.occ_ref.size()];
+             .shell_sites[timeIndex * neighborhoodGroups.second.occ_ref.size()];
     for (size_t i = 0; i < neighborhoodGroups.second.occ_ref.size(); i++) {
       if (*p != UINT16_MAX) {
         sites.push_back(*p);
@@ -1092,20 +1081,20 @@ std::vector<int8_t> DatasetManager::getShellSiteTypes(size_t atomIndex) {
       p++;
     }
 
-    auto siteIt = sites.begin();
-    bool isMatch = true;
     assert(sites.size() == 0 ||
            sites.size() == neighborhoodGroups.second.occ_ref.size());
     if (sites.size() > 0) {
+      auto siteIt = sites.begin();
+      bool isMatch = true;
 
       for (auto occ_ref : neighborhoodGroups.second.occ_ref) {
-        size_t index =
-            numAtoms * mParameterSpace.getDimension("time")->getCurrentIndex() +
-            *siteIt;
-        if (trajectoryData[index] != occ_ref) {
+        size_t index = numAtoms * timeIndex + *siteIt;
+        auto occ_dof = trajectoryData[index];
+        if (occ_dof != occ_ref) {
           isMatch = false;
           break;
         }
+        siteIt++;
       }
       if (isMatch) {
         matches.push_back(count);

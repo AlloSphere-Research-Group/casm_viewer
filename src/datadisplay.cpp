@@ -18,6 +18,8 @@ void DataDisplay::init() {
   MPI_Comm_rank(MPI_COMM_WORLD, &mWorldRank);
 #endif
 
+  synth.gain(5.0);
+
   mPickableManager << graphPickable << parallelPickable << perspectivePickable;
 
   graphPickable.bb.set(Vec3f(-1.2f, -0.9f, -0.05f), Vec3f(1.2f, 0.9f, 0.0f));
@@ -103,70 +105,112 @@ void DataDisplay::init() {
       });
 
   mDatasetManager.mShellSiteTypes.registerChangeCallback([&](uint16_t value) {
-    auto voice = synth.getVoice<ModalVoice>();
     if (value & 1) {
+      auto voice = synth.getVoice<ModalVoice>();
       voice->fundamentalFreq = 1500;
       voice->setFrequencies(voice->smallHandBell, 0.0004);
+      voice->globalAmp = 30.0;
+      synth.triggerOn(voice);
+    }
+    if (value & 1 << 1) {
+      auto voice = synth.getVoice<ModalVoice>();
+      voice->fundamentalFreq = 1200;
+      voice->setFrequencies(voice->xylo, 0.07);
+      voice->globalAmp = 3.0;
+      synth.triggerOn(voice);
     }
     if (value & 1 << 2) {
-      voice->fundamentalFreq = 1200;
-      voice->setFrequencies(voice->xylo, 0.0004);
+      auto voice = synth.getVoice<ModalVoice>();
+      voice->fundamentalFreq = 800;
+      voice->setFrequencies(voice->smallHandBell, 0.0004);
+      voice->globalAmp = 30.0;
+      synth.triggerOn(voice);
     }
     if (value & 1 << 3) {
-      voice->fundamentalFreq = 800;
-      voice->setFrequencies(voice->smallHandBell, 0.0004);
-    }
-    if (value & 1 << 4) {
+      auto voice = synth.getVoice<ModalVoice>();
       voice->fundamentalFreq = 650;
       voice->setFrequencies(voice->xylo, 0.004);
+      voice->globalAmp = 2.0;
+      synth.triggerOn(voice);
     }
-    if (value & 1 << 5) {
+    if (value & 1 << 4) {
+      auto voice = synth.getVoice<ModalVoice>();
       voice->fundamentalFreq = 420;
       voice->setFrequencies(voice->smallHandBell, 0.0004);
+      voice->globalAmp = 40.0;
+      synth.triggerOn(voice);
     }
-    if (value & 1 << 6) {
+    if (value & 1 << 5) {
+      auto voice = synth.getVoice<ModalVoice>();
       voice->fundamentalFreq = 300;
       voice->setFrequencies(voice->xylo, 0.004);
+      voice->globalAmp = 7.0;
+      synth.triggerOn(voice);
     }
-    if (value & 1 << 7) {
+    if (value & 1 << 6) {
+      auto voice = synth.getVoice<ModalVoice>();
       voice->fundamentalFreq = 280;
       voice->setFrequencies(voice->smallHandBell, 0.0004);
+      voice->globalAmp = 40.0;
+      synth.triggerOn(voice);
     }
-    if (value & 1 << 8) {
+    if (value & 1 << 7) {
+      auto voice = synth.getVoice<ModalVoice>();
       voice->fundamentalFreq = 210;
       voice->setFrequencies(voice->xylo, 0.004);
+      voice->globalAmp = 7.0;
+      synth.triggerOn(voice);
+    }
+    if (value & 1 << 8) {
+      auto voice = synth.getVoice<ModalVoice>();
+      voice->fundamentalFreq = 1100;
+      voice->setFrequencies(voice->aluminiumBar, 0.004);
+      voice->globalAmp = 6.0;
+      synth.triggerOn(voice);
     }
     if (value & 1 << 9) {
-      voice->fundamentalFreq = 1100;
-      voice->setFrequencies(voice->xylo, 0.0004);
+      auto voice = synth.getVoice<ModalVoice>();
+      voice->fundamentalFreq = 800;
+      voice->setFrequencies(voice->tubularBell, 0.0004);
+      voice->globalAmp = 40.0;
+      synth.triggerOn(voice);
     }
     if (value & 1 << 10) {
-      voice->fundamentalFreq = 800;
-      voice->setFrequencies(voice->smallHandBell, 0.004);
+      auto voice = synth.getVoice<ModalVoice>();
+      voice->fundamentalFreq = 570;
+      voice->setFrequencies(voice->aluminiumBar, 0.004);
+      voice->globalAmp = 6.0;
+      synth.triggerOn(voice);
     }
     if (value & 1 << 11) {
-      voice->fundamentalFreq = 570;
-      voice->setFrequencies(voice->xylo, 0.0004);
+      auto voice = synth.getVoice<ModalVoice>();
+      voice->fundamentalFreq = 400;
+      voice->setFrequencies(voice->tubularBell, 0.0004);
+      voice->globalAmp = 30.0;
+      synth.triggerOn(voice);
     }
     if (value & 1 << 12) {
-      voice->fundamentalFreq = 400;
-      voice->setFrequencies(voice->smallHandBell, 0.004);
+      auto voice = synth.getVoice<ModalVoice>();
+      voice->fundamentalFreq = 3180;
+      voice->setFrequencies(voice->aluminiumBar, 0.004);
+      voice->globalAmp = 6.0;
+      synth.triggerOn(voice);
     }
     if (value & 1 << 13) {
-      voice->fundamentalFreq = 3180;
-      voice->setFrequencies(voice->xylo, 0.0004);
-    }
-    if (value & 1 << 15) {
+      auto voice = synth.getVoice<ModalVoice>();
       voice->fundamentalFreq = 259;
-      voice->setFrequencies(voice->smallHandBell, 0.004);
+      voice->setFrequencies(voice->tubularBell, 0.0004);
+      voice->globalAmp = 30.0;
+      synth.triggerOn(voice);
     }
-    if (value & 1 << 15) {
+    if (value & 1 << 14) {
+      auto voice = synth.getVoice<ModalVoice>();
       voice->fundamentalFreq = 223;
-      voice->setFrequencies(voice->xylo, 0.0004);
-    } else {
+      voice->setFrequencies(voice->aluminiumBar, 0.004);
+      voice->globalAmp = 2.0;
+      synth.triggerOn(voice);
     }
-    synth.triggerOn(voice);
-    std::cout << "set" << std::endl;
+
   });
 
   mShowAtoms.registerChangeCallback([this](uint16_t value) {
@@ -175,7 +219,7 @@ void DataDisplay::init() {
       // value
       mShowAtoms.setNoCalls(value);
       // TODO we should have a less heavy function to turn atoms on and off
-      mDatasetManager.computeNewSample();
+      mDatasetManager.sampleComputationChain.process();
     }
   });
 

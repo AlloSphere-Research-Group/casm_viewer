@@ -46,7 +46,6 @@ struct ModalVoice : public SynthVoice {
 
   std::vector<gam::Reson<>> modes;
   std::vector<float> amps;
-  float globalAmp = 10.;
 
   gam::NoisePink<> noise;
 
@@ -54,6 +53,7 @@ struct ModalVoice : public SynthVoice {
   gam::EnvFollow<> envFollow; // track envelope to know when to turn off note.
 
   float fundamentalFreq = 440;
+  float globalAmp = 10.;
 
   void init() override;
 

@@ -109,7 +109,7 @@ public:
   //  Trigger mRecomputeSpace{"RecomputeSpace"};
 
   ParameterBool mAutoAdvance{"autoAdvance"};
-  Parameter mAutoAdvanceFreq{"autoAdvanceFreq", "", 2, "", 0.25, 5.0};
+  Parameter mAutoAdvanceFreq{"autoAdvanceFreq", "", 5, "", 0.25, 10.0};
 
   // File selection
   //  ParameterMenu mDataRootPath{"datarootPath"};

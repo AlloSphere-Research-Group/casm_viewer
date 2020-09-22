@@ -34,6 +34,7 @@
 #include "tinc/AtomRenderer.hpp"
 #include "tinc/ScriptProcessor.hpp"
 #include "tinc/VASPReader.hpp"
+#include "tinc/ImageDiskBuffer.hpp"
 
 #include "datasetmanager.hpp"
 #include "slice.hpp"
@@ -110,6 +111,9 @@ public:
   ParameterBundle bundle{"CASMDataset"};
 
   ParameterInt currentSelection{"currentSelection"};
+
+  ParameterColor mMarkerColor{"markerColor"};
+  Parameter mMarkerScale{"markerScale", "", 1.7, 0.001, 4};
 };
 
 // -----------------------------------------------------------------
@@ -122,6 +126,8 @@ public:
 
   Mesh mHistoryMesh;
   Mesh mTrajectoryMesh;
+
+  ImageDiskBuffer imageDiskBuffer{"graph", "currentGraph.png", "cachedGraph"};
 
   // Pickables
   PickableManager mPickableManager;

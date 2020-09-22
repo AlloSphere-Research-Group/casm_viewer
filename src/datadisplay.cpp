@@ -283,26 +283,7 @@ void DataDisplay::init() {
         // New image module puts origin on top right
         //        if (mGraphTextureLock.try_lock()) {
         //            if (mGraphFilePathToLoad.size() > 0) {
-        Image img(value);
-        if (!img.loaded()) {
-          static std::string lastFailed = "";
-          if (lastFailed != value) {
-#ifdef AL_BUILD_MPI
-            char name[MPI_MAX_PROCESSOR_NAME];
-            int len;
-            int ret = MPI_Get_processor_name(name, &len);
-            std::cout << name << ": ";
-#endif
-            cout << "failed to load image " << value << endl;
-            lastFailed = value;
-          }
-          mGraphTexture.resize(4, 4);
-        } else {
-          mGraphTexture.resize(img.width(), img.height());
-          mGraphTexture.submit(img.pixels(), GL_RGBA, GL_UNSIGNED_BYTE);
-
-          mGraphTexture.filter(Texture::LINEAR_MIPMAP_LINEAR);
-        }
+        imageDiskBuffer.updateData(value);
       });
 
   mLabelFont.alignLeft();
@@ -528,18 +509,12 @@ void DataDisplay::draw(Graphics &g) { // Load data after drawing frame to allow
   }
 
   std::unique_lock<std::mutex> lk(mDrawLock);
-  // g.depthTesting(false);
   g.blendAdd();
-
-  g.lens().eyeSep(0.2);
 
   if (mShowPerspective.get() == 1.0f) {
     drawPerspective(g);
   }
 
-  // now draw graph and iso view 3d slabs
-  // set view to identity, effectively putting coord in eye space
-  // g.pushViewMatrix(Matrix4f::identity());
   g.texture();
   g.blendTrans();
 
@@ -551,7 +526,6 @@ void DataDisplay::draw(Graphics &g) { // Load data after drawing frame to allow
   if (mShowGraph.get() == 1.0f) {
     drawGraph(g);
   }
-  // g.popViewMatrix();
 }
 
 void DataDisplay::setFont(string name, float size) {
@@ -977,24 +951,9 @@ void DataDisplay::drawPerspective(Graphics &g) {
 
     {
       g.pushMatrix();
-      // Update box mesh that marks near and far clipping
-      // assumption
-      //   1. data is aligned to z axis
-      //   2. data range is [0:1] for all x, y, z
-      //   3. modelview matrix for perspective view should have been applied
       boxMesh.reset();
       boxMesh.primitive(Mesh::LINES);
-      // const float z[2] = {mNearClip.get(), mFarClip.get()};
-      // double scalingFactor = 1.0/(mDataBoundaries.maxz -
-      // mDataBoundaries.minz);
 
-      // Plane equation Ax + By + Cz - D = 0
-      //        float D =  -mSlicingPlanePoint.get().dot(mSlicingPlaneNormal);
-      // Line Equation
-
-      // const float x[2] = {mDataBoundaries.max.x, mDataBoundaries.min.x};
-      // const float y[2] = {mDataBoundaries.max.y, mDataBoundaries.min.y};
-      // const float z[2] = {0.0, (atomrender.mSlicingPlaneThickness)};
       const float x[2] = {slicePickable.bb.max.x, slicePickable.bb.min.x};
       const float y[2] = {slicePickable.bb.max.y, slicePickable.bb.min.y};
       const float z[2] = {slicePickable.bb.max.z, slicePickable.bb.min.z};
@@ -1018,7 +977,7 @@ void DataDisplay::drawPerspective(Graphics &g) {
                          /*perspectivePickable.scale * */ g.lens().eyeSep() *
                              g.eye() / 2.0f);
 
-      glLineWidth(5);
+      //      glLineWidth(5);
       g.polygonLine();
       g.color(0.8f, 0.8f, 1.0f, 0.9f);
       g.scale(1.0f, 1.0f, 1.0f + atomrender.mLayerSeparation);
@@ -1030,7 +989,7 @@ void DataDisplay::drawPerspective(Graphics &g) {
                0.0);
       g.draw(boxMesh);
       g.polygonFill();
-      glLineWidth(1);
+      //      glLineWidth(1);
 
       g.popMatrix();
     }
@@ -1048,8 +1007,8 @@ void DataDisplay::drawPerspective(Graphics &g) {
         for (auto addedPos : added.second) {
           g.pushMatrix();
           g.translate(addedPos.x, addedPos.y, addedPos.z);
-          g.color(1, 1, 1);
-          g.scale(1.7);
+          g.color(mMarkerColor);
+          g.scale(mMarkerScale);
           g.draw(mMarker);
           g.popMatrix();
         }
@@ -1087,44 +1046,40 @@ void DataDisplay::drawPerspective(Graphics &g) {
   g.polygonFill();
   g.depthTesting(false);
   g.blendAdd();
-  g.pushMatrix();
-  // TODO billboard this text
-  perspectivePickable.updateAABB();
+  {
+    g.pushMatrix();
+    // TODO billboard this text
+    perspectivePickable.updateAABB();
 
-  if (mDrawLabels == 1.0f) {
-    Vec3f textPos = perspectivePickable.aabb.min;
-    //        textPos.x = perspectivePickable.aabb.cen.x;
-    textPos.z = perspectivePickable.aabb.cen.z;
-    float dist = textPos.mag() * 0.025f;
-    g.translate(textPos);
-    if (mSmallLabel == 1.0f) {
-      g.scale(dist * 0.5f);
-    } else {
-      //            g.scale(dist * 0.5);
+    if (mDrawLabels == 1.0f) {
+      Vec3f textPos = perspectivePickable.aabb.min;
+      //        textPos.x = perspectivePickable.aabb.cen.x;
+      textPos.z = perspectivePickable.aabb.cen.z;
+      float dist = textPos.mag() * 0.025f;
+      g.translate(textPos);
+      if (mSmallLabel == 1.0f) {
+        g.scale(dist * 0.5f);
+      } else {
+        //            g.scale(dist * 0.5);
+      }
+      g.translate(0.0, -1.5, 0); // Push the text down a bit
+
+      // Draw label
+      Mesh mesh;
+      mLabelFont.write(
+          mesh, (mDatasetManager.currentDataset() + " " + mParamText).c_str(),
+          1.0);
+      g.texture();
+      mLabelFont.tex.bind();
+      g.draw(mesh);
+      mLabelFont.tex.unbind();
     }
-    g.translate(0.0, -1.5, 0); // Push the text down a bit
 
-    // Draw label
-    Mesh mesh;
-    mLabelFont.write(
-        mesh, (mDatasetManager.currentDataset() + " " + mParamText).c_str(),
-        1.0);
-    g.texture();
-    mLabelFont.tex.bind();
-    g.draw(mesh);
-    mLabelFont.tex.unbind();
+    g.popMatrix();
   }
 
-  g.popMatrix();
-
   perspectivePickable.drawBB(g);
-  //        perspectivePickable.drawChildren(g);
-  // if(perspectivePickable.hover || rh.hover[0] || rh.hover[1] || rh.hover[2]
-  // ){
-  //     g.depthTesting(false);
-  //     perspectivePickable.drawChildren(g);
-  //     g.depthTesting(true);
-  // }
+  g.popMatrix();
 }
 
 void DataDisplay::drawParallelProjection(Graphics &g) {
@@ -1174,6 +1129,12 @@ void DataDisplay::drawParallelProjection(Graphics &g) {
 }
 
 void DataDisplay::drawGraph(Graphics &g) {
+  if (imageDiskBuffer.newDataAvailable()) {
+    auto imageBuffer = imageDiskBuffer.get();
+    mGraphTexture.resize(imageBuffer->width(), imageBuffer->height());
+    mGraphTexture.submit(imageBuffer->pixels(), GL_RGBA, GL_UNSIGNED_BYTE);
+    mGraphTexture.filter(Texture::LINEAR_MIPMAP_LINEAR);
+  }
   graphPickable.pushMatrix(g);
 
   Vec3f forward = graphPickable.pose.get().pos();

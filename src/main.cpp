@@ -153,7 +153,7 @@ public:
   ScriptProcessor transfmatExtractor{"TransfmatExtractor"};
   ScriptProcessor templateGen{"TemplateGenerator"};
 
-  TincServer processorServer; // To expose processor chains on the network
+  TincServer tincServer;
 
   // --------
   std::vector<DataDisplay *> dataDisplays;
@@ -650,6 +650,7 @@ public:
     if (isPrimary()) {
       storeConfiguration();
     }
+    tincServer.stop();
     imguiShutdown();
     //#ifdef AL_EXT_OPENVR
     //    mOpenVR.close();
@@ -1188,22 +1189,23 @@ public:
                               "/reassign_occs/template_creator.py");
     templateGen.setOutputFileNames({"cached_output/template.nc"});
 
-    //    parameterSpaceProcessor.verbose(true);
-    //    transfmatExtractor.verbose(true);
-    //    templateGen.verbose(true);
+    parameterSpaceProcessor.verbose(true);
+    transfmatExtractor.verbose(true);
+    templateGen.verbose(true);
 
     templateGen.prepareFunction = [&]() {
       if (File::exists(transfmatExtractor.outputFile())) {
         auto transfmatFile = transfmatExtractor.outputFile(false);
         templateGen.configuration["transfmat"] = transfmatFile;
-        templateGen.setInputDirectory(transfmatExtractor.outputDirectory());
-      } else if (File::exists(templateGen.runningDirectory() +
+        templateGen.setInputDirectory(transfmatExtractor.getOutputDirectory());
+      } else if (File::exists(templateGen.getRunningDirectory() +
                               "cached_output/transfmat")) {
         templateGen.configuration["transfmat"] =
             VariantValue("cached_output/transfmat");
-      } else if (File::exists(templateGen.runningDirectory() + "transfmat")) {
+      } else if (File::exists(templateGen.getRunningDirectory() +
+                              "transfmat")) {
         templateGen.configuration["transfmat"] = "transfmat";
-      } else if (File::exists(templateGen.runningDirectory() +
+      } else if (File::exists(templateGen.getRunningDirectory() +
                               "../transfmat")) {
         templateGen.configuration["transfmat"] = "../transfmat";
       } else {
@@ -1217,10 +1219,18 @@ public:
                              << transfmatExtractor
                              << templateGen /*<< trajectoryProcessor*/;
 
-    // Only the root chain needs to be exposed
-    processorServer << initRootComputationChain
-                    << dataDisplays[0]->mDatasetManager.sampleComputationChain;
-    processorServer.exposeToNetwork(parameterServer());
+    // Configure TINC server
+    tincServer << initRootComputationChain
+               << dataDisplays[0]->mDatasetManager.sampleComputationChain;
+    tincServer << dataDisplays[0]->mDatasetManager.mParameterSpace;
+    tincServer << dataDisplays[0]->mDatasetManager.mShellSiteTypes;
+    tincServer << dataDisplays[0]->imageDiskBuffer;
+
+    tincServer << dataDisplays[0]->mMarkerColor
+               << dataDisplays[0]->mMarkerScale;
+
+    tincServer.registerParameterServer(parameterServer());
+    tincServer.start();
   }
 
   void registerParameterCallbacks() {

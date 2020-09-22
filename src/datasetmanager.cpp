@@ -130,7 +130,7 @@ void DatasetManager::initializeComputation() {
   trajectoryProcessor.prepareFunction = [&]() -> bool {
     trajectoryProcessor.configuration[""];
     return File::exists(
-        File::conformDirectory(trajectoryProcessor.runningDirectory()) +
+        File::conformDirectory(trajectoryProcessor.getRunningDirectory()) +
         "trajectory.json.gz");
   };
 
@@ -232,7 +232,7 @@ void DatasetManager::initializeComputation() {
       graphGenerator.configuration["inyFile"] =
           std::string("cached_output/iny.bin");
 
-      graphGenerator.setOutputDirectory(graphGenerator.runningDirectory() +
+      graphGenerator.setOutputDirectory(graphGenerator.getRunningDirectory() +
                                         "/cached_output");
       graphGenerator.setOutputFileNames({datasetId + "_" + highlightValue +
                                          "_" +
@@ -287,7 +287,7 @@ void DatasetManager::initializeComputation() {
     if (labelProcessor.configuration.find("time") !=
         labelProcessor.configuration.end()) {
       positionOutputName +=
-          "_" + std::to_string(labelProcessor.configuration["time"].valueInt);
+          "_" + std::to_string(labelProcessor.configuration["time"].valueInt64);
     }
     labelProcessor.setOutputFileNames(
         {labelProcessor.sanitizeName(positionOutputName) + ".nc"});
@@ -1080,8 +1080,13 @@ DatasetManager::getCurrentCompositions() {
 std::vector<int8_t> DatasetManager::getShellSiteTypes(size_t timeIndex) {
   std::vector<int8_t> matches;
   int8_t count = 0;
+
   for (auto &neighborhoodGroups : shellSiteMap) {
     std::vector<int16_t> sites;
+    if (!mParameterSpace.getDimension("time") ||
+        mParameterSpace.getDimension("time")->size() <= timeIndex) {
+      continue;
+    }
     auto *p =
         &neighborhoodGroups.second
              .shell_sites[timeIndex * neighborhoodGroups.second.occ_ref.size()];
@@ -1110,15 +1115,10 @@ std::vector<int8_t> DatasetManager::getShellSiteTypes(size_t timeIndex) {
       //        siteIt++;
       //      }
 
-      bool isMatch = false;
       if (neighborhoodGroups.second.flag.size() > timeIndex) {
         if (neighborhoodGroups.second.flag[timeIndex] == 1) {
-          isMatch = true;
+          matches.push_back(count);
         }
-      }
-
-      if (isMatch) {
-        matches.push_back(count);
       }
     }
     count++;

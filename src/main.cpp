@@ -1220,12 +1220,14 @@ public:
                              << templateGen /*<< trajectoryProcessor*/;
 
     // Configure TINC server
-    tincServer << initRootComputationChain
-               << dataDisplays[0]->mDatasetManager.sampleComputationChain;
+    tincServer << initRootComputationChain;
+
+    tincServer << dataDisplays[0]->mDatasetManager.sampleComputationChain;
     tincServer << dataDisplays[0]->mDatasetManager.mParameterSpace;
     tincServer << dataDisplays[0]->mDatasetManager.mShellSiteTypes;
-    tincServer << dataDisplays[0]->imageDiskBuffer;
+    tincServer << dataDisplays[0]->mDatasetManager.dataPool;
 
+    tincServer << dataDisplays[0]->imageDiskBuffer;
     tincServer << dataDisplays[0]->mMarkerColor
                << dataDisplays[0]->mMarkerScale;
 

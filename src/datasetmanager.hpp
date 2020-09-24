@@ -10,6 +10,7 @@
 #include "tinc/ImageDiskBuffer.hpp"
 #include "tinc/ParameterSpace.hpp"
 #include "tinc/VASPReader.hpp"
+#include "tinc/DataPool.hpp"
 
 #include "al/ui/al_Parameter.hpp"
 
@@ -68,6 +69,8 @@ public:
   ScriptProcessor labelProcessor{"AtomLabelProcessor"};
   CppProcessor kmcOccupation{"KMCOccupationExtractor"};
   ScriptProcessor graphGenerator{"GraphGenerator"};
+
+  DataPool dataPool{"resultsData", mParameterSpace, "slices"};
 
   // TINC Buffers.
   //  BufferManager<std::map<std::string, std::vector<float>>>

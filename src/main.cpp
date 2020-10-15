@@ -113,6 +113,7 @@ public:
 
   // File selection
   //  ParameterMenu mDataRootPath{"datarootPath"};
+  ParameterString mDataset{"dataset"};
   ParameterMenu mRecentDatasets{"recentDatasets"};
 
   // 3D nav parameters
@@ -1231,6 +1232,8 @@ public:
     tincServer << dataDisplays[0]->mMarkerColor
                << dataDisplays[0]->mMarkerScale;
 
+    tincServer << mDataset;
+
     tincServer.registerParameterServer(parameterServer());
     tincServer.start();
   }
@@ -1508,9 +1511,13 @@ public:
           });
         }
       });
+
+      mDataset.registerChangeCallback([&](std::string value) {
+        loadDataset(value, vdvBundle.currentBundle());
+      });
+
       mRecentDatasets.registerChangeCallback([&](int index) {
-        loadDataset(mRecentDatasets.getElements()[index],
-                    vdvBundle.currentBundle());
+        mDataset.set(mRecentDatasets.getElements()[index]);
         if (mDatasetSelector) {
           mDatasetSelector->cancel();
         }

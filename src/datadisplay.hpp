@@ -75,6 +75,7 @@ struct ElementData {
 
 class DataDisplayParameters {
 public:
+  ParameterBool mDisplaySlicing{"displaySlicing", "", 1.0};
   ParameterVec3 layerDir{"LayerDir", ""}; // Direction of layers in data
 
   ParameterChoice mShowAtoms{"ShowAtoms"};

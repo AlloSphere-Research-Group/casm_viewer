@@ -814,6 +814,8 @@ public:
         ParameterGUI::drawTrigger(&mSaveGraphics);
         ImGui::SameLine();
         ParameterGUI::drawParameterMeta(&ResetSlicing);
+        ParameterGUI::draw(
+            &this->dataDisplays[vdvBundle.currentBundle()]->mDisplaySlicing);
 
         ImGui::Text("%s", dataDisplays[vdvBundle.currentBundle()]
                               ->mDatasetManager.metaText.c_str());
@@ -822,13 +824,15 @@ public:
         ParameterGUI::drawParameterMeta(
             &this->dataDisplays[vdvBundle.currentBundle()]
                  ->mDatasetManager.mShellSiteTypes);
-        if (ImGui::CollapsingHeader("Slicing")) {
+        if (this->dataDisplays[vdvBundle.currentBundle()]
+                    ->mDisplaySlicing.get() == 1.0 &&
+            ImGui::CollapsingHeader("Slicing")) {
           ImGui::Indent(20.0);
           ParameterGUI::drawParameterMeta(
-              &dataDisplays[vdvBundle.currentBundle()]
+              &this->dataDisplays[vdvBundle.currentBundle()]
                    ->atomrender.mSlicingPlaneNormal);
           ParameterGUI::drawParameterMeta(
-              &dataDisplays[vdvBundle.currentBundle()]
+              &this->dataDisplays[vdvBundle.currentBundle()]
                    ->atomrender.mSlicingPlaneThickness);
 
           ParameterGUI::drawParameterMeta(&mJumpLayerNeg);

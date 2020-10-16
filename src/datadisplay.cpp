@@ -316,6 +316,7 @@ void DataDisplay::init() {
   bundle << mBillboarding;
   bundle << mSmallLabel;
   bundle << mDrawLabels;
+  bundle << mDisplaySlicing;
 }
 
 void DataDisplay::initDataset() {
@@ -518,7 +519,7 @@ void DataDisplay::draw(Graphics &g) { // Load data after drawing frame to allow
   g.texture();
   g.blendTrans();
 
-  if (mShowParallel.get() == 1.0f) {
+  if (mDisplaySlicing.get() == 1.0 && mShowParallel.get() == 1.0f) {
     drawParallelProjection(g);
   }
 
@@ -949,7 +950,7 @@ void DataDisplay::drawPerspective(Graphics &g) {
     g.depthTesting(true);
     g.blending(true);
 
-    {
+    if (mDisplaySlicing.get() == 1.0) {
       g.pushMatrix();
       boxMesh.reset();
       boxMesh.primitive(Mesh::LINES);

@@ -959,6 +959,16 @@ public:
 
     ParameterGUI::endPanel();
     ImGui::PopID();
+
+    auto params = tincServer.dimensions();
+    ImGui::Begin("TINC controls");
+    for (auto *param : params) {
+      if (param->getGroup() == "casm") {
+        al::ParameterGUI::draw(&param->parameter());
+      }
+    }
+    ImGui::End();
+
     imguiEndFrame();
   }
 

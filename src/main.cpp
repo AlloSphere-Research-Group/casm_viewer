@@ -964,7 +964,7 @@ public:
     ImGui::Begin("TINC controls");
     for (auto *param : params) {
       if (param->getGroup() == "casm") {
-        al::ParameterGUI::draw(&param->parameter());
+        gui::drawControl(param);
       }
     }
     ImGui::End();

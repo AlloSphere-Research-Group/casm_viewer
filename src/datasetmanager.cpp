@@ -53,8 +53,8 @@ void DatasetManager::initializeComputation() {
       ParameterSpace *ps) {
     std::string condition;
     std::string folder;
-    for (auto dim : ps->dimensions) {
-      if (dim->type == ParameterSpaceDimension::MAPPED) {
+    for (auto dim : ps->getDimensions()) {
+      if (dim->getSpaceType() == ParameterSpaceDimension::ID) {
         if (dim->getName() != "dir") {
           condition = std::to_string(dim->getCurrentIndex());
           break;
@@ -115,8 +115,8 @@ void DatasetManager::initializeComputation() {
       relPath = ps->getDimension("dir")->idAt(indeces["dir"]);
     }
     std::string condition;
-    for (auto dim : ps->dimensions) {
-      if (dim->type == ParameterSpaceDimension::INDEX) {
+    for (auto dim : ps->getDimensions()) {
+      if (dim->getSpaceType() == ParameterSpaceDimension::INDEX) {
         condition = std::to_string(indeces[dim->getName()]);
       }
     }
@@ -258,8 +258,9 @@ void DatasetManager::initializeComputation() {
 
   std::string condition;
   std::string folder;
-  for (auto ps : mParameterSpace.dimensions) {
-    if (ps->type == ParameterSpaceDimension::MAPPED && ps->getName() != "dir") {
+  for (auto ps : mParameterSpace.getDimensions()) {
+    if (ps->getSpaceType() == ParameterSpaceDimension::ID &&
+        ps->getName() != "dir") {
       condition = std::to_string(ps->getCurrentIndex());
       break;
     } else {
@@ -393,8 +394,8 @@ std::string DatasetManager::getGlobalRootPath() {
 
 std::string DatasetManager::fullConditionPath() {
 
-  for (auto ps : mParameterSpace.dimensions) {
-    if (ps->type == ParameterSpaceDimension::INDEX) {
+  for (auto ps : mParameterSpace.getDimensions()) {
+    if (ps->getSpaceType() == ParameterSpaceDimension::INDEX) {
       std::string condition = std::to_string(ps->getCurrentIndex());
       return File::conformPathToOS(getGlobalRootPath() + mCurrentDataset.get() +
                                    "/" + getSubDir() + "/conditions." +
@@ -701,8 +702,8 @@ bool DatasetManager::valid() {
 std::string DatasetManager::currentDataset() { return mLoadedDataset; }
 
 std::string DatasetManager::getSubDir() {
-  for (auto ps : mParameterSpace.dimensions) {
-    if (ps->type == ParameterSpaceDimension::MAPPED) {
+  for (auto ps : mParameterSpace.getDimensions()) {
+    if (ps->getSpaceType() == ParameterSpaceDimension::ID) {
       return ps->getCurrentId();
     }
   }
@@ -948,8 +949,8 @@ void DatasetManager::loadTrajectory() {
     mParameterSpace.getDimension("time")
         ->append(timeValues.data(), timeValues.size());
     mParameterSpace.getDimension("time")->conform();
-    mParameterSpace.getDimension("time")->type =
-        ParameterSpaceDimension::INTERNAL;
+    mParameterSpace.getDimension("time")
+        ->setSpaceType(ParameterSpaceDimension::VALUE);
 
     if (numTimeSteps != mParameterSpace.getDimension("time")->size()) {
       std::cout << "ERROR: Time dimension mismatch!" << std::endl;
@@ -1070,8 +1071,8 @@ DatasetManager::getCurrentCompositions() {
       //                // Look for available comp_n atom names
       if (key.compare(0, comp_prefix.size(), comp_prefix) == 0) {
 
-        for (auto ps : mParameterSpace.dimensions) {
-          if (ps->type == ParameterSpaceDimension::INDEX) {
+        for (auto ps : mParameterSpace.getDimensions()) {
+          if (ps->getSpaceType() == ParameterSpaceDimension::INDEX) {
             if (ps->size() > 0) {
               auto index = ps->getCurrentIndex();
               if (it.value().size() > index) {

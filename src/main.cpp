@@ -719,6 +719,10 @@ public:
 
   void loadDataset(std::string path, size_t index) {
     assert(index < dataDisplays.size());
+    if (!al::File::isDirectory(path)) {
+      std::cerr << "ERROR: Can't find directory " << path << std::endl;
+    }
+
     parameterSpaceProcessor.setRunningDirectory(path);
     parameterSpaceProcessor.setOutputDirectory(path + "/cached_output");
 
@@ -774,7 +778,8 @@ public:
         mDatasetSelector->start(mPreviousBrowseDir);
       }
       if (this->dataDisplays[vdvBundle.currentBundle()]
-              ->mDatasetManager.mParameterSpace.dimensions.size() > 0) {
+              ->mDatasetManager.mParameterSpace.getDimensions()
+              .size() > 0) {
         if (mAutoAdvance == 0.0) {
           int currentBundle = vdvBundle.currentBundle();
 

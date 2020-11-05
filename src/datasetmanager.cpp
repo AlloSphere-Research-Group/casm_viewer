@@ -127,12 +127,14 @@ void DatasetManager::initializeComputation() {
 
   // Configure processing nodes and computation chains
 
-  trajectoryProcessor.prepareFunction = [&]() -> bool {
-    trajectoryProcessor.configuration[""];
-    return File::exists(
-        File::conformDirectory(trajectoryProcessor.getRunningDirectory()) +
-        "trajectory.json.gz");
-  };
+  //  trajectoryProcessor.prepareFunction = [&]() -> bool {
+  //    trajectoryProcessor.configuration[""];
+  //    std::cout << "Trajectory processor running in "
+  //              << trajectoryProcessor.getRunningDirectory() << std::endl;
+  //    return File::exists(
+  //        File::conformDirectory(trajectoryProcessor.getRunningDirectory()) +
+  //        "trajectory.json.gz");
+  //  };
 
   trajectoryProcessor.setInputFileNames({"trajectory.json.gz"});
   trajectoryProcessor.setOutputFileNames({"trajectory.nc"});
@@ -384,8 +386,9 @@ void DatasetManager::setPythonScriptPath(std::string pythonScriptPath) {
                                "graphing/plot.py");
   labelProcessor.setScriptName(File::conformDirectory(pythonScriptPath) +
                                "reassign_occs/reassign_occs.py");
-  trajectoryProcessor.setScriptName(File::conformDirectory(pythonScriptPath) +
-                                    "reassign_occs/analyze_kmc.py");
+  trajectoryProcessor.setScriptName(
+      File::conformDirectory(pythonScriptPath) +
+      "reassign_occs/extract_nc_from_trajectory_gzip.py");
 }
 
 std::string DatasetManager::getGlobalRootPath() {
@@ -415,9 +418,14 @@ void DatasetManager::initDataset() {
   std::unique_lock<std::mutex> lk(mDataLock);
   mParameterSpace.stopSweep();
 
+  // C:\Users\Andres\source\repos\casm_viewer\vdv_group_python\reassign_occs\extract_nc_from_trajectory_gzip.py
+
   std::string fullDatasetPath = File::conformPathToOS(
       getGlobalRootPath() + File::conformPathToOS(mCurrentDataset.get()));
   mLoadedDataset = fullDatasetPath;
+
+  trajectoryProcessor.setInputDirectory(fullDatasetPath);
+  trajectoryProcessor.process();
 
   // Read template
   std::string templatePath = fullDatasetPath + "cached_output/template.nc";
@@ -522,7 +530,6 @@ void DatasetManager::initDataset() {
   std::cout << fullDatasetPath + "slices" << std::endl;
 
   lk.unlock();
-  //  mParameterSpace.sweepAsync(sampleComputationChain);
 }
 
 void DatasetManager::analyzeDataset() {
@@ -869,6 +876,7 @@ std::vector<std::string> DatasetManager::getDataNames() {
 
 void DatasetManager::loadTrajectory() {
   auto trajectoryFile = fullConditionPath() + "trajectory.nc";
+  std::cout << "trying " << trajectoryFile;
   if (File::exists(trajectoryFile)) {
 
     int retval, ncid, varid;

@@ -761,7 +761,9 @@ public:
           auto selectedItems = mDatasetSelector->getSelection();
           if (selectedItems.count() > 0) {
             auto selection = selectedItems[0];
-            loadDataset(selection.filepath(), vdvBundle.currentBundle());
+            mDataset.set(File::conformPathToOS(selection.filepath()));
+            //            loadDataset(selection.filepath(),
+            //            vdvBundle.currentBundle());
             mPreviousBrowseDir = selection.path();
           }
           delete mDatasetSelector;
@@ -1246,6 +1248,7 @@ public:
     tincServer << dataDisplays[0]->mDatasetManager.mParameterSpace;
     tincServer << dataDisplays[0]->mDatasetManager.mShellSiteTypes;
     tincServer << dataDisplays[0]->mDatasetManager.dataPool;
+    tincServer << dataDisplays[0]->mDatasetManager.trajectoriesPool;
 
     tincServer << dataDisplays[0]->imageDiskBuffer;
     tincServer << dataDisplays[0]->mMarkerColor

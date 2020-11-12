@@ -71,6 +71,7 @@ public:
   ScriptProcessor graphGenerator{"GraphGenerator"};
 
   DataPool dataPool{"resultsData", mParameterSpace, "slices"};
+  DataPool trajectoriesPool{"trajectories", mParameterSpace, "slices"};
 
   // TINC Buffers.
   //  BufferManager<std::map<std::string, std::vector<float>>>

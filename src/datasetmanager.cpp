@@ -371,6 +371,25 @@ void DatasetManager::initializeComputation() {
     }
     return paths;
   };
+
+  trajectoriesPool.registerDataFile("trajectories.nc", "time");
+  trajectoriesPool.getAllPaths = [&]() {
+    std::vector<std::string> paths;
+    for (auto id : mParameterSpace.getDimension("dir")->ids()) {
+      auto path = al::File::conformPathToOS(mParameterSpace.rootPath) +
+                  al::File::conformPathToOS(id) + "/";
+      for (auto ps : mParameterSpace.getDimensions()) {
+        if (ps->getSpaceType() == ParameterSpaceDimension::INDEX) {
+          std::string condition = std::to_string(ps->getCurrentIndex());
+          path += "condition." + condition;
+        }
+      }
+      if (path.size() > 0) {
+        paths.push_back(path);
+      }
+    }
+    return paths;
+  };
 }
 
 void DatasetManager::setPythonBinary(std::string pythonBinaryPath) {
@@ -527,6 +546,7 @@ void DatasetManager::initDataset() {
   }
 
   dataPool.setCacheDirectory(fullDatasetPath + "slices");
+  trajectoriesPool.setCacheDirectory(fullDatasetPath + "slices");
   std::cout << fullDatasetPath + "slices" << std::endl;
 
   lk.unlock();
@@ -876,7 +896,7 @@ std::vector<std::string> DatasetManager::getDataNames() {
 
 void DatasetManager::loadTrajectory() {
   auto trajectoryFile = fullConditionPath() + "trajectory.nc";
-  std::cout << "trying " << trajectoryFile;
+  //  std::cout << "trying " << trajectoryFile;
   if (File::exists(trajectoryFile)) {
 
     int retval, ncid, varid;

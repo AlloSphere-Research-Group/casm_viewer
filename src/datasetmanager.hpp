@@ -72,6 +72,7 @@ public:
 
   DataPool dataPool{"resultsData", mParameterSpace, "slices"};
   DataPool trajectoriesPool{"trajectories", mParameterSpace, "slices"};
+  DataPool neighborhoodPool{"neighborhood", mParameterSpace, "slices"};
 
   // TINC Buffers.
   //  BufferManager<std::map<std::string, std::vector<float>>>

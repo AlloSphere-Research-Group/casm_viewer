@@ -1249,6 +1249,7 @@ public:
     tincServer << dataDisplays[0]->mDatasetManager.mShellSiteTypes;
     tincServer << dataDisplays[0]->mDatasetManager.dataPool;
     tincServer << dataDisplays[0]->mDatasetManager.trajectoriesPool;
+    tincServer << dataDisplays[0]->mDatasetManager.neighborhoodPool;
 
     tincServer << dataDisplays[0]->imageDiskBuffer;
     tincServer << dataDisplays[0]->mMarkerColor

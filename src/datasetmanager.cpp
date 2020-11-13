@@ -390,6 +390,28 @@ void DatasetManager::initializeComputation() {
     }
     return paths;
   };
+
+  neighborhoodPool.registerDataFile("../cleared_path0.nc", "");
+  neighborhoodPool.registerDataFile("../free_range_path0.nc", "");
+  neighborhoodPool.getAllPaths = [&]() {
+    std::vector<std::string> paths;
+    for (auto id : mParameterSpace.getDimension("dir")->ids()) {
+      auto path = al::File::conformPathToOS(mParameterSpace.rootPath) +
+                  al::File::conformPathToOS(id) + "/";
+      //          for (auto ps : mParameterSpace.getDimensions()) {
+      //              if (ps->getSpaceType() == ParameterSpaceDimension::INDEX)
+      //              {
+      //                  std::string condition =
+      //                  std::to_string(ps->getCurrentIndex());
+      //                  path += "condition." + condition;
+      //              }
+      //          }
+      if (path.size() > 0) {
+        paths.push_back(path);
+      }
+    }
+    return paths;
+  };
 }
 
 void DatasetManager::setPythonBinary(std::string pythonBinaryPath) {

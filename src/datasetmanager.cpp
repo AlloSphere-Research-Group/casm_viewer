@@ -54,7 +54,7 @@ void DatasetManager::initializeComputation() {
     std::string condition;
     std::string folder;
     for (auto dim : ps->getDimensions()) {
-      if (dim->getSpaceType() == ParameterSpaceDimension::ID) {
+      if (dim->getSpaceRepresentationType() == ParameterSpaceDimension::ID) {
         if (dim->getName() != "dir") {
           condition = std::to_string(dim->getCurrentIndex());
           break;
@@ -107,22 +107,17 @@ void DatasetManager::initializeComputation() {
 
     updateText();
   };
-
   mParameterSpace.generateRelativeRunPath = [&](
       std::map<std::string, size_t> indeces, ParameterSpace *ps) {
-    std::string relPath;
-    if (ps->getDimension("dir")) {
-      relPath = ps->getDimension("dir")->idAt(indeces["dir"]);
-    }
-    std::string condition;
+    std::string conditionDim;
     for (auto dim : ps->getDimensions()) {
-      if (dim->getSpaceType() == ParameterSpaceDimension::INDEX) {
-        condition = std::to_string(indeces[dim->getName()]);
+      if (dim->getSpaceRepresentationType() == ParameterSpaceDimension::INDEX) {
+        conditionDim = dim->getName();
       }
     }
-    relPath += "conditions." + condition + "/";
-
-    return relPath;
+    std::string pathTemplate = "%%dir%%conditions.%%" + conditionDim + "%%";
+    std::string path = ps->resolveFilename(pathTemplate);
+    return al::File::conformPathToOS(path);
   };
 
   // Configure processing nodes and computation chains
@@ -173,7 +168,8 @@ void DatasetManager::initializeComputation() {
       if (mParameterSpace.getDimension(xLabel)) {
         try {
           datax.reserve(mParameterSpace.getDimension(xLabel)->size());
-          for (auto value : mParameterSpace.getDimension(xLabel)->values()) {
+          for (auto value :
+               mParameterSpace.getDimension(xLabel)->getSpaceValues<float>()) {
             datax.push_back(value);
           }
           highlightValue = std::to_string(
@@ -261,7 +257,7 @@ void DatasetManager::initializeComputation() {
   std::string condition;
   std::string folder;
   for (auto ps : mParameterSpace.getDimensions()) {
-    if (ps->getSpaceType() == ParameterSpaceDimension::ID &&
+    if (ps->getSpaceRepresentationType() == ParameterSpaceDimension::ID &&
         ps->getName() != "dir") {
       condition = std::to_string(ps->getCurrentIndex());
       break;
@@ -362,7 +358,7 @@ void DatasetManager::initializeComputation() {
   dataPool.registerDataFile("results.json", "chempotA");
   dataPool.getAllPaths = [&]() {
     std::vector<std::string> paths;
-    for (auto id : mParameterSpace.getDimension("dir")->ids()) {
+    for (auto id : mParameterSpace.getDimension("dir")->getSpaceIds()) {
       auto path = al::File::conformPathToOS(mParameterSpace.rootPath) +
                   al::File::conformPathToOS(id);
       if (path.size() > 0) {
@@ -375,11 +371,12 @@ void DatasetManager::initializeComputation() {
   trajectoriesPool.registerDataFile("trajectories.nc", "time");
   trajectoriesPool.getAllPaths = [&]() {
     std::vector<std::string> paths;
-    for (auto id : mParameterSpace.getDimension("dir")->ids()) {
+    for (auto id : mParameterSpace.getDimension("dir")->getSpaceIds()) {
       auto path = al::File::conformPathToOS(mParameterSpace.rootPath) +
                   al::File::conformPathToOS(id) + "/";
       for (auto ps : mParameterSpace.getDimensions()) {
-        if (ps->getSpaceType() == ParameterSpaceDimension::INDEX) {
+        if (ps->getSpaceRepresentationType() ==
+            ParameterSpaceDimension::INDEX) {
           std::string condition = std::to_string(ps->getCurrentIndex());
           path += "condition." + condition;
         }
@@ -395,7 +392,7 @@ void DatasetManager::initializeComputation() {
   neighborhoodPool.registerDataFile("../free_range_path0.nc", "");
   neighborhoodPool.getAllPaths = [&]() {
     std::vector<std::string> paths;
-    for (auto id : mParameterSpace.getDimension("dir")->ids()) {
+    for (auto id : mParameterSpace.getDimension("dir")->getSpaceIds()) {
       auto path = al::File::conformPathToOS(mParameterSpace.rootPath) +
                   al::File::conformPathToOS(id) + "/";
       //          for (auto ps : mParameterSpace.getDimensions()) {
@@ -439,7 +436,7 @@ std::string DatasetManager::getGlobalRootPath() {
 std::string DatasetManager::fullConditionPath() {
 
   for (auto ps : mParameterSpace.getDimensions()) {
-    if (ps->getSpaceType() == ParameterSpaceDimension::INDEX) {
+    if (ps->getSpaceRepresentationType() == ParameterSpaceDimension::INDEX) {
       std::string condition = std::to_string(ps->getCurrentIndex());
       return File::conformPathToOS(getGlobalRootPath() + mCurrentDataset.get() +
                                    "/" + getSubDir() + "/conditions." +
@@ -752,7 +749,7 @@ std::string DatasetManager::currentDataset() { return mLoadedDataset; }
 
 std::string DatasetManager::getSubDir() {
   for (auto ps : mParameterSpace.getDimensions()) {
-    if (ps->getSpaceType() == ParameterSpaceDimension::ID) {
+    if (ps->getSpaceRepresentationType() == ParameterSpaceDimension::ID) {
       return ps->getCurrentId();
     }
   }
@@ -997,10 +994,10 @@ void DatasetManager::loadTrajectory() {
     assert(mParameterSpace.getDimension("time"));
     mParameterSpace.getDimension("time")->clear();
     mParameterSpace.getDimension("time")
-        ->append(timeValues.data(), timeValues.size());
-    mParameterSpace.getDimension("time")->conform();
+        ->setSpaceValues(timeValues.data(), timeValues.size());
+    mParameterSpace.getDimension("time")->conformSpace();
     mParameterSpace.getDimension("time")
-        ->setSpaceType(ParameterSpaceDimension::VALUE);
+        ->setSpaceRepresentationType(ParameterSpaceDimension::VALUE);
 
     if (numTimeSteps != mParameterSpace.getDimension("time")->size()) {
       std::cout << "ERROR: Time dimension mismatch!" << std::endl;
@@ -1122,7 +1119,8 @@ DatasetManager::getCurrentCompositions() {
       if (key.compare(0, comp_prefix.size(), comp_prefix) == 0) {
 
         for (auto ps : mParameterSpace.getDimensions()) {
-          if (ps->getSpaceType() == ParameterSpaceDimension::INDEX) {
+          if (ps->getSpaceRepresentationType() ==
+              ParameterSpaceDimension::INDEX) {
             if (ps->size() > 0) {
               auto index = ps->getCurrentIndex();
               if (it.value().size() > index) {

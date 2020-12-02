@@ -95,10 +95,10 @@ public:
   Trigger stepChempot2Neg{"stepChempot2Neg"};
   Trigger stepTimePos{"stepTimePos"};
   Trigger stepTimeNeg{"stepTimeNeg"};
-  Parameter pitchAngleStep{"PitchAngleStep", "AngleControl", 15, "", 0.0, 60.0};
+  Parameter pitchAngleStep{"PitchAngleStep", "AngleControl", 15, 0.0, 60.0};
   Trigger stepPitchAnglePos{"stepPitchAnglePos", "AngleControl"};
   Trigger stepPitchAngleNeg{"stepPitchAngleNeg", "AngleControl"};
-  Parameter rollAngleStep{"RollAngleStep", "AngleControl", 15, "", 0.0, 60.0};
+  Parameter rollAngleStep{"RollAngleStep", "AngleControl", 15, 0.0, 60.0};
   Trigger stepRollAnglePos{"stepRollAnglePos", "AngleControl"};
   Trigger stepRollAngleNeg{"stepRollAngleNeg", "AngleControl"};
   //  Trigger CalculateSlicing{"CalculateSlicing"};
@@ -109,7 +109,7 @@ public:
   //  Trigger mRecomputeSpace{"RecomputeSpace"};
 
   ParameterBool mAutoAdvance{"autoAdvance"};
-  Parameter mAutoAdvanceFreq{"autoAdvanceFreq", "", 5, "", 0.25, 10.0};
+  Parameter mAutoAdvanceFreq{"autoAdvanceFreq", "", 5, 0.25, 10.0};
 
   // File selection
   //  ParameterMenu mDataRootPath{"datarootPath"};
@@ -117,8 +117,8 @@ public:
   ParameterMenu mRecentDatasets{"recentDatasets"};
 
   // 3D nav parameters
-  Parameter Z{"Z", "", 2.8f, "", -15, 15};
-  Parameter X{"X", "", 0.0, "", -2, 2};
+  Parameter Z{"Z", "", 2.8f, -15, 15};
+  Parameter X{"X", "", 0.0, -2, 2};
 
   // Settings
   ParameterColor backgroundColor{"background", "",
@@ -126,7 +126,7 @@ public:
   ParameterColor sliceBackground{"sliceBackground", "",
                                  Color(0.0f, 0.0f, 0.0f, 1.0f)};
   ParameterString font{"font"};
-  Parameter fontSize{"fontSize", "", 32, "", 2, 128};
+  Parameter fontSize{"fontSize", "", 32, 2, 128};
   ParameterString pythonScriptPath{"pythonScriptPath"};
   ParameterString pythonBinary{"pythonBinary"};
 
@@ -193,6 +193,8 @@ public:
 
     for (int i = 0; i < numDisplays; i++) {
       dataDisplays.push_back(new DataDisplay);
+      dataDisplays.back()->mDatasetManager.mParameterSpace.setId(
+          "casm_space_" + std::to_string(i));
       dataDisplays.back()->init();
       dataDisplays.back()->mDatasetManager.mRunProcessors = rank == 0;
       if (dataRoot.size() > 0) {
@@ -721,6 +723,7 @@ public:
     assert(index < dataDisplays.size());
     if (!al::File::isDirectory(path)) {
       std::cerr << "ERROR: Can't find directory " << path << std::endl;
+      return;
     }
 
     parameterSpaceProcessor.setRunningDirectory(path);

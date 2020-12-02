@@ -1152,6 +1152,10 @@ std::vector<int8_t> DatasetManager::getShellSiteTypes(size_t timeIndex) {
         mParameterSpace.getDimension("time")->size() <= timeIndex) {
       continue;
     }
+    if (neighborhoodGroups.second.shell_sites.size() <=
+        timeIndex * neighborhoodGroups.second.occ_ref.size()) {
+      continue;
+    }
     auto *p =
         &neighborhoodGroups.second
              .shell_sites[timeIndex * neighborhoodGroups.second.occ_ref.size()];

@@ -789,7 +789,6 @@ public:
           int currentBundle = vdvBundle.currentBundle();
 
           ImGui::Separator();
-          ImGui::Text("Parameter Space");
           gui::drawControls(this->dataDisplays[vdvBundle.currentBundle()]
                                 ->mDatasetManager.mParameterSpace);
           // auto &ps = this->dataDisplays[vdvBundle.currentBundle()]
@@ -972,6 +971,7 @@ public:
 
     auto params = tincServer.dimensions();
     ImGui::Begin("TINC controls");
+    gui::drawTincServerInfo(tincServer);
     for (auto *param : params) {
       if (param->getGroup() == "casm") {
         gui::drawControl(param);

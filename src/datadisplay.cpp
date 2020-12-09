@@ -96,12 +96,12 @@ void DataDisplay::init() {
   mDatasetManager.mCurrentDataset.setSynchronousCallbacks();
   mDatasetManager.mCurrentDataset.registerChangeCallback(
       [&](std::string value) {
-        //        if (value != mDatasetManager.mCurrentDataset.get()) {
-        // First force application of value
-        mDatasetManager.mCurrentDataset.setLocking(value);
-        initDataset();
-        resetSlicing();
-        //        }
+        if (value != mDatasetManager.mCurrentDataset.get()) {
+          // First force application of value
+          mDatasetManager.mCurrentDataset.setLocking(value);
+          initDataset();
+          resetSlicing();
+        }
       });
 
   mDatasetManager.mShellSiteTypes.registerChangeCallback([&](uint16_t value) {

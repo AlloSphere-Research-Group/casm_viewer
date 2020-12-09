@@ -115,6 +115,7 @@ public:
   //  ParameterMenu mDataRootPath{"datarootPath"};
   ParameterString mDataset{"dataset"};
   ParameterMenu mRecentDatasets{"recentDatasets"};
+  ParameterString mWindowTitle{"windowTitle"};
 
   // 3D nav parameters
   Parameter Z{"Z", "", 2.8f, -15, 15};
@@ -161,7 +162,6 @@ public:
 
   ObjectTransformHandler object_transform;
   bool showGui{true};
-  bool mMarkUpdateTitle{true};
 
 #ifdef AL_EXT_OPENVR
   std::shared_ptr<OpenVRDomain> openVRDomain;
@@ -289,9 +289,9 @@ public:
       }
     }
 
-    std::string cwdString = File::currentPath();
-    mDatasetSelector = new FileSelector(dataRoot, File::isDirectory);
-    mDatasetSelector->start(cwdString);
+//    std::string cwdString = File::currentPath();
+//    mDatasetSelector = new FileSelector(dataRoot, File::isDirectory);
+//    mDatasetSelector->start(cwdString);
 
 #ifdef AL_EXT_OPENVR
     openVRDomain = OpenVRDomain::enableVR(this);
@@ -390,18 +390,8 @@ public:
 
   virtual void onDraw(Graphics &g) override {
     g.clear(backgroundColor);
-    if (mMarkUpdateTitle) {
-      std::string newTitle = "CASM Viewer ";
-      for (auto *display : dataDisplays) {
-        if (display->mVisible == 1.0f) {
-          //          newTitle += display->mDatasetManager.mRootPath.get() + " :
-          //          ";
-          newTitle += display->mDatasetManager.mCurrentDataset;
-          newTitle += " -- ";
-        }
-      }
-      title(newTitle);
-      mMarkUpdateTitle = false;
+    if (mWindowTitle.processChange()) {
+      title(mWindowTitle.get());
     }
     drawScene(g);
     if (isPrimary()) {
@@ -745,7 +735,6 @@ public:
         mRecentDatasets.setElements(previousDatasets);
         mRecentDatasets.setNoCalls(0);
       }
-
     } else {
     }
   }
@@ -971,7 +960,7 @@ public:
 
     auto params = tincServer.dimensions();
     ImGui::Begin("TINC controls");
-    gui::drawTincServerInfo(tincServer);
+    gui::drawTincServerInfo(tincServer, true);
     for (auto *param : params) {
       if (param->getGroup() == "casm") {
         gui::drawControl(param);
@@ -1539,8 +1528,14 @@ public:
       });
 
       mDataset.registerChangeCallback([&](std::string value) {
-        loadDataset(value, vdvBundle.currentBundle());
+        if (value != mDataset.get()) {
+          // Only trigger load if value has changed
+          loadDataset(value, vdvBundle.currentBundle());
+        }
       });
+
+      // We want to process title changes in the graphics thread.
+      mWindowTitle.setSynchronousCallbacks(false);
 
       mRecentDatasets.registerChangeCallback([&](int index) {
         mDataset.set(mRecentDatasets.getElements()[index]);
@@ -1673,7 +1668,18 @@ public:
 
   //  const char *flowAddress() override { return "interface"; }
 
-  void updateTitle() { mMarkUpdateTitle = true; }
+  void updateTitle() {
+    std::string newTitle = "CASM Viewer ";
+    for (auto *display : dataDisplays) {
+      if (display->mVisible == 1.0f) {
+        //          newTitle += display->mDatasetManager.mRootPath.get() + " :
+        //          ";
+        newTitle += display->mDatasetManager.mCurrentDataset;
+        newTitle += " -- ";
+      }
+    }
+    mWindowTitle.set(newTitle);
+  }
 };
 
 int main() {

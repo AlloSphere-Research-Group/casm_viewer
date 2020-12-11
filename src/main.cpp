@@ -1249,7 +1249,7 @@ public:
 
     tincServer << mDataset;
 
-    tincServer.registerParameterServer(parameterServer());
+    tincServer.setVerbose(true);
     tincServer.start();
   }
 

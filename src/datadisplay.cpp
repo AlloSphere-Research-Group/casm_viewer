@@ -398,7 +398,6 @@ void DataDisplay::prepare(Graphics &g, Matrix4f &transformMatrix) {
   if (mDatasetManager.occupationData.newDataAvailable()) {
     updateDisplayBuffers();
   }
-  prepareHistoryMesh();
   prepareParallelProjection(g, transformMatrix);
 }
 

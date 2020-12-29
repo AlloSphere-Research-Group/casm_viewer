@@ -312,7 +312,7 @@ void DataDisplay::init() {
          << mGridYOffset;
 
   bundle << atomrender.mShowRadius;
-  bundle << mCumulativeTrajectory << mIndividualTrajectory;
+  //  bundle << mCumulativeTrajectory << mIndividualTrajectory;
   bundle << mBillboarding;
   bundle << mSmallLabel;
   bundle << mDrawLabels;
@@ -352,107 +352,6 @@ void DataDisplay::initDataset() {
     if (elementLabel.substr(0, speciesOfInterest.size()) == speciesOfInterest) {
       mShowAtoms.setElementSelected(elementLabel);
     }
-  }
-}
-
-void DataDisplay::prepareHistoryMesh() {
-  // History mesh displays individual movements from their actual positions
-  mHistoryMesh.primitive(Mesh::TRIANGLES);
-  mHistoryMesh.reset();
-
-  float historyWidth = 0.65f;
-  size_t counter = mDatasetManager.mHistory.size() - 1;
-  for (auto historyPoint = mDatasetManager.mHistory.begin();
-       historyPoint != mDatasetManager.mHistory.end(); historyPoint++) {
-    HSV hsvColor(0.5f * float(counter) / mDatasetManager.mHistory.size(), 1.0,
-                 1.0);
-    Color c;
-
-    // Assumes the plane's normal is the z-axis
-    Vec3f orthogonalVec = (historyPoint->second - historyPoint->first)
-                              .cross({0, 0, 1})
-                              .normalize(historyWidth);
-    Vec3f orthogonalVec2 = (historyPoint->second - historyPoint->first)
-                               .cross({1, 0, 0})
-                               .normalize(historyWidth);
-    if (orthogonalVec2.mag() < 0.0001f) {
-      orthogonalVec2 = (historyPoint->second - historyPoint->first)
-                           .cross({0, 1, 0})
-                           .normalize(historyWidth);
-    }
-    assert(orthogonalVec2.mag() > 0.0001f);
-    ImGui::ColorConvertHSVtoRGB(hsvColor.h, hsvColor.s, hsvColor.v, c.r, c.g,
-                                c.b);
-    c.a = 0.35f;
-    unsigned int previousSize = mHistoryMesh.vertices().size();
-    mHistoryMesh.color(c);
-    mHistoryMesh.vertex(historyPoint->first - orthogonalVec);
-    mHistoryMesh.color(c);
-    mHistoryMesh.vertex(historyPoint->second - orthogonalVec * 0.1f);
-    mHistoryMesh.color(c);
-    mHistoryMesh.vertex(historyPoint->first + orthogonalVec);
-    mHistoryMesh.color(c);
-    mHistoryMesh.vertex(historyPoint->second + orthogonalVec * 0.1f);
-
-    mHistoryMesh.index(previousSize);
-    mHistoryMesh.index(previousSize + 1);
-    mHistoryMesh.index(previousSize + 2);
-
-    mHistoryMesh.index(previousSize + 2);
-    mHistoryMesh.index(previousSize + 3);
-    mHistoryMesh.index(previousSize + 1);
-    counter--;
-  }
-
-  // Trajectory mesh displays the cumulative trajectory
-  mTrajectoryMesh.primitive(Mesh::TRIANGLES);
-  mTrajectoryMesh.reset();
-  Vec3f previousPoint(0, 0, 0);
-  float previousMag = 0.0;
-
-  float trajectoryWidth = 0.35f;
-  counter = mDatasetManager.mHistory.size() - 1;
-  for (auto historyPoint = mDatasetManager.mHistory.begin();
-       historyPoint != mDatasetManager.mHistory.end(); historyPoint++) {
-    HSV hsvColor(0.5f * float(counter) / mDatasetManager.mHistory.size(), 1.0,
-                 1.0);
-    Color c;
-
-    // Assumes the plane's normal is the z-axis
-    Vec3f thisMovement = historyPoint->second - historyPoint->first;
-    Vec3f orthogonalVec =
-        thisMovement.cross({0, 0, 1}).normalize(trajectoryWidth);
-    ImGui::ColorConvertHSVtoRGB(hsvColor.h, hsvColor.s, hsvColor.v, c.r, c.g,
-                                c.b);
-    c.a = 0.8f;
-    unsigned int previousSize = mTrajectoryMesh.vertices().size();
-    if (thisMovement.mag() >
-        fabs(mDataBoundaries.max.x - mDataBoundaries.min.x) /
-            2.0f) { // Atom is wrapping around
-      //              c = Color(0.8f, 0.8f, 0.8f, 1.0f);
-      thisMovement = -thisMovement;
-      thisMovement.normalize(previousMag);
-    } else {
-      previousMag = thisMovement.mag();
-    }
-    mTrajectoryMesh.color(c);
-    mTrajectoryMesh.vertex(previousPoint - orthogonalVec);
-    mTrajectoryMesh.color(c);
-    mTrajectoryMesh.vertex(previousPoint + thisMovement - orthogonalVec * 0.2f);
-    mTrajectoryMesh.color(c);
-    mTrajectoryMesh.vertex(previousPoint + orthogonalVec);
-    mTrajectoryMesh.color(c);
-    mTrajectoryMesh.vertex(previousPoint + thisMovement + orthogonalVec * 0.2f);
-
-    mTrajectoryMesh.index(previousSize);
-    mTrajectoryMesh.index(previousSize + 1);
-    mTrajectoryMesh.index(previousSize + 2);
-
-    mTrajectoryMesh.index(previousSize + 2);
-    mTrajectoryMesh.index(previousSize + 3);
-    mTrajectoryMesh.index(previousSize + 1);
-    previousPoint = previousPoint + thisMovement;
-    counter--;
   }
 }
 
@@ -739,15 +638,18 @@ void DataDisplay::drawHistory(Graphics &g) {
   g.pushMatrix();
   g.meshColor();
   g.polygonFill();
-  if (mIndividualTrajectory.get() != 0.0f) {
-    g.draw(mHistoryMesh);
-  }
-  if (mCumulativeTrajectory.get() != 0.0f) {
-    g.translate((mDataBoundaries.max.x - mDataBoundaries.min.x) / 2.0f,
-                (mDataBoundaries.max.y - mDataBoundaries.min.y) / 2.0f,
-                (mDataBoundaries.max.z - mDataBoundaries.min.z) / 2.0f);
-    g.draw(mTrajectoryMesh);
-  }
+  g.blending(true);
+  g.blendAdd();
+  //  g.translate((mDataBoundaries.max.x - mDataBoundaries.min.x) / 2.0f,
+  //              (mDataBoundaries.max.y - mDataBoundaries.min.y) / 2.0f,
+  //              (mDataBoundaries.max.z - mDataBoundaries.min.z) / 2.0f);
+
+  mHistoryRender.update(0);
+  mTrajRender.update(0);
+
+  mHistoryRender.onProcess(g);
+  mTrajRender.onProcess(g);
+
   g.popMatrix();
 }
 
@@ -910,8 +812,6 @@ void DataDisplay::prepareParallelProjection(Graphics &g,
       atomrender.instancingMesh.draw();
     }
 
-    drawHistory(g);
-
     g.popMatrix();
     g.popViewMatrix();
     g.popViewport();
@@ -932,6 +832,7 @@ void DataDisplay::drawPerspective(Graphics &g) {
   }
 
   g.lens().far(2000);
+
   {
     perspectivePickable.pushMatrix(g);
 
@@ -940,10 +841,14 @@ void DataDisplay::drawPerspective(Graphics &g) {
 
     g.meshColor();
 
-    g.pushMatrix();
-    g.scale(20);
-    g.draw(axis);
-    g.popMatrix();
+    {
+      g.pushMatrix();
+      g.scale(20);
+      g.draw(axis);
+      g.popMatrix();
+    }
+
+    drawHistory(g);
 
     atomrender.draw(g, perspectivePickable.scale, mAtomData, mAligned4fData);
 
@@ -995,8 +900,6 @@ void DataDisplay::drawPerspective(Graphics &g) {
       g.popMatrix();
     }
 
-    drawHistory(g);
-
     { // Draw change markers
       g.pushMatrix();
 
@@ -1041,7 +944,7 @@ void DataDisplay::drawPerspective(Graphics &g) {
       g.popMatrix();
     }
 
-    g.popMatrix(); // pickable
+    perspectivePickable.popMatrix(g); // pickable
   }
 
   g.polygonFill();

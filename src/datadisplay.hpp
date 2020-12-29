@@ -31,10 +31,11 @@
 #include "al/ui/al_PickableManager.hpp"
 #include "al/ui/al_PickableRotateHandle.hpp"
 
-#include "tinc/AtomRenderer.hpp"
+#include "tinc/vis/AtomRenderer.hpp"
 #include "tinc/ScriptProcessor.hpp"
 #include "tinc/VASPReader.hpp"
 #include "tinc/ImageDiskBuffer.hpp"
+#include "tinc/vis/TrajectoryRender.hpp"
 
 #include "datasetmanager.hpp"
 #include "slice.hpp"
@@ -79,8 +80,8 @@ public:
   ParameterVec3 layerDir{"LayerDir", ""}; // Direction of layers in data
 
   ParameterChoice mShowAtoms{"ShowAtoms"};
-  ParameterBool mCumulativeTrajectory{"ShowCumulativeTrajectory", "", 1.0};
-  ParameterBool mIndividualTrajectory{"ShowIndividualTrajectory", "", 1.0};
+  //  ParameterBool mCumulativeTrajectory{"ShowCumulativeTrajectory", "", 1.0};
+  //  ParameterBool mIndividualTrajectory{"ShowIndividualTrajectory", "", 1.0};
 
   ParameterColor backgroundColor{"projectionBackground", "",
                                  Color(0.1f, 0.1f, 0.1f, 0.8f)};
@@ -125,9 +126,6 @@ public:
 
   DatasetManager mDatasetManager;
 
-  Mesh mHistoryMesh;
-  Mesh mTrajectoryMesh;
-
   ImageDiskBuffer imageDiskBuffer{"graph", "currentGraph.png", "cachedGraph"};
 
   // Pickables
@@ -138,6 +136,9 @@ public:
   PickableBB slicePickable{"slice"};
   // PickableRotateHandle rh;
   Vec3f selectedPosition{FLT_MIN, FLT_MIN, FLT_MIN};
+
+  TrajectoryRender mHistoryRender{"history", "history.json"};
+  TrajectoryRender mTrajRender{"trajectory", "trajectory.json"};
 
   std::string mParamText;
 
@@ -160,7 +161,6 @@ public:
 
   // Prepare elements before draw call
   void prepare(Graphics &g, Matrix4f &transformMatrix);
-  void prepareHistoryMesh();
   void prepareParallelProjection(Graphics &g, Matrix4f &transformMatrix);
 
   // Draw function

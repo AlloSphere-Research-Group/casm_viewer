@@ -653,11 +653,9 @@ public:
   // ---- Drawing functions
 
   void drawScene(Graphics &g) {
-    g.pushMatrix();
     for (auto *display : dataDisplays) {
       display->draw(g);
     }
-    g.popMatrix();
   }
 
 #ifdef AL_EXT_OPENVR
@@ -800,12 +798,12 @@ public:
                                std::to_string(mAutoAdvanceFreq);
             ImGui::Text("%s", text.c_str());
           }
-          ParameterGUI::drawParameterMeta(
-              &this->dataDisplays[vdvBundle.currentBundle()]
-                   ->mCumulativeTrajectory);
-          ParameterGUI::drawParameterMeta(
-              &this->dataDisplays[vdvBundle.currentBundle()]
-                   ->mIndividualTrajectory);
+          //          ParameterGUI::drawParameterMeta(
+          //              &this->dataDisplays[vdvBundle.currentBundle()]
+          //                   ->mCumulativeTrajectory);
+          //          ParameterGUI::drawParameterMeta(
+          //              &this->dataDisplays[vdvBundle.currentBundle()]
+          //                   ->mIndividualTrajectory);
         }
         //          ImGui::Separator();
         //          ParameterGUI::drawParameterMeta(&mViewMenu);
@@ -1248,6 +1246,12 @@ public:
                << dataDisplays[0]->mMarkerScale;
 
     tincServer << mDataset;
+
+    dataDisplays[0]->mHistoryRender.trajectoryWidth.max(100);
+    dataDisplays[0]->mTrajRender.trajectoryWidth.max(100);
+
+    dataDisplays[0]->mHistoryRender.registerWithTincServer(tincServer);
+    dataDisplays[0]->mTrajRender.registerWithTincServer(tincServer);
 
     tincServer.setVerbose(true);
     tincServer.start();

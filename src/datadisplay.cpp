@@ -219,7 +219,7 @@ void DataDisplay::init() {
       // value
       mShowAtoms.setNoCalls(value);
       // TODO we should have a less heavy function to turn atoms on and off
-      mDatasetManager.sampleComputationChain.process();
+      mDatasetManager.sampleProcessorGraph.process();
     }
   });
 

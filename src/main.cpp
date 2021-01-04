@@ -148,12 +148,12 @@ public:
   PeriodicTask mParameterPlayback;
 
   // TINC computation chains
-  ComputationChain initRootComputationChain{"PrepareDataset"};
+  ProcessorGraph initRootProcessorGraph{"PrepareDataset"};
 
-  ScriptProcessor parameterSpaceProcessor{"ParameterSpaceProcessor"};
-  ScriptProcessor shellSiteFileAnalyzer{"ShellSiteFileAnalyzer"};
-  ScriptProcessor transfmatExtractor{"TransfmatExtractor"};
-  ScriptProcessor templateGen{"TemplateGenerator"};
+  ProcessorScript parameterSpaceProcessor{"ParameterSpaceProcessor"};
+  ProcessorScript shellSiteFileAnalyzer{"ShellSiteFileAnalyzer"};
+  ProcessorScript transfmatExtractor{"TransfmatExtractor"};
+  ProcessorScript templateGen{"TemplateGenerator"};
 
   TincServer tincServer;
 
@@ -722,7 +722,7 @@ public:
     transfmatExtractor.setDataDirectory(path);
     templateGen.setDataDirectory(path);
 
-    initRootComputationChain.process();
+    initRootProcessorGraph.process();
 
     if (index >= 0) {
       dataDisplays[index]->mDatasetManager.mCurrentDataset.set(path);
@@ -1227,14 +1227,14 @@ public:
       return true;
     };
 
-    initRootComputationChain << parameterSpaceProcessor << shellSiteFileAnalyzer
+    initRootProcessorGraph << parameterSpaceProcessor << shellSiteFileAnalyzer
                              << transfmatExtractor
                              << templateGen /*<< trajectoryProcessor*/;
 
     // Configure TINC server
-    tincServer << initRootComputationChain;
+    tincServer << initRootProcessorGraph;
 
-    tincServer << dataDisplays[0]->mDatasetManager.sampleComputationChain;
+    tincServer << dataDisplays[0]->mDatasetManager.sampleProcessorGraph;
     tincServer << dataDisplays[0]->mDatasetManager.mParameterSpace;
     tincServer << dataDisplays[0]->mDatasetManager.mShellSiteTypes;
     tincServer << dataDisplays[0]->mDatasetManager.dataPool;
@@ -1633,7 +1633,7 @@ public:
           transfmatExtractor.setDataDirectory(element.filepath());
           templateGen.setDataDirectory(element.filepath());
 
-          initRootComputationChain.process();
+          initRootProcessorGraph.process();
 
           std::cout << "Process parameter space for " << element.filepath()
                     << std::endl;

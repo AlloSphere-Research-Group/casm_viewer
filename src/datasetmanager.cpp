@@ -16,7 +16,7 @@
 
 #include "datasetmanager.hpp"
 
-#include "tinc/NetCDFDiskBuffer.hpp"
+#include "tinc/DiskBufferNetCDF.hpp"
 
 using namespace al;
 
@@ -80,7 +80,7 @@ void DatasetManager::initializeComputation() {
           getShellSiteTypes(ps->getDimension("time")->getCurrentIndex());
 
       mShellSiteTypes.set(shellSiteTypes);
-      //      ps->sweep(sampleComputationChain, {"time"});
+      //      ps->sweep(sampleProcessorGraph, {"time"});
     }
 
     if (ps->getDimension("time")) {
@@ -93,7 +93,7 @@ void DatasetManager::initializeComputation() {
                                       ParameterSpaceDimension *changedDimension,
                                       ParameterSpace *ps) {
 
-    sampleComputationChain.process();
+    sampleProcessorGraph.process();
 
     if (mParameterSpace.getDimension("time")) {
       occupationData.doneWriting(occupationData.getWritable());
@@ -139,7 +139,7 @@ void DatasetManager::initializeComputation() {
   labelProcessor.verbose();
 
   atomPositionChain << labelProcessor;
-  sampleComputationChain << atomPositionChain << graphGenerator;
+  sampleProcessorGraph << atomPositionChain << graphGenerator;
 
   // Graph generator
   graphGenerator.prepareFunction = [&]() {
@@ -234,7 +234,7 @@ void DatasetManager::initializeComputation() {
                                         "/cached_output");
       graphGenerator.setOutputFileNames({datasetId + "_" + highlightValue +
                                          "_" +
-                                         ScriptProcessor::sanitizeName(subDir) +
+                                         ProcessorScript::sanitizeName(subDir) +
                                          "_" + yLabelSanitized + "_graph.png"});
     } else {
       return false;

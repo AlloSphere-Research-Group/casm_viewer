@@ -32,9 +32,9 @@
 #include "al/ui/al_PickableRotateHandle.hpp"
 
 #include "tinc/vis/AtomRenderer.hpp"
-#include "tinc/ScriptProcessor.hpp"
+#include "tinc/ProcessorScript.hpp"
 #include "tinc/VASPReader.hpp"
-#include "tinc/ImageDiskBuffer.hpp"
+#include "tinc/DiskBufferImage.hpp"
 #include "tinc/vis/TrajectoryRender.hpp"
 
 #include "datasetmanager.hpp"

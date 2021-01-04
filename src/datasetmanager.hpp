@@ -5,9 +5,9 @@
 #include <string>
 #include <vector>
 
-#include "tinc/ComputationChain.hpp"
-#include "tinc/CppProcessor.hpp"
-#include "tinc/ImageDiskBuffer.hpp"
+#include "tinc/ProcessorGraph.hpp"
+#include "tinc/ProcessorCpp.hpp"
+#include "tinc/DiskBufferImage.hpp"
 #include "tinc/ParameterSpace.hpp"
 #include "tinc/VASPReader.hpp"
 #include "tinc/DataPool.hpp"
@@ -61,14 +61,14 @@ public:
 
   // TINC Computation
 
-  ComputationChain sampleComputationChain{"SampleComputation"};
+  ProcessorGraph sampleProcessorGraph{"SampleComputation"};
 
-  ComputationChain atomPositionChain{"AtomPositionComputation"};
+  ProcessorGraph atomPositionChain{"AtomPositionComputation"};
 
-  ScriptProcessor trajectoryProcessor{"TrajectoryPreprocessor"};
-  ScriptProcessor labelProcessor{"AtomLabelProcessor"};
-  CppProcessor kmcOccupation{"KMCOccupationExtractor"};
-  ScriptProcessor graphGenerator{"GraphGenerator"};
+  ProcessorScript trajectoryProcessor{"TrajectoryPreprocessor"};
+  ProcessorScript labelProcessor{"AtomLabelProcessor"};
+  ProcessorCpp kmcOccupation{"KMCOccupationExtractor"};
+  ProcessorScript graphGenerator{"GraphGenerator"};
 
   DataPool dataPool{"resultsData", mParameterSpace, "slices"};
   DataPool trajectoriesPool{"trajectories", mParameterSpace, "slices"};
@@ -111,7 +111,7 @@ public:
   ParameterString currentPoscarName{"currentPoscarName", "internal", ""};
   ParameterBool processing{"processing", "internal", false};
 
-  ParameterSpace mParameterSpace;
+  ParameterSpace mParameterSpace{"casmParameters"};
 
   // Plot axes
   ParameterMenu mPlotYAxis{"PlotYAxis"};

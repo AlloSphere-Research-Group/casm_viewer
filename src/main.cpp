@@ -20,7 +20,7 @@
 #include "al_ext/openvr/al_OpenVRDomain.hpp"
 
 #include "tinc/DeferredComputation.hpp"
-#include "tinc/GUI.hpp"
+#include "tinc/vis/GUI.hpp"
 #include "tinc/PeriodicTask.hpp"
 #include "tinc/TincServer.hpp"
 

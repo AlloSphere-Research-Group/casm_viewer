@@ -48,9 +48,11 @@ void DatasetManager::initializeComputation() {
                                       {"chempotA", "param_chem_pot(a)"},
                                       {"chempotB", "param_chem_pot(b)"}};
 
-  mParameterSpace.updateComputationSettings = [&](
-      float oldValue, ParameterSpaceDimension *changedDimension,
-      ParameterSpace *ps) {
+  // Parameter space callback
+  mParameterSpace.onValueChange = [&](ParameterSpaceDimension *changedDimension,
+                                      ParameterSpace *ps) {
+    // Update computation settings:
+
     std::string condition;
     std::string folder;
     for (auto dim : ps->getDimensions()) {
@@ -69,29 +71,31 @@ void DatasetManager::initializeComputation() {
     labelProcessor.configuration["condition"] = condition;
     labelProcessor.configuration["dir"] = folder;
 
-    if (changedDimension->getName() == "dir" &&
-        changedDimension->getCurrentId() !=
-            changedDimension->idAt(changedDimension->getIndexForValue(
-                oldValue))) { // Only reload if id has changed
-      //      ps->stopSweep();
-      loadTrajectory();
-      loadShellSiteData();
-      shellSiteTypes =
-          getShellSiteTypes(ps->getDimension("time")->getCurrentIndex());
+    if (changedDimension->getName() == "dir") {
+      int32_t previousValue =
+          dynamic_cast<Parameter *>(changedDimension->parameterMeta())
+              ->getPrevious();
+      if (changedDimension->getCurrentId() !=
+          changedDimension->idAt(
+              changedDimension->getIndexForValue(previousValue))) {
+        // Only reload if id has changed
+        //      ps->stopSweep();
+        loadTrajectory();
+        loadShellSiteData();
+        shellSiteTypes =
+            getShellSiteTypes(ps->getDimension("time")->getCurrentIndex());
 
-      mShellSiteTypes.set(shellSiteTypes);
-      //      ps->sweep(sampleProcessorGraph, {"time"});
+        mShellSiteTypes.set(shellSiteTypes);
+        //      ps->sweep(sampleProcessorGraph, {"time"});
+      }
     }
 
     if (ps->getDimension("time")) {
       labelProcessor.configuration["time"] =
           (int64_t)ps->getDimension("time")->getCurrentIndex();
     }
-  };
 
-  mParameterSpace.onValueChange = [&](float oldValue,
-                                      ParameterSpaceDimension *changedDimension,
-                                      ParameterSpace *ps) {
+    // Process new value
 
     sampleProcessorGraph.process();
 
@@ -120,14 +124,16 @@ void DatasetManager::initializeComputation() {
     return al::File::conformPathToOS(path);
   };
 
-  // Configure processing nodes and computation chains
+  // ** Configure processing nodes and computation chains
 
   //  trajectoryProcessor.prepareFunction = [&]() -> bool {
   //    trajectoryProcessor.configuration[""];
   //    std::cout << "Trajectory processor running in "
-  //              << trajectoryProcessor.getRunningDirectory() << std::endl;
+  //              << trajectoryProcessor.getRunningDirectory() <<
+  //              std::endl;
   //    return File::exists(
-  //        File::conformDirectory(trajectoryProcessor.getRunningDirectory()) +
+  //        File::conformDirectory(trajectoryProcessor.getRunningDirectory())
+  //        +
   //        "trajectory.json.gz");
   //  };
 
@@ -138,10 +144,6 @@ void DatasetManager::initializeComputation() {
   //  graphGenerator.verbose();
   labelProcessor.verbose();
 
-  atomPositionChain << labelProcessor;
-  sampleProcessorGraph << atomPositionChain << graphGenerator;
-
-  // Graph generator
   graphGenerator.prepareFunction = [&]() {
     std::string datasetId = mCurrentDataset.get();
     std::string xLabel = mPlotXAxis.getCurrent();
@@ -245,7 +247,8 @@ void DatasetManager::initializeComputation() {
   graphGenerator.registerDoneCallback([this](bool runOk) {
     if (runOk) {
       currentGraphName.set(graphGenerator.outputFile());
-      //      std::cout << "Generated graph: " << graphGenerator.outputFile()
+      //      std::cout << "Generated graph: " <<
+      //      graphGenerator.outputFile()
       //                << std::endl;
       //              graphProcessing = false;
     } else {
@@ -303,6 +306,10 @@ void DatasetManager::initializeComputation() {
     return true;
   };
 
+  // Connect processors into chains
+  atomPositionChain << labelProcessor;
+  sampleProcessorGraph << atomPositionChain << graphGenerator;
+
   // Configure parameter callbacks
   mPlotYAxis.registerChangeCallback([this](float value) {
     if (mPlotYAxis.get() != value) {
@@ -355,6 +362,7 @@ void DatasetManager::initializeComputation() {
     }
   });
 
+  // Data pools
   dataPool.registerDataFile("results.json", "chempotA");
   dataPool.getAllPaths = [&]() {
     std::vector<std::string> paths;
@@ -396,7 +404,8 @@ void DatasetManager::initializeComputation() {
       auto path = al::File::conformPathToOS(mParameterSpace.rootPath) +
                   al::File::conformPathToOS(id) + "/";
       //          for (auto ps : mParameterSpace.getDimensions()) {
-      //              if (ps->getSpaceType() == ParameterSpaceDimension::INDEX)
+      //              if (ps->getSpaceType() ==
+      //              ParameterSpaceDimension::INDEX)
       //              {
       //                  std::string condition =
       //                  std::to_string(ps->getCurrentIndex());
@@ -892,7 +901,8 @@ void DatasetManager::updateText() {
   //          dimension->getName() + " : " + dimension->getCurrentId() + "\n";
   //    } else {
 
-  //      metaText += "Condition Param: " + dimension->getName() + " condition:
+  //      metaText += "Condition Param: " + dimension->getName() + "
+  //      condition:
   //      " +
   //                  std::to_string(dimension->getCurrentIndex()) + "\n";
   //    }

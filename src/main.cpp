@@ -776,7 +776,7 @@ public:
           int currentBundle = vdvBundle.currentBundle();
 
           ImGui::Separator();
-          gui::drawControls(this->dataDisplays[vdvBundle.currentBundle()]
+          vis::drawControls(this->dataDisplays[vdvBundle.currentBundle()]
                                 ->mDatasetManager.mParameterSpace);
           // auto &ps = this->dataDisplays[vdvBundle.currentBundle()]
           //    ->mDatasetManager.mParameterSpace;
@@ -958,10 +958,10 @@ public:
 
     auto params = tincServer.dimensions();
     ImGui::Begin("TINC controls");
-    gui::drawTincServerInfo(tincServer, true);
+    vis::drawTincServerInfo(tincServer, true);
     for (auto *param : params) {
       if (param->getGroup() == "casm") {
-        gui::drawControl(param);
+        vis::drawControl(param);
       }
     }
     ImGui::End();
@@ -1228,8 +1228,8 @@ public:
     };
 
     initRootProcessorGraph << parameterSpaceProcessor << shellSiteFileAnalyzer
-                             << transfmatExtractor
-                             << templateGen /*<< trajectoryProcessor*/;
+                           << transfmatExtractor
+                           << templateGen /*<< trajectoryProcessor*/;
 
     // Configure TINC server
     tincServer << initRootProcessorGraph;
@@ -1242,6 +1242,10 @@ public:
     tincServer << dataDisplays[0]->mDatasetManager.neighborhoodPool;
 
     tincServer << dataDisplays[0]->imageDiskBuffer;
+    for (auto &db : dataDisplays[0]->imageDiskBuffers) {
+      tincServer << *db;
+    }
+
     tincServer << dataDisplays[0]->mMarkerColor
                << dataDisplays[0]->mMarkerScale;
 

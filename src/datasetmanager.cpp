@@ -244,18 +244,18 @@ void DatasetManager::initializeComputation() {
     return true;
   };
 
-  graphGenerator.registerDoneCallback([this](bool runOk) {
-    if (runOk) {
-      currentGraphName.set(graphGenerator.outputFile());
-      //      std::cout << "Generated graph: " <<
-      //      graphGenerator.outputFile()
-      //                << std::endl;
-      //              graphProcessing = false;
-    } else {
-      std::cerr << "Graph generation failed." << std::endl;
-    }
-  });
-  graphGenerator.ignoreFail = true;
+  //  graphGenerator.registerDoneCallback([this](bool runOk) {
+  //    if (runOk) {
+  //      currentGraphName.set(graphGenerator.outputFile());
+  //      //      std::cout << "Generated graph: " <<
+  //      //      graphGenerator.outputFile()
+  //      //                << std::endl;
+  //      //              graphProcessing = false;
+  //    } else {
+  //      std::cerr << "Graph generation failed." << std::endl;
+  //    }
+  //  });
+  //  graphGenerator.ignoreFail = true;
 
   std::string condition;
   std::string folder;

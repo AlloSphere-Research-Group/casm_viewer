@@ -32,7 +32,6 @@
 #include "al/ui/al_PickableRotateHandle.hpp"
 
 #include "tinc/vis/AtomRenderer.hpp"
-#include "tinc/ProcessorScript.hpp"
 #include "tinc/VASPReader.hpp"
 #include "tinc/DiskBufferImage.hpp"
 #include "tinc/vis/TrajectoryRender.hpp"
@@ -128,9 +127,18 @@ public:
 
   ImageDiskBuffer imageDiskBuffer{"graph", "currentGraph.png", "cachedGraph"};
 
+  const size_t graphCount = 5;
+  std::vector<std::unique_ptr<ImageDiskBuffer>> imageDiskBuffers;
+  std::vector<std::unique_ptr<ParameterString>> currentGraphNames;
+
+  std::vector<std::unique_ptr<ParameterBool>> mShowGraphs;
+
   // Pickables
   PickableManager mPickableManager;
+
   PickableBB graphPickable{"graph"};
+  std::vector<std::unique_ptr<PickableBB>> graphPickables;
+
   PickableBB parallelPickable{"parallel"};
   PickableBB perspectivePickable{"perspective"};
   PickableBB slicePickable{"slice"};
@@ -224,6 +232,9 @@ protected:
   void drawPerspective(Graphics &g);
   void drawParallelProjection(Graphics &g);
   void drawGraph(Graphics &g);
+  void drawGraphPickable(Graphics &g, PickableBB *graphPickable,
+                         Texture *graphTexture, bool billboarding,
+                         bool drawLabels, bool smallLabel);
 
 private:
   VAOMesh axis;
@@ -233,8 +244,9 @@ private:
   VAOMesh mGridMesh;
   VAOMesh mMarker;
 
-  // Graph
+  // Graphs
   Texture mGraphTexture;
+  Texture mGraphTextures[5];
 
   Font mLabelFont;
 

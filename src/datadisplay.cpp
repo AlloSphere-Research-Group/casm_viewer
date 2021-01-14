@@ -18,6 +18,25 @@ void DataDisplay::init() {
   MPI_Comm_rank(MPI_COMM_WORLD, &mWorldRank);
 #endif
 
+  for (size_t i = 0; i < graphCount; i++) {
+    std::string name = "graph" + std::to_string(i + 1);
+    std::string filename = "currentGraph" + std::to_string(i + 1) + ".png";
+    imageDiskBuffers.emplace_back(
+        std::make_unique<ImageDiskBuffer>(name, filename, "cachedGraph"));
+    graphPickables.emplace_back(std::make_unique<PickableBB>(name));
+
+    std::string graphName = "graph" + std::to_string(i + 1) + "name";
+    currentGraphNames.push_back(
+        std::make_unique<ParameterString>(graphName, "internal", ""));
+    mPickableManager << *graphPickables.back();
+    graphPickables.back()->bb.set(Vec3f(-1.2f, -0.9f, -0.05f),
+                                  Vec3f(1.2f, 0.9f, 0.0f));
+    graphPickables.back()->pose =
+        Pose(Vec3d(-2.0 + 0.5 * i, 0.8, -.75), Quatf());
+    graphPickables.back()->scale = 0.2f;
+    mShowGraphs.emplace_back(std::make_unique<ParameterBool>(
+        "ShowGraph" + std::to_string(i), "", 1));
+  }
   synth.gain(5.0);
 
   mPickableManager << graphPickable << parallelPickable << perspectivePickable;
@@ -285,6 +304,22 @@ void DataDisplay::init() {
         //            if (mGraphFilePathToLoad.size() > 0) {
         imageDiskBuffer.updateData(value);
       });
+
+  for (size_t i = 0; i < graphCount; i++) {
+    currentGraphNames[i]->setSynchronousCallbacks();
+    currentGraphNames[i]->registerChangeCallback([&](std::string value) {
+      std::string fullDatasetPath = File::conformPathToOS(
+          mDatasetManager.getGlobalRootPath() +
+          File::conformPathToOS(mDatasetManager.mCurrentDataset.get()));
+
+      std::cout << "loading graph [" << i << "] " << value << " at "
+                << fullDatasetPath << std::endl;
+      // New image module puts origin on top right
+      //        if (mGraphTextureLock.try_lock()) {
+      //            if (mGraphFilePathToLoad.size() > 0) {
+      imageDiskBuffers[i]->updateData(value);
+    });
+  }
 
   mLabelFont.alignLeft();
 
@@ -1031,48 +1066,76 @@ void DataDisplay::drawParallelProjection(Graphics &g) {
   parallelPickable.drawBB(g);
 }
 
-void DataDisplay::drawGraph(Graphics &g) {
-  if (imageDiskBuffer.newDataAvailable()) {
-    auto imageBuffer = imageDiskBuffer.get();
-    mGraphTexture.resize(imageBuffer->width(), imageBuffer->height());
-    mGraphTexture.submit(imageBuffer->pixels(), GL_RGBA, GL_UNSIGNED_BYTE);
-    mGraphTexture.filter(Texture::LINEAR_MIPMAP_LINEAR);
-  }
-  graphPickable.pushMatrix(g);
+void DataDisplay::drawGraphPickable(Graphics &g, PickableBB *graphPickable,
+                                    Texture *graphTexture, bool billboarding,
+                                    bool drawLabels, bool smallLabel) {
+  graphPickable->pushMatrix(g);
 
-  Vec3f forward = graphPickable.pose.get().pos();
-  forward.normalize();
-
-  if (mBillboarding.get() == 1.0f) {
+  if (billboarding) {
+    Vec3f forward = graphPickable->pose.get().pos();
+    forward.normalize();
     Quatf rot = Quatf::getBillboardRotation(-forward, Vec3f{0.0, 1.0f, 0.0f});
     g.rotate(rot);
   }
 
   g.depthTesting(true);
-  g.quad(mGraphTexture, -1.2f, 0.9f, 2.4f, -1.8f);
+  g.quad(*graphTexture, -1.2f, 0.9f, 2.4f, -1.8f);
   // Draw label
 
-  if (mDrawLabels == 1.0f) {
+  if (drawLabels) {
     g.depthTesting(false);
     g.blendAdd();
     g.translate(-1.0, -1.0, 0.0);
-    if (mSmallLabel == 1.0f) {
+    if (smallLabel) {
       g.scale(0.1f);
     } else {
       g.scale(0.2f);
     }
 
     // Draw label
-    Mesh mesh;
-    mLabelFont.write(
-        mesh, (mDatasetManager.currentDataset() + " " + mParamText).c_str(),
-        1.0);
-    g.texture();
-    mLabelFont.tex.bind();
-    g.draw(mesh);
-    mLabelFont.tex.unbind();
+    //    Mesh mesh;
+    //    mLabelFont.write(
+    //      mesh, (mDatasetManager.currentDataset() + " " + mParamText).c_str(),
+    //      1.0);
+    //    g.texture();
+    //    mLabelFont.tex.bind();
+    //    g.draw(mesh);
+    //    mLabelFont.tex.unbind();
   }
-  graphPickable.popMatrix(g);
+  graphPickable->popMatrix(g);
 
-  graphPickable.drawBB(g);
+  graphPickable->drawBB(g);
+}
+
+void DataDisplay::drawGraph(Graphics &g) {
+
+  // Update graph textures if new data available
+  if (imageDiskBuffer.newDataAvailable()) {
+    auto imageBuffer = imageDiskBuffer.get();
+    mGraphTexture.resize(imageBuffer->width(), imageBuffer->height());
+    mGraphTexture.submit(imageBuffer->pixels(), GL_RGBA, GL_UNSIGNED_BYTE);
+    mGraphTexture.filter(Texture::LINEAR_MIPMAP_LINEAR);
+  }
+  auto *graphTextPtr = mGraphTextures;
+  for (auto &imageBuffer : imageDiskBuffers) {
+    if (imageBuffer->newDataAvailable()) {
+      auto buf = imageBuffer->get();
+      graphTextPtr->resize(buf->width(), buf->height());
+      graphTextPtr->submit(buf->pixels(), GL_RGBA, GL_UNSIGNED_BYTE);
+      graphTextPtr->filter(Texture::LINEAR_MIPMAP_LINEAR);
+    }
+    graphTextPtr++;
+  }
+
+  drawGraphPickable(g, &graphPickable, &mGraphTexture,
+                    mBillboarding.get() == 1.0, mDrawLabels.get() == 1.0,
+                    mSmallLabel.get());
+
+  graphTextPtr = mGraphTextures;
+  for (auto &pickable : graphPickables) {
+    drawGraphPickable(g, pickable.get(), graphTextPtr,
+                      mBillboarding.get() == 1.0, mDrawLabels.get() == 1.0,
+                      mSmallLabel.get());
+    graphTextPtr++;
+  }
 }

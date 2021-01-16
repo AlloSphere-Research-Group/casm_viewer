@@ -28,12 +28,14 @@ void DataDisplay::init() {
     std::string graphName = "graph" + std::to_string(i + 1) + "name";
     currentGraphNames.push_back(
         std::make_unique<ParameterString>(graphName, "internal", ""));
+
     mPickableManager << *graphPickables.back();
     graphPickables.back()->bb.set(Vec3f(-1.2f, -0.9f, -0.05f),
                                   Vec3f(1.2f, 0.9f, 0.0f));
     graphPickables.back()->pose =
-        Pose(Vec3d(-2.0 + 0.5 * i, 0.8, -.75), Quatf());
+        Pose(Vec3d(-2.0 + 0.5 * (i + 1), 0.8, -.75), Quatf());
     graphPickables.back()->scale = 0.2f;
+
     mShowGraphs.emplace_back(std::make_unique<ParameterBool>(
         "ShowGraph" + std::to_string(i), "", 1));
   }
@@ -73,6 +75,9 @@ void DataDisplay::init() {
   fbo_iso.init(2048, 2048, setting);
 
   mGraphTexture.mipmap(true);
+  for (auto &graph : mGraphTextures) {
+    graph.mipmap(true);
+  }
 
   int num_verts_added;
   Mat4f transform;
@@ -457,9 +462,7 @@ void DataDisplay::draw(Graphics &g) { // Load data after drawing frame to allow
   }
 
   g.blending(false);
-  if (mShowGraph.get() == 1.0f) {
-    drawGraph(g);
-  }
+  drawGraph(g);
 }
 
 void DataDisplay::setFont(string name, float size) {
@@ -1110,32 +1113,40 @@ void DataDisplay::drawGraphPickable(Graphics &g, PickableBB *graphPickable,
 void DataDisplay::drawGraph(Graphics &g) {
 
   // Update graph textures if new data available
-  if (imageDiskBuffer.newDataAvailable()) {
-    auto imageBuffer = imageDiskBuffer.get();
-    mGraphTexture.resize(imageBuffer->width(), imageBuffer->height());
-    mGraphTexture.submit(imageBuffer->pixels(), GL_RGBA, GL_UNSIGNED_BYTE);
-    mGraphTexture.filter(Texture::LINEAR_MIPMAP_LINEAR);
-  }
-  auto *graphTextPtr = mGraphTextures;
-  for (auto &imageBuffer : imageDiskBuffers) {
-    if (imageBuffer->newDataAvailable()) {
-      auto buf = imageBuffer->get();
-      graphTextPtr->resize(buf->width(), buf->height());
-      graphTextPtr->submit(buf->pixels(), GL_RGBA, GL_UNSIGNED_BYTE);
-      graphTextPtr->filter(Texture::LINEAR_MIPMAP_LINEAR);
+
+  if (mShowGraph.get() == 1.0f) {
+    if (imageDiskBuffer.newDataAvailable()) {
+      auto imageBuffer = imageDiskBuffer.get();
+      mGraphTexture.resize(imageBuffer->width(), imageBuffer->height());
+      mGraphTexture.submit(imageBuffer->pixels(), GL_RGBA, GL_UNSIGNED_BYTE);
+      mGraphTexture.filter(Texture::LINEAR_MIPMAP_LINEAR);
     }
-    graphTextPtr++;
-  }
+    auto *graphTextPtr = mGraphTextures;
+    for (auto &imageBuffer : imageDiskBuffers) {
+      if (imageBuffer->newDataAvailable()) {
+        auto buf = imageBuffer->get();
+        graphTextPtr->resize(buf->width(), buf->height());
+        graphTextPtr->submit(buf->pixels(), GL_RGBA, GL_UNSIGNED_BYTE);
+        graphTextPtr->filter(Texture::LINEAR_MIPMAP_LINEAR);
+      }
+      graphTextPtr++;
+    }
 
-  drawGraphPickable(g, &graphPickable, &mGraphTexture,
-                    mBillboarding.get() == 1.0, mDrawLabels.get() == 1.0,
-                    mSmallLabel.get());
-
-  graphTextPtr = mGraphTextures;
-  for (auto &pickable : graphPickables) {
-    drawGraphPickable(g, pickable.get(), graphTextPtr,
+    drawGraphPickable(g, &graphPickable, &mGraphTexture,
                       mBillboarding.get() == 1.0, mDrawLabels.get() == 1.0,
                       mSmallLabel.get());
+  }
+
+  auto *graphTextPtr = mGraphTextures;
+  auto showGraphIt = mShowGraphs.begin();
+  graphTextPtr = mGraphTextures;
+  for (auto &pickable : graphPickables) {
+    if ((*showGraphIt)->get() == 1.0) {
+      drawGraphPickable(g, pickable.get(), graphTextPtr,
+                        mBillboarding.get() == 1.0, mDrawLabels.get() == 1.0,
+                        mSmallLabel.get());
+    }
+    showGraphIt++;
     graphTextPtr++;
   }
 }

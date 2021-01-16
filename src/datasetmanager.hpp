@@ -63,11 +63,9 @@ public:
 
   ProcessorGraph sampleProcessorGraph{"SampleComputation"};
 
-  ProcessorGraph atomPositionChain{"AtomPositionComputation"};
-
   ProcessorScript trajectoryProcessor{"TrajectoryPreprocessor"};
+
   ProcessorScript labelProcessor{"AtomLabelProcessor"};
-  ProcessorCpp kmcOccupation{"KMCOccupationExtractor"};
   ProcessorScript graphGenerator{"GraphGenerator"};
 
   DataPool dataPool{"resultsData", mParameterSpace, "slices"};

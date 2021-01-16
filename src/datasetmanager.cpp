@@ -47,12 +47,9 @@ void DatasetManager::initializeComputation() {
   mParameterSpace.parameterNameMap = {{"temperature", "T"},
                                       {"chempotA", "param_chem_pot(a)"},
                                       {"chempotB", "param_chem_pot(b)"}};
-
   // Parameter space callback
   mParameterSpace.onValueChange = [&](ParameterSpaceDimension *changedDimension,
                                       ParameterSpace *ps) {
-    // Update computation settings:
-
     std::string condition;
     std::string folder;
     for (auto dim : ps->getDimensions()) {
@@ -68,8 +65,6 @@ void DatasetManager::initializeComputation() {
     if (condition.size() == 0) {
       condition = "0";
     }
-    labelProcessor.configuration["condition"] = condition;
-    labelProcessor.configuration["dir"] = folder;
 
     if (changedDimension->getName() == "dir") {
       int32_t previousValue =
@@ -90,8 +85,10 @@ void DatasetManager::initializeComputation() {
       }
     }
 
+    sampleProcessorGraph.configuration["condition"] = condition;
+    //    labelProcessor.configuration["dir"] = folder;
     if (ps->getDimension("time")) {
-      labelProcessor.configuration["time"] =
+      sampleProcessorGraph.configuration["time"] =
           (int64_t)ps->getDimension("time")->getCurrentIndex();
     }
 
@@ -111,31 +108,6 @@ void DatasetManager::initializeComputation() {
 
     updateText();
   };
-  mParameterSpace.generateRelativeRunPath = [&](
-      std::map<std::string, size_t> indeces, ParameterSpace *ps) {
-    std::string conditionDim;
-    for (auto dim : ps->getDimensions()) {
-      if (dim->getSpaceRepresentationType() == ParameterSpaceDimension::INDEX) {
-        conditionDim = dim->getName();
-      }
-    }
-    std::string pathTemplate = "%%dir%%conditions.%%" + conditionDim + "%%";
-    std::string path = ps->resolveFilename(pathTemplate);
-    return al::File::conformPathToOS(path);
-  };
-
-  // ** Configure processing nodes and computation chains
-
-  //  trajectoryProcessor.prepareFunction = [&]() -> bool {
-  //    trajectoryProcessor.configuration[""];
-  //    std::cout << "Trajectory processor running in "
-  //              << trajectoryProcessor.getRunningDirectory() <<
-  //              std::endl;
-  //    return File::exists(
-  //        File::conformDirectory(trajectoryProcessor.getRunningDirectory())
-  //        +
-  //        "trajectory.json.gz");
-  //  };
 
   trajectoryProcessor.setInputFileNames({"trajectory.json.gz"});
   trajectoryProcessor.setOutputFileNames({"trajectory.nc"});
@@ -244,33 +216,21 @@ void DatasetManager::initializeComputation() {
     return true;
   };
 
-  //  graphGenerator.registerDoneCallback([this](bool runOk) {
-  //    if (runOk) {
-  //      currentGraphName.set(graphGenerator.outputFile());
-  //      //      std::cout << "Generated graph: " <<
-  //      //      graphGenerator.outputFile()
-  //      //                << std::endl;
-  //      //              graphProcessing = false;
+  //  std::string condition;
+  //  std::string folder;
+  //  for (auto ps : mParameterSpace.getDimensions()) {
+  //    if (ps->getSpaceRepresentationType() == ParameterSpaceDimension::ID &&
+  //        ps->getName() != "dir") {
+  //      condition = std::to_string(ps->getCurrentIndex());
+  //      break;
   //    } else {
-  //      std::cerr << "Graph generation failed." << std::endl;
+  //      folder = ps->getCurrentId();
   //    }
-  //  });
-  //  graphGenerator.ignoreFail = true;
+  //  }
+  //  if (condition.size() == 0) {
+  //    condition = "0";
+  //  }
 
-  std::string condition;
-  std::string folder;
-  for (auto ps : mParameterSpace.getDimensions()) {
-    if (ps->getSpaceRepresentationType() == ParameterSpaceDimension::ID &&
-        ps->getName() != "dir") {
-      condition = std::to_string(ps->getCurrentIndex());
-      break;
-    } else {
-      folder = ps->getCurrentId();
-    }
-  }
-  if (condition.size() == 0) {
-    condition = "0";
-  }
   labelProcessor.setOutputDirectory(getGlobalRootPath() +
                                     mCurrentDataset.get() + "/cached_output");
 
@@ -307,8 +267,7 @@ void DatasetManager::initializeComputation() {
   };
 
   // Connect processors into chains
-  atomPositionChain << labelProcessor;
-  sampleProcessorGraph << atomPositionChain << graphGenerator;
+  sampleProcessorGraph << labelProcessor << graphGenerator;
 
   // Configure parameter callbacks
   mPlotYAxis.registerChangeCallback([this](float value) {
@@ -367,7 +326,7 @@ void DatasetManager::initializeComputation() {
   dataPool.getAllPaths = [&]() {
     std::vector<std::string> paths;
     for (auto id : mParameterSpace.getDimension("dir")->getSpaceIds()) {
-      auto path = al::File::conformPathToOS(mParameterSpace.rootPath) +
+      auto path = al::File::conformPathToOS(mParameterSpace.getRootPath()) +
                   al::File::conformPathToOS(id);
       if (path.size() > 0) {
         paths.push_back(path);
@@ -380,7 +339,7 @@ void DatasetManager::initializeComputation() {
   trajectoriesPool.getAllPaths = [&]() {
     std::vector<std::string> paths;
     for (auto id : mParameterSpace.getDimension("dir")->getSpaceIds()) {
-      auto path = al::File::conformPathToOS(mParameterSpace.rootPath) +
+      auto path = al::File::conformPathToOS(mParameterSpace.getRootPath()) +
                   al::File::conformPathToOS(id) + "/";
       for (auto ps : mParameterSpace.getDimensions()) {
         if (ps->getSpaceRepresentationType() ==
@@ -401,7 +360,7 @@ void DatasetManager::initializeComputation() {
   neighborhoodPool.getAllPaths = [&]() {
     std::vector<std::string> paths;
     for (auto id : mParameterSpace.getDimension("dir")->getSpaceIds()) {
-      auto path = al::File::conformPathToOS(mParameterSpace.rootPath) +
+      auto path = al::File::conformPathToOS(mParameterSpace.getRootPath()) +
                   al::File::conformPathToOS(id) + "/";
       //          for (auto ps : mParameterSpace.getDimensions()) {
       //              if (ps->getSpaceType() ==
@@ -456,9 +415,10 @@ std::string DatasetManager::fullConditionPath() {
 }
 
 void DatasetManager::readParameterSpace() {
-  mParameterSpace.rootPath = File::conformPathToOS(
-      getGlobalRootPath() + File::conformPathToOS(mCurrentDataset.get()));
+  mParameterSpace.setRootPath(File::conformPathToOS(
+      getGlobalRootPath() + File::conformPathToOS(mCurrentDataset.get())));
   mParameterSpace.readFromNetCDF("parameter_space.nc");
+  mParameterSpace.enableCache("ps_cache");
 }
 
 void DatasetManager::initDataset() {
@@ -517,6 +477,19 @@ void DatasetManager::initDataset() {
   loadTrajectory(); // The time parameter space is loaded here.
   loadShellSiteData();
   analyzeDataset();
+
+  std::string conditionDim;
+  for (auto dim : mParameterSpace.getDimensions()) {
+    if (dim->getSpaceRepresentationType() == ParameterSpaceDimension::INDEX) {
+      conditionDim = dim->getName();
+      std::cout << "Using dimension '" << dim->getName()
+                << "' as condition dimension" << std::endl;
+      break;
+    }
+  }
+
+  mParameterSpace.setCurrentPathTemplate("%%dir%%conditions.%%" + conditionDim +
+                                         "%%");
 
   std::vector<std::string> parameterSpaceNames;
   parameterSpaceNames.push_back("temperature");

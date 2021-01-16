@@ -188,13 +188,12 @@ public:
     dimensions(1200, 800);
 
     // Create and configure displays
-    int numDisplays = 2; // 2 is a good number. Usually need one, but some
-                         // times need to compare 2
+    int numDisplays = 1;
 
     for (int i = 0; i < numDisplays; i++) {
       dataDisplays.push_back(new DataDisplay);
-      dataDisplays.back()->mDatasetManager.mParameterSpace.setId(
-          "casm_space_" + std::to_string(i));
+      //      dataDisplays.back()->mDatasetManager.mParameterSpace.setId(
+      //          "casm_space_" + std::to_string(i));
       dataDisplays.back()->init();
       dataDisplays.back()->mDatasetManager.mRunProcessors = rank == 0;
       if (dataRoot.size() > 0) {
@@ -1185,21 +1184,23 @@ public:
     parameterSpaceProcessor.setScriptName(pythonScriptPath.get() +
                                           "/analyze_parameter_space.py");
     parameterSpaceProcessor.setOutputFileNames({"parameter_space.nc"});
+    parameterSpaceProcessor.useCache();
 
     shellSiteFileAnalyzer.setCommand(pythonBinary);
     shellSiteFileAnalyzer.setScriptName(pythonScriptPath.get() +
                                         "/analyze_shell_site_files.py");
-    parameterSpaceProcessor.setOutputFileNames({"parameter_space.nc"});
 
     transfmatExtractor.setCommand(pythonBinary);
     transfmatExtractor.setScriptName(pythonScriptPath.get() +
                                      "/extract_transfmat.py");
     transfmatExtractor.setOutputFileNames({"transfmat"});
+    transfmatExtractor.useCache();
 
     templateGen.setCommand(pythonBinary);
     templateGen.setScriptName(pythonScriptPath.get() +
                               "/reassign_occs/template_creator.py");
     templateGen.setOutputFileNames({"cached_output/template.nc"});
+    templateGen.useCache();
 
     parameterSpaceProcessor.verbose(true);
     transfmatExtractor.verbose(true);

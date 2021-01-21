@@ -488,9 +488,6 @@ void DatasetManager::initDataset() {
     }
   }
 
-  mParameterSpace.setCurrentPathTemplate("%%dir%%conditions.%%" + conditionDim +
-                                         "%%");
-
   std::vector<std::string> parameterSpaceNames;
   parameterSpaceNames.push_back("temperature");
 
@@ -551,6 +548,9 @@ void DatasetManager::initDataset() {
   std::cout << fullDatasetPath + "slices" << std::endl;
 
   lk.unlock();
+
+  mParameterSpace.setCurrentPathTemplate("%%dir%%conditions.%%" + conditionDim +
+                                         "%%");
 }
 
 void DatasetManager::analyzeDataset() {

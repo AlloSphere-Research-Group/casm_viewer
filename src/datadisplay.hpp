@@ -112,6 +112,7 @@ public:
   ParameterBundle bundle{"CASMDataset"};
 
   ParameterInt currentSelection{"currentSelection"};
+  ParameterInt previousSelection{"previousSelection"};
 
   ParameterColor mMarkerColor{"markerColor"};
   Parameter mMarkerScale{"markerScale", "", 1.7, 0.001, 20};

@@ -1247,8 +1247,9 @@ public:
       tincServer << *db;
     }
 
-    tincServer << dataDisplays[0]->mMarkerColor
-               << dataDisplays[0]->mMarkerScale;
+    tincServer << dataDisplays[0]->mMarkerColor << dataDisplays[0]->mMarkerScale
+               << dataDisplays[0]->currentSelection
+               << dataDisplays[0]->previousSelection;
 
     tincServer << mDataset;
 

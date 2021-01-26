@@ -111,10 +111,10 @@ void DatasetManager::initializeComputation() {
 
   trajectoryProcessor.setInputFileNames({"trajectory.json.gz"});
   trajectoryProcessor.setOutputFileNames({"trajectory.nc"});
-  trajectoryProcessor.verbose();
+  trajectoryProcessor.verbose(false);
 
   //  graphGenerator.verbose();
-  labelProcessor.verbose();
+  labelProcessor.verbose(false);
 
   graphGenerator.prepareFunction = [&]() {
     std::string datasetId = mCurrentDataset.get();

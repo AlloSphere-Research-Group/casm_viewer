@@ -612,6 +612,9 @@ void DataDisplay::updateDisplayBuffers() {
           if (prevAtomName != atomName) {
             if (atomName == "Va") {
               atomRemoved.push_back(*templateDataIt);
+
+              previousSelection.set(std::distance(
+                  mDatasetManager.templateData.begin(), templateDataIt));
             } else {
               if (atomAdded.find(atomName) == atomAdded.end()) {
                 atomAdded[atomName] = std::vector<DatasetManager::position_t>();

@@ -1202,25 +1202,25 @@ public:
     templateGen.setOutputFileNames({"cached_output/template.nc"});
     templateGen.useCache();
 
-    parameterSpaceProcessor.verbose(true);
-    transfmatExtractor.verbose(true);
-    templateGen.verbose(true);
+    bool verbose = false;
+    parameterSpaceProcessor.verbose(verbose);
+    transfmatExtractor.verbose(verbose);
+    templateGen.verbose(verbose);
 
     templateGen.prepareFunction = [&]() {
       if (File::exists(transfmatExtractor.outputFile())) {
         auto transfmatFile = transfmatExtractor.outputFile(false);
-        templateGen.configuration["transfmat"] = transfmatFile;
+        templateGen.setInputFileNames({transfmatFile});
         templateGen.setInputDirectory(transfmatExtractor.getOutputDirectory());
       } else if (File::exists(templateGen.getRunningDirectory() +
                               "cached_output/transfmat")) {
-        templateGen.configuration["transfmat"] =
-            VariantValue("cached_output/transfmat");
+        templateGen.setInputFileNames({"cached_output/transfmat"});
       } else if (File::exists(templateGen.getRunningDirectory() +
                               "transfmat")) {
-        templateGen.configuration["transfmat"] = "transfmat";
+        templateGen.setInputFileNames({"transfmat"});
       } else if (File::exists(templateGen.getRunningDirectory() +
                               "../transfmat")) {
-        templateGen.configuration["transfmat"] = "../transfmat";
+        templateGen.setInputFileNames({"../transfmat"});
       } else {
         std::cerr << "Transformation matrix not found!" << std::endl;
         return false;

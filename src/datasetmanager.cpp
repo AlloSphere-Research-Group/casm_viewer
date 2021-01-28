@@ -68,7 +68,7 @@ void DatasetManager::initializeComputation() {
 
     if (changedDimension->getName() == "dir") {
       int32_t previousValue =
-          dynamic_cast<Parameter *>(changedDimension->parameterMeta())
+          dynamic_cast<Parameter *>(changedDimension->getParameterMeta())
               ->getPrevious();
       if (changedDimension->getCurrentId() !=
           changedDimension->idAt(

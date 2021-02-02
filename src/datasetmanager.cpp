@@ -53,7 +53,7 @@ void DatasetManager::initializeComputation() {
     std::string condition;
     std::string folder;
     for (auto dim : ps->getDimensions()) {
-      if (dim->getSpaceRepresentationType() == ParameterSpaceDimension::ID) {
+      if (dim->getSpaceRepresentationType() == ParameterSpaceDimension::INDEX) {
         if (dim->getName() != "dir") {
           condition = std::to_string(dim->getCurrentIndex());
           break;
@@ -96,7 +96,8 @@ void DatasetManager::initializeComputation() {
 
     sampleProcessorGraph.process();
 
-    if (mParameterSpace.getDimension("time")) {
+    if (mParameterSpace.getDimension("time") &&
+        mParameterSpace.getDimension("time")->size() > 0) {
       occupationData.doneWriting(occupationData.getWritable());
       shellSiteTypes =
           getShellSiteTypes(ps->getDimension("time")->getCurrentIndex());
@@ -111,10 +112,11 @@ void DatasetManager::initializeComputation() {
 
   trajectoryProcessor.setInputFileNames({"trajectory.json.gz"});
   trajectoryProcessor.setOutputFileNames({"trajectory.nc"});
-  trajectoryProcessor.verbose(false);
 
-  //  graphGenerator.verbose();
-  labelProcessor.verbose(false);
+  bool verbose = true;
+  trajectoryProcessor.verbose(verbose);
+  graphGenerator.verbose(verbose);
+  labelProcessor.verbose(verbose);
 
   graphGenerator.prepareFunction = [&]() {
     std::string datasetId = mCurrentDataset.get();
@@ -239,13 +241,13 @@ void DatasetManager::initializeComputation() {
     std::string condition = labelProcessor.configuration["condition"].valueStr;
     std::string folder = labelProcessor.configuration["dir"].valueStr;
 
-    std::string positionOutputName = "positions";
+    std::string currentDataset = mCurrentDataset.get();
+    std::string subDir = getSubDir();
 
-    if (labelProcessor.configuration.find("dir") !=
-        labelProcessor.configuration.end()) {
-      positionOutputName += "_" + folder;
-    }
+    std::string positionOutputName = "positions";
+    positionOutputName += "_" + subDir;
     positionOutputName += "_" + condition;
+
     if (labelProcessor.configuration.find("time") !=
         labelProcessor.configuration.end()) {
       positionOutputName +=
@@ -259,9 +261,8 @@ void DatasetManager::initializeComputation() {
 
     std::string final_state_path =
         conditionSubdir + "final_state.json"; // final_state.json file
-    labelProcessor.configuration["final_state_path"] = File::conformPathToOS(
-        labelProcessor.configuration["dataset_path"].valueStr + "/" +
-        final_state_path);
+    labelProcessor.configuration["final_state_path"] =
+        File::conformPathToOS(currentDataset + subDir + "/" + final_state_path);
 
     return true;
   };
@@ -535,7 +536,8 @@ void DatasetManager::initDataset() {
                                     mCurrentDataset.get() + "/cached_output");
 
   // If there is a time space, don't use labeling script. Data is ready
-  if (mParameterSpace.getDimension("time")) {
+  if (mParameterSpace.getDimension("time") &&
+      mParameterSpace.getDimension("time")->size() > 0) {
     labelProcessor.enabled = false;
     graphGenerator.enabled = false; // Graphing not working with kmc yet.
   } else {

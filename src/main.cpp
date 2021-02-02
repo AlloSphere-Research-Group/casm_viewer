@@ -1202,16 +1202,21 @@ public:
     templateGen.setOutputFileNames({"cached_output/template.nc"});
     templateGen.useCache();
 
-    bool verbose = false;
+    bool verbose = true;
     parameterSpaceProcessor.verbose(verbose);
     transfmatExtractor.verbose(verbose);
     templateGen.verbose(verbose);
 
     templateGen.prepareFunction = [&]() {
-      if (File::exists(transfmatExtractor.outputFile())) {
-        auto transfmatFile = transfmatExtractor.outputFile(false);
-        templateGen.setInputFileNames({transfmatFile});
+      // if transfmat extractor could not generate file, search for alternatives
+      if (transfmatExtractor.getOutputFileNames().size() > 0 &&
+          File::exists(transfmatExtractor.getOutputDirectory() +
+                       transfmatExtractor.getOutputFileNames()[0])) {
+
+        templateGen.setInputFileNames(
+            {transfmatExtractor.getOutputFileNames()[0]});
         templateGen.setInputDirectory(transfmatExtractor.getOutputDirectory());
+        return true;
       } else if (File::exists(templateGen.getRunningDirectory() +
                               "cached_output/transfmat")) {
         templateGen.setInputFileNames({"cached_output/transfmat"});
@@ -1227,10 +1232,8 @@ public:
       }
       return true;
     };
-
     initRootProcessorGraph << parameterSpaceProcessor << shellSiteFileAnalyzer
-                           << transfmatExtractor
-                           << templateGen /*<< trajectoryProcessor*/;
+                           << transfmatExtractor << templateGen;
 
     // Configure TINC server
     tincServer << initRootProcessorGraph;

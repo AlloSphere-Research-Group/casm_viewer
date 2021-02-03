@@ -416,6 +416,7 @@ std::string DatasetManager::fullConditionPath() {
 }
 
 void DatasetManager::readParameterSpace() {
+  mParameterSpace.clear();
   mParameterSpace.setRootPath(File::conformPathToOS(
       getGlobalRootPath() + File::conformPathToOS(mCurrentDataset.get())));
   mParameterSpace.readFromNetCDF("parameter_space.nc");
@@ -474,6 +475,12 @@ void DatasetManager::initDataset() {
   }
 
   // ===
+  {
+    // FIXME hack to avoid loop that occurs from triggering these...
+    labelProcessor.enabled = false;
+    graphGenerator.enabled = false; // Graphing not working with kmc yet.
+  }
+
   readParameterSpace();
   loadTrajectory(); // The time parameter space is loaded here.
   loadShellSiteData();
@@ -488,6 +495,9 @@ void DatasetManager::initDataset() {
       break;
     }
   }
+
+  mParameterSpace.setCurrentPathTemplate("%%dir%%conditions.%%" + conditionDim +
+                                         "%%");
 
   std::vector<std::string> parameterSpaceNames;
   parameterSpaceNames.push_back("temperature");
@@ -550,9 +560,6 @@ void DatasetManager::initDataset() {
   std::cout << fullDatasetPath + "slices" << std::endl;
 
   lk.unlock();
-
-  mParameterSpace.setCurrentPathTemplate("%%dir%%conditions.%%" + conditionDim +
-                                         "%%");
 }
 
 void DatasetManager::analyzeDataset() {

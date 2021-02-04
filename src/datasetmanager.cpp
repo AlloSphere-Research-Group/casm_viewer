@@ -96,6 +96,7 @@ void DatasetManager::initializeComputation() {
 
     sampleProcessorGraph.process();
 
+    // TODO is this necessary? Shouldn't this happen automatically?
     if (mParameterSpace.getDimension("time") &&
         mParameterSpace.getDimension("time")->size() > 0) {
       occupationData.doneWriting(occupationData.getWritable());
@@ -482,9 +483,9 @@ void DatasetManager::initDataset() {
   }
 
   readParameterSpace();
-  loadTrajectory(); // The time parameter space is loaded here.
   loadShellSiteData();
   analyzeDataset();
+  loadTrajectory(); // The time parameter space is loaded here.
 
   std::string conditionDim;
   for (auto dim : mParameterSpace.getDimensions()) {
@@ -987,7 +988,7 @@ void DatasetManager::loadTrajectory() {
     mParameterSpace.getDimension("time")->clear();
     mParameterSpace.getDimension("time")
         ->setSpaceValues(timeValues.data(), timeValues.size());
-    mParameterSpace.getDimension("time")->conformSpace();
+    //    mParameterSpace.getDimension("time")->conformSpace();
     mParameterSpace.getDimension("time")
         ->setSpaceRepresentationType(ParameterSpaceDimension::VALUE);
 

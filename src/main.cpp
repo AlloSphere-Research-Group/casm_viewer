@@ -724,7 +724,9 @@ public:
     initRootProcessorGraph.process();
 
     if (index >= 0) {
-      dataDisplays[index]->mDatasetManager.mCurrentDataset.set(path);
+      if (dataDisplays[index]->mDatasetManager.mCurrentDataset.get() != path) {
+        dataDisplays[index]->mDatasetManager.mCurrentDataset.set(path);
+      }
       auto previousDatasets = mRecentDatasets.getElements();
       if (std::find(previousDatasets.begin(), previousDatasets.end(), path) ==
           previousDatasets.end()) {

@@ -95,6 +95,8 @@ void DatasetManager::initializeComputation() {
     // Process new value
 
     sampleProcessorGraph.process();
+    currentGraphName.set(graphGenerator.getOutputDirectory() +
+                         graphGenerator.getOutputFileNames()[0]);
 
     // TODO is this necessary? Shouldn't this happen automatically?
     if (mParameterSpace.getDimension("time") &&
@@ -209,8 +211,7 @@ void DatasetManager::initializeComputation() {
 
       graphGenerator.setOutputDirectory(graphGenerator.getRunningDirectory() +
                                         "/cached_output");
-      graphGenerator.setOutputFileNames({datasetId + "_" + highlightValue +
-                                         "_" +
+      graphGenerator.setOutputFileNames({"_" + highlightValue + "_" +
                                          ProcessorScript::sanitizeName(subDir) +
                                          "_" + yLabelSanitized + "_graph.png"});
     } else {
@@ -275,12 +276,14 @@ void DatasetManager::initializeComputation() {
   mPlotYAxis.registerChangeCallback([this](float value) {
     if (mPlotYAxis.get() != value) {
       graphGenerator.process();
+      // TODO connect to ImageDiskBuffer
     }
   });
 
   mPlotXAxis.registerChangeCallback([this](float value) {
     if (mPlotXAxis.get() != value) {
       graphGenerator.process();
+      // TODO connect to ImageDiskBuffer
     }
   });
 

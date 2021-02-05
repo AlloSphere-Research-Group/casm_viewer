@@ -127,11 +127,11 @@ public:
   DatasetManager mDatasetManager;
 
   // Graphs
-  ImageDiskBuffer imageDiskBuffer{"graph", "currentGraph.png", "cachedGraph"};
+  DiskBufferImage imageDiskBuffer{"graph", "currentGraph.png"};
   Texture mGraphTexture;
 
   const size_t graphCount = 5;
-  std::vector<std::unique_ptr<ImageDiskBuffer>> imageDiskBuffers;
+  std::vector<std::unique_ptr<DiskBufferImage>> imageDiskBuffers;
   std::vector<std::unique_ptr<ParameterString>> currentGraphNames;
   std::vector<std::unique_ptr<ParameterBool>> mShowGraphs;
   std::vector<std::unique_ptr<PickableBB>> graphPickables;

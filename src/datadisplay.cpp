@@ -22,7 +22,7 @@ void DataDisplay::init() {
     std::string name = "graph" + std::to_string(i + 1);
     std::string filename = "currentGraph" + std::to_string(i + 1) + ".png";
     imageDiskBuffers.emplace_back(
-        std::make_unique<ImageDiskBuffer>(name, filename, "cachedGraph"));
+        std::make_unique<DiskBufferImage>(name, filename, "cachedGraph"));
     graphPickables.emplace_back(std::make_unique<PickableBB>(name));
 
     std::string graphName = "graph" + std::to_string(i + 1) + "name";

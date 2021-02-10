@@ -134,6 +134,9 @@ public:
   ParameterBool recallPositions{"recallPositions", "", 1.0};
 
   std::unique_ptr<PresetHandler> presetHandler;
+
+  std::unique_ptr<PresetHandler> positionPresets;
+
   std::unique_ptr<PresetSequencer> sequencer;
   std::unique_ptr<SequenceRecorder> recorder;
   std::unique_ptr<PresetServer> presetServer;
@@ -172,6 +175,7 @@ public:
 
   void onInit() override {
     presetHandler = std::make_unique<PresetHandler>();
+    positionPresets = std::make_unique<PresetHandler>("positionPresets");
     sequencer = std::make_unique<PresetSequencer>();
     recorder = std::make_unique<SequenceRecorder>();
     presetServer = std::make_unique<PresetServer>();
@@ -235,6 +239,14 @@ public:
         *presetHandler << display->graphPickable.bundle
                        << display->parallelPickable.bundle
                        << display->perspectivePickable.bundle;
+
+        *positionPresets << display->graphPickable.bundle;
+        *positionPresets << display->graphPickable.bundle
+                         << display->parallelPickable.bundle
+                         << display->perspectivePickable.bundle;
+        for (auto &graph : display->graphPickables) {
+          *positionPresets << graph->bundle;
+        }
         vdvBundle << display->bundle;
       }
       // Add parameters that are not part of the bundle
@@ -872,6 +884,7 @@ public:
 
           ImGui::Unindent(20.0);
         }
+        ParameterGUI::drawPresetHandler(positionPresets.get());
       } else {
         ImGui::Text("No dataset loaded");
       }
@@ -1273,24 +1286,30 @@ public:
       display->mVisible.registerChangeCallback(
           [this](float) { updateTitle(); });
 
-      display->mDatasetManager.mCurrentDataset.registerChangeCallback(
-          [this, display](std::string value) {
-            std::string path = value;
-            path = path.substr(path.rfind('/') + 1);
-            if (display->mDatasetManager.mGlobalRoot.size() > 0) {
-              presetHandler->setRootPath(display->mDatasetManager.mGlobalRoot);
-              if (!File::exists(display->mDatasetManager.mGlobalRoot + value +
-                                "/presets")) {
-                Dir::make(value + "/presets");
-              }
-              presetHandler->setSubDirectory(value + "/presets");
-              presetHandler->setCurrentPresetMap("default", true);
-              std::cout << "Preset Handler sub dir set to " << value
-                        << std::endl;
-            }
-            updateTitle();
-            mAutoAdvance = 0.0; // Turn off auto advance
-          });
+      display->mDatasetManager.mCurrentDataset.registerChangeCallback([this,
+                                                                       display](
+          std::string value) {
+        std::string path = value;
+        path = path.substr(path.rfind('/') + 1);
+        if (display->mDatasetManager.mGlobalRoot.size() > 0) {
+          presetHandler->setRootPath(display->mDatasetManager.mGlobalRoot);
+          positionPresets->setRootPath(display->mDatasetManager.mGlobalRoot);
+          if (!File::exists(display->mDatasetManager.mGlobalRoot + value +
+                            "/presets")) {
+            Dir::make(value + "/presets");
+          }
+          if (!File::exists(display->mDatasetManager.mGlobalRoot + value +
+                            "/positionPresets")) {
+            Dir::make(value + "/positionPresets");
+          }
+          presetHandler->setSubDirectory(value + "/presets");
+          positionPresets->setSubDirectory(value + "/presets");
+          presetHandler->setCurrentPresetMap("default", true);
+          std::cout << "Preset Handler sub dir set to " << value << std::endl;
+        }
+        updateTitle();
+        mAutoAdvance = 0.0; // Turn off auto advance
+      });
     }
 
     // Triggers and callbacks that should only be handled by rank 0

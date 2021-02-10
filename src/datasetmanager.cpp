@@ -95,8 +95,10 @@ void DatasetManager::initializeComputation() {
     // Process new value
 
     sampleProcessorGraph.process();
-    currentGraphName.set(graphGenerator.getOutputDirectory() +
-                         graphGenerator.getOutputFileNames()[0]);
+    if (graphGenerator.getOutputFileNames().size() > 0) {
+      currentGraphName.set(graphGenerator.getOutputDirectory() +
+                           graphGenerator.getOutputFileNames()[0]);
+    }
 
     // TODO is this necessary? Shouldn't this happen automatically?
     if (mParameterSpace.getDimension("time") &&
@@ -326,22 +328,10 @@ void DatasetManager::initializeComputation() {
     }
   });
 
-  // Data pools
-  dataPool.registerDataFile("results.json", "chempotA");
-  dataPool.getAllPaths = [&]() {
-    std::vector<std::string> paths;
-    for (auto id : mParameterSpace.getDimension("dir")->getSpaceIds()) {
-      auto path = al::File::conformPathToOS(mParameterSpace.getRootPath()) +
-                  al::File::conformPathToOS(id);
-      if (path.size() > 0) {
-        paths.push_back(path);
-      }
-    }
-    return paths;
-  };
-
+  // Datapools
   trajectoriesPool.registerDataFile("trajectories.nc", "time");
-  trajectoriesPool.getAllPaths = [&]() {
+  trajectoriesPool.getAllPaths = [&](std::vector<std::string> fixedDimensions =
+                                         std::vector<std::string>()) {
     std::vector<std::string> paths;
     for (auto id : mParameterSpace.getDimension("dir")->getSpaceIds()) {
       auto path = al::File::conformPathToOS(mParameterSpace.getRootPath()) +
@@ -362,7 +352,8 @@ void DatasetManager::initializeComputation() {
 
   neighborhoodPool.registerDataFile("../cleared_path0.nc", "");
   neighborhoodPool.registerDataFile("../free_range_path0.nc", "");
-  neighborhoodPool.getAllPaths = [&]() {
+  neighborhoodPool.getAllPaths = [&](std::vector<std::string> fixedDimensions =
+                                         std::vector<std::string>()) {
     std::vector<std::string> paths;
     for (auto id : mParameterSpace.getDimension("dir")->getSpaceIds()) {
       auto path = al::File::conformPathToOS(mParameterSpace.getRootPath()) +
@@ -500,8 +491,24 @@ void DatasetManager::initDataset() {
     }
   }
 
-  mParameterSpace.setCurrentPathTemplate("%%dir%%conditions.%%" + conditionDim +
-                                         "%%");
+  std::string idDim;
+  for (auto dim : mParameterSpace.getDimensions()) {
+    if (dim->getSpaceRepresentationType() == ParameterSpaceDimension::ID) {
+      idDim = dim->getName();
+      std::cout << "Using dimension '" << dim->getName()
+                << "' as subdir dimension" << std::endl;
+      break;
+    }
+  }
+
+  std::string pathTemplate;
+
+  if (mParameterSpace.getDimension("dir") &&
+      mParameterSpace.getDimension("dir")->size() > 0) {
+    pathTemplate = "%%dir%%";
+  }
+  pathTemplate += "%%" + idDim + "%%conditions.%%" + conditionDim + "%%";
+  mParameterSpace.setCurrentPathTemplate(pathTemplate);
 
   std::vector<std::string> parameterSpaceNames;
   parameterSpaceNames.push_back("temperature");
@@ -558,9 +565,16 @@ void DatasetManager::initDataset() {
     labelProcessor.enabled = true;
     graphGenerator.enabled = true;
   }
+  for (auto ps : mParameterSpace.getDimensions()) {
+    if (ps->getSpaceRepresentationType() == ParameterSpaceDimension::INDEX) {
+      std::string condition = std::to_string(ps->getCurrentIndex());
 
+      dataPool.registerDataFile("../results.json", ps->getName());
+    }
+  }
   dataPool.setCacheDirectory(fullDatasetPath + "slices");
   trajectoriesPool.setCacheDirectory(fullDatasetPath + "slices");
+  neighborhoodPool.setCacheDirectory(fullDatasetPath + "slices");
   std::cout << fullDatasetPath + "slices" << std::endl;
 
   lk.unlock();

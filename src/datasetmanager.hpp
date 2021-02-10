@@ -10,7 +10,7 @@
 #include "tinc/DiskBufferImage.hpp"
 #include "tinc/ParameterSpace.hpp"
 #include "tinc/VASPReader.hpp"
-#include "tinc/DataPool.hpp"
+#include "tinc/DataPoolJson.hpp"
 
 #include "al/ui/al_Parameter.hpp"
 
@@ -68,9 +68,9 @@ public:
   ProcessorScript labelProcessor{"AtomLabelProcessor"};
   ProcessorScript graphGenerator{"GraphGenerator"};
 
-  DataPool dataPool{"resultsData", mParameterSpace, "slices"};
-  DataPool trajectoriesPool{"trajectories", mParameterSpace, "slices"};
-  DataPool neighborhoodPool{"neighborhood", mParameterSpace, "slices"};
+  DataPoolJson dataPool{"resultsData", mParameterSpace, "slices"};
+  DataPoolJson trajectoriesPool{"trajectories", mParameterSpace, "slices"};
+  DataPoolJson neighborhoodPool{"neighborhood", mParameterSpace, "slices"};
 
   // TINC Buffers.
   //  BufferManager<std::map<std::string, std::vector<float>>>

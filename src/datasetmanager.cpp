@@ -1018,6 +1018,9 @@ void DatasetManager::loadTrajectory() {
     if ((retval = nc_close(ncid))) {
       return /*false*/;
     }
+  } else {
+    mParameterSpace.getDimension("time")->clear();
+    mParameterSpace.getDimension("time")->conformSpace();
   }
 }
 

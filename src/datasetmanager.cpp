@@ -505,7 +505,9 @@ void DatasetManager::initDataset() {
 
   if (mParameterSpace.getDimension("dir") &&
       mParameterSpace.getDimension("dir")->size() > 0) {
-    pathTemplate = "%%dir%%";
+    if (idDim != mParameterSpace.getDimension("dir")->getName()) {
+      pathTemplate = "%%dir%%";
+    }
   }
   pathTemplate += "%%" + idDim + "%%conditions.%%" + conditionDim + "%%";
   mParameterSpace.setCurrentPathTemplate(pathTemplate);

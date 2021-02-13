@@ -1218,9 +1218,9 @@ public:
     templateGen.useCache();
 
     bool verbose = true;
-    parameterSpaceProcessor.verbose(verbose);
-    transfmatExtractor.verbose(verbose);
-    templateGen.verbose(verbose);
+    parameterSpaceProcessor.setVerbose(verbose);
+    transfmatExtractor.setVerbose(verbose);
+    templateGen.setVerbose(verbose);
 
     templateGen.prepareFunction = [&]() {
       // if transfmat extractor could not generate file, search for alternatives

@@ -75,6 +75,7 @@ void DatasetManager::initializeComputation() {
               changedDimension->getIndexForValue(previousValue))) {
         // Only reload if id has changed
         //      ps->stopSweep();
+
         loadTrajectory();
         loadShellSiteData();
         shellSiteTypes =
@@ -109,7 +110,8 @@ void DatasetManager::initializeComputation() {
 
       mShellSiteTypes.set(shellSiteTypes);
     } else {
-      currentPoscarName.set(labelProcessor.outputFile());
+      //      occupationData.doneWriting(occupationData.getWritable());
+      currentPoscarName.set(labelProcessor.getOutputFileNames()[0]);
     }
 
     updateText();
@@ -119,9 +121,9 @@ void DatasetManager::initializeComputation() {
   trajectoryProcessor.setOutputFileNames({"trajectory.nc"});
 
   bool verbose = true;
-  trajectoryProcessor.verbose(verbose);
-  graphGenerator.verbose(verbose);
-  labelProcessor.verbose(verbose);
+  trajectoryProcessor.setVerbose(verbose);
+  graphGenerator.setVerbose(verbose);
+  labelProcessor.setVerbose(verbose);
 
   graphGenerator.prepareFunction = [&]() {
     std::string datasetId = mCurrentDataset.get();
@@ -914,7 +916,8 @@ void DatasetManager::updateText() {
     metaText += compData.first + " = " + std::to_string(compData.second) + "\n";
   }
   metaText += "Current POSCAR :";
-  metaText += labelProcessor.outputFile();
+  metaText += labelProcessor.getOutputDirectory() +
+              labelProcessor.getOutputFileNames()[0];
 }
 
 std::vector<std::string> DatasetManager::getDataNames() {

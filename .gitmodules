@@ -1,9 +1,3 @@
-[submodule "vdv_group"]
-	path = vdv_group
-	url = arg@nonce.mat.ucsb.edu:vdv_group.git
-[submodule "vdv_group_python"]
-	path = vdv_group_python
-	url = arg@nonce.mat.ucsb.edu:vdv_group_python.git
 [submodule "external/tinc"]
 	path = external/tinc
 	url = https://github.com/AlloSphere-Research-Group/tinc

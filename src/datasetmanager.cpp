@@ -424,7 +424,7 @@ void DatasetManager::initDataset() {
   std::unique_lock<std::mutex> lk(mDataLock);
   mParameterSpace.stopSweep();
 
-  // C:\Users\Andres\source\repos\casm_viewer\vdv_group_python\reassign_occs\extract_nc_from_trajectory_gzip.py
+  // C:\Users\Andres\source\repos\casm_viewer\python\reassign_occs\extract_nc_from_trajectory_gzip.py
 
   std::string fullDatasetPath = File::conformPathToOS(
       getGlobalRootPath() + File::conformPathToOS(mCurrentDataset.get()));

@@ -90,6 +90,13 @@ def extract_folder_template(root_path):
                 max_count = count
     return folder_template
     
+def dir_sort(v):
+    try:
+        k = int(v)
+        return k
+    except ValueError:
+        return 1000
+
 def dataset_directories():
     dataset_dirs = []
     # Quick and dirty way to check if this is a CASM run. Perhaps should be improved?
@@ -100,12 +107,9 @@ def dataset_directories():
     p=os.listdir('./')
     for i in p:
         if os.path.isdir(i):
-            try:
-                can_convert = int(i)
-                sub_dirs.append(i)
-            except ValueError:
-                print("Ignoring dir:", i)
-    sub_dirs = sorted(sub_dirs, key=lambda v: int(v))
+            sub_dirs.append(i)
+    
+    sub_dirs = sorted(sub_dirs, key=dir_sort)
     for sub_dir in sub_dirs:
         # Quick and dirty way to check if this is a CASM run. Perhaps should be improved?
         if os.path.exists(sub_dir + '/conditions.0/') or os.path.exists(sub_dir + "/results.json"):
@@ -252,6 +256,8 @@ if __name__ == '__main__':
 
             if len(results) > 0:    
                 dataset_params[dataset_path] = results
+            else:
+                print("No results for path ", dataset_path)
 
             # Gather results together
             for dataset_param_meta_new in results:

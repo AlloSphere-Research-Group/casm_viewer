@@ -533,10 +533,7 @@ void DataDisplay::previousLayer() { atomrender.previousLayer(); }
 void DataDisplay::updateDisplayBuffers() {
   //  std::map<string, int> elementCounts;
 
-  auto allPositions = mDatasetManager.occupationData.get();
-
   auto curVisibleAtoms = mShowAtoms.getSelectedElements();
-  // TODO these colors should be exposed as a preference
 
   mDataBoundaries.resetInv();
   mAligned4fData.clear();
@@ -641,6 +638,8 @@ void DataDisplay::updateDisplayBuffers() {
     }
   } else {
     // Dataset is Grand Canonical MC
+
+    auto allPositions = mDatasetManager.occupationData.get();
     auto templateDataIt = mDatasetManager.templateData.begin();
     for (auto &atom : *allPositions) {
       std::string atomName =

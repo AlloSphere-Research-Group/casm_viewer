@@ -93,13 +93,6 @@ void DatasetManager::initializeComputation() {
           (int64_t)ps->getDimension("time")->getCurrentIndex();
     }
 
-    // Process new value
-
-    sampleProcessorGraph.process();
-    if (graphGenerator.getOutputFileNames().size() > 0) {
-      currentGraphName.set(graphGenerator.getOutputDirectory() +
-                           graphGenerator.getOutputFileNames()[0]);
-    }
 
     // TODO is this necessary? Shouldn't this happen automatically?
     if (mParameterSpace.getDimension("time") &&
@@ -110,8 +103,12 @@ void DatasetManager::initializeComputation() {
 
       mShellSiteTypes.set(shellSiteTypes);
     } else {
-      //      occupationData.doneWriting(occupationData.getWritable());
-      currentPoscarName.set(labelProcessor.getOutputFileNames()[0]);
+      sampleProcessorGraph.process();
+      if (graphGenerator.getOutputFileNames().size() > 0) {
+        currentGraphName.set(graphGenerator.getOutputDirectory() +
+                             graphGenerator.getOutputFileNames()[0]);
+      }
+      currentPoscarName.set(labelProcessor.getOutputDirectory() +  labelProcessor.getOutputFileNames()[0]);
     }
 
     updateText();
@@ -224,21 +221,6 @@ void DatasetManager::initializeComputation() {
     return true;
   };
 
-  //  std::string condition;
-  //  std::string folder;
-  //  for (auto ps : mParameterSpace.getDimensions()) {
-  //    if (ps->getSpaceRepresentationType() == ParameterSpaceDimension::ID &&
-  //        ps->getName() != "dir") {
-  //      condition = std::to_string(ps->getCurrentIndex());
-  //      break;
-  //    } else {
-  //      folder = ps->getCurrentId();
-  //    }
-  //  }
-  //  if (condition.size() == 0) {
-  //    condition = "0";
-  //  }
-
   labelProcessor.setOutputDirectory(getGlobalRootPath() +
                                     mCurrentDataset.get() + "/cached_output");
 
@@ -295,6 +277,7 @@ void DatasetManager::initializeComputation() {
     int ncid, retval;
 
     if ((retval = nc_open(newName.c_str(), NC_NOWRITE | NC_SHARE, &ncid))) {
+      std::cerr << "Failed to open positions file: " << newName << std::endl;
       return /*false*/;
     }
     int varid;
@@ -1022,8 +1005,13 @@ void DatasetManager::loadTrajectory() {
       return /*false*/;
     }
   } else {
+    std::cout << "No trajectory file found"<< std::endl;
     mParameterSpace.getDimension("time")->clear();
     mParameterSpace.getDimension("time")->conformSpace();
+    trajectoryData.clear();
+    auto w = occupationData.getWritable();
+    w->clear();
+    occupationData.doneWriting(w);
   }
 }
 

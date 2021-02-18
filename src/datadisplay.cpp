@@ -556,6 +556,7 @@ void DataDisplay::updateDisplayBuffers() {
   if (mDatasetManager.mParameterSpace.getDimension("time") &&
       mDatasetManager.mParameterSpace.getDimension("time")->size() > 0) {
     // This is a Kinetic MC dataset.
+    mDatasetManager.occupationData.get(); // To mark as consumed.
     auto currentIndex =
         mDatasetManager.mParameterSpace.getDimension("time")->getCurrentIndex();
     auto templateDataIt = mDatasetManager.templateData.begin();

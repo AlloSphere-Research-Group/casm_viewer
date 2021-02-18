@@ -861,7 +861,7 @@ public:
           ImGui::Unindent(20.0);
         }
 
-        if (ImGui::CollapsingHeader("Graphics")) {
+        if (ImGui::CollapsingHeader("Appearance")) {
           ImGui::Indent(20.0);
           ParameterGUI::drawParameterMeta(&backgroundColor);
           ParameterGUI::drawParameterMeta(&sliceBackground);
@@ -875,6 +875,9 @@ public:
           ImGui::Indent(20.0);
           ParameterGUI::drawBundle(
               &dataDisplays[vdvBundle.currentBundle()]->graphPickable.bundle);
+          for (auto &graphPick: dataDisplays[vdvBundle.currentBundle()]->graphPickables) {
+            ParameterGUI::drawBundle(&graphPick->bundle);
+          }
           ParameterGUI::drawBundle(&dataDisplays[vdvBundle.currentBundle()]
                                         ->parallelPickable.bundle);
           ParameterGUI::drawBundle(&dataDisplays[vdvBundle.currentBundle()]

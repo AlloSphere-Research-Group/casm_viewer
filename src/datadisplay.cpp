@@ -10,8 +10,8 @@
 #include <condition_variable>
 
 #include "datadisplay.hpp"
-#include "modalsynth.hpp"
 #include "imgui.h"
+#include "modalsynth.hpp"
 
 void DataDisplay::init() {
 #ifdef AL_BUILD_MPI
@@ -234,7 +234,6 @@ void DataDisplay::init() {
       voice->globalAmp = 2.0;
       synth.triggerOn(voice);
     }
-
   });
 
   mShowAtoms.registerChangeCallback([this](uint16_t value) {

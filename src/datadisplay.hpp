@@ -148,8 +148,8 @@ public:
   // PickableRotateHandle rh;
   Vec3f selectedPosition{FLT_MIN, FLT_MIN, FLT_MIN};
 
-  TrajectoryRender mHistoryRender{"history", "history.json"};
-  TrajectoryRender mTrajRender{"trajectory", "trajectory.json"};
+  TrajectoryRender mHistoryRender{"history", "history.json", "", 4};
+  TrajectoryRender mTrajRender{"trajectory", "trajectory.json", "", 4};
 
   std::string mParamText;
 

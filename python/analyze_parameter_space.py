@@ -162,6 +162,35 @@ def write_transfmat(dataset_path, is_collection):
     return False
 
 def write_dir(output_full_path, dataset_params):
+    
+    empty_lists = True
+    for name,space in dataset_param_meta['internal_params'].items():
+        try:
+            if len(space) > 0:
+                empty_lists = False
+        except:
+            # Single value
+            pass
+
+    for name,space in dataset_param_meta['index_params'].items():
+        try:
+            if len(space) > 0:
+                empty_lists = False
+        except:
+            # Single value
+            pass
+
+    for name,space in dataset_param_meta['mapped_params'].items():
+        try:
+            if len(space) > 0:
+                empty_lists = False
+        except:
+            # Single value
+            pass
+
+    if empty_lists:
+        print(f"All lists are empty. Not writing paramter space for {output_full_path}")
+        return
     print("Writing output: " + output_full_path)
     ncfile = netCDF4.Dataset(output_full_path, mode='w', format='NETCDF4') 
     # occupation_dim = ncfile.createDimension('index', size=len(results_json['DoF'][0]['occupation']))

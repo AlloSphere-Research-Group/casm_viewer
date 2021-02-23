@@ -1,11 +1,16 @@
 # CASM Viewer
 
-Interactive cisualization of CASM output.
+Interactive visualization of CASM output.
+
+![CASM Viewer-Grand Canonical](images/CASM_viewer-GC.png)
+
+![CASM Viewer-Grand Canonical](images/CASM_viewer-KMC-cumulative-path.png)
+
+![CASM Viewer-Grand Canonical](images/CASM_viewer-KMC-single atom path.png)
 
 
 # Keyboard Commands
 
-    1-9    - Change View
     [,]    - Scale layer view
     -, =   - prev/next layer in perspective view
     O, P   - Temperature prev/next

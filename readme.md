@@ -2,12 +2,9 @@
 
 Interactive visualization of CASM output.
 
-![CASM Viewer-Grand Canonical](images/CASM_viewer-GC.png)
+![CASM Viewer-Grand Canonical](images/CASM_viewer-GC.PNG)
 
-![CASM Viewer-Grand Canonical](images/CASM_viewer-KMC-cumulative-path.png)
-
-![CASM Viewer-Grand Canonical](images/CASM_viewer-KMC-single atom path.png)
-
+![CASM Viewer-KMC](images/CASM_viewer-KMC-cumulative-path.PNG)
 
 # Keyboard Commands
 

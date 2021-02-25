@@ -1005,9 +1005,11 @@ void DatasetManager::loadTrajectory() {
       return /*false*/;
     }
   } else {
-    std::cout << "No trajectory file found"<< std::endl;
-    mParameterSpace.getDimension("time")->clear();
-    mParameterSpace.getDimension("time")->conformSpace();
+    std::cout << "No trajectory file found" << std::endl;
+    if (mParameterSpace.getDimension("time")) {
+      mParameterSpace.getDimension("time")->clear();
+      mParameterSpace.getDimension("time")->conformSpace();
+    }
     trajectoryData.clear();
     auto w = occupationData.getWritable();
     w->clear();

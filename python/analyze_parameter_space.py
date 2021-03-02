@@ -270,107 +270,115 @@ if __name__ == '__main__':
     prim_path = ''
     results = []
 
-    if len(dataset_dirs) == 1:
-        output_full_path = output_dir + '/' + output_name
-        results = get_dataset_params()
 
-        # TODO FINISH SINGLE DATASET
-    else:
-        dataset_params = {}  
+    dataset_params = {}  
 
-        dataset_param_common = {}  
-        for dataset_path in dataset_dirs:
-            with pushd(dataset_path): 
-                results = get_dataset_params()
+    dataset_param_common = {}  
+    for dataset_path in dataset_dirs:
+        with pushd(dataset_path): 
+            results = get_dataset_params()
 
-            if len(results) > 0:    
-                dataset_params[dataset_path] = results
-            else:
-                print("No results for path ", dataset_path)
-
-            # Gather results together
-            for dataset_param_meta_new in results:
-                if len(dataset_param_common) == 0 and len(dataset_param_meta_new) > 0:
-                    dataset_param_meta = dataset_param_meta_new
-                else:
-                    for parameter_name in dataset_param_meta_new['parameters'].keys():
-                        dataset_param_meta['parameters'][parameter_name] += dataset_param_meta_new['parameters'][parameter_name]
-
-            
-        if len(dataset_params) == 0:
-            print("Directory not a casm dataset")    
-            sys.exit(255)
-
-        param_cache = {}
-        param_consistent = []
-        for path, params in dataset_params.items():
-            for param in params:
-                for param_name, param_data in param.items():
-                    if not param_name in param_cache:
-                        param_cache[param_name] = param_data
-                        param_consistent.append(param_name)
-                    else:
-                        if not param_cache[param_name] == param_data and param_consistent.count(param_name) > 0:
-                            param_consistent.remove(param_name)
-        
-        consistent_params_data = {}
-        for param_name in param_consistent:
-            consistent_params_data[param_name] = param_cache[param_name]
-            
-        # Remove consistent parameters from internal values
-        for path, params in dataset_params.items():
-            for param in params:
-                for consistent_param in consistent_params_data.keys():
-                    del param[consistent_param]
-        
-        # Now check if KMC dataset and write time dimension
-
-        for path, params in dataset_params.items():
-            sub_dirs = glob.glob(path+'/*/')
-            for sub_dir in sub_dirs:
-                # TODO copy params
-                dataset_param_meta = {"internal_params": {}, "index_params": {}, "mapped_params": {}}
-                if os.path.exists(sub_dir + "/trajectory.nc"):
-                    dataset_param_meta["internal_params"]["time"] = []
-                
-            if len(params) > 0:
-                write_dir(path + output_name, dataset_param_meta)
-
-        # dataset_param_meta_new = {}
-        # if len(dir_params) > 0:
-        #     dataset_param_meta_new = {'conditions': consistent_params_data,
-        #                         'internal_states': internal_run_conditions,
-        #                         'conditions_map': conditions_map, "parameters" : {}} 
-        #     for dir_name, params in dir_params:
-        #         for param_name, param_value in params.items():
-        #             if not param_name in dataset_param_meta_new['parameters']:    
-        #                 dataset_param_meta_new['parameters'][param_name] = []
-        #             dataset_param_meta_new['parameters'][param_name].append({'value': param_value, 'dir': dir_name})
-        dataset_param_meta = {}
-
-        dir_params = {}
-        for dir_name, contents in dataset_params.items():
-            for entry in contents:
-                for name, data_val in entry.items():
-                    if not name in dir_params:
-                        dir_params[name] = []
-                    dir_params[name].append((dir_name, data_val))
-                    if dataset_dirs.count(dir_name) > 0:
-                        dataset_dirs.remove(dir_name)
-
-        from operator import itemgetter
-        for param_name, param_map in dir_params.items():
-            param_map.sort(key=itemgetter(1))
-
-        if len(dataset_dirs) > 0:
-            dataset_param_meta["mapped_params"] = {"dir": {"value": [i for i in range(len(dataset_dirs))], "dir" : dataset_dirs }}
+        if len(results) > 0:    
+            dataset_params[dataset_path] = results
         else:
-            for dir_param_name, dir_param_values in dir_params.items():
-                dataset_param_meta["mapped_params"] = {dir_param_name: {"value": [i[1] for i in dir_param_values], "dir" : [i[0] for i in dir_param_values] }}
-        dataset_param_meta["index_params"] = consistent_params_data
-        dataset_param_meta["internal_params"] = {"time": []}
+            print("No results for path ", dataset_path)
 
-        write_dir(output_name, dataset_param_meta)
+        # Gather results together
+        for dataset_param_meta_new in results:
+            if len(dataset_param_common) == 0 and len(dataset_param_meta_new) > 0:
+                dataset_param_meta = dataset_param_meta_new
+            else:
+                for parameter_name in dataset_param_meta_new['parameters'].keys():
+                    dataset_param_meta['parameters'][parameter_name] += dataset_param_meta_new['parameters'][parameter_name]
+
+        
+    if len(dataset_params) == 0:
+        print("Directory not a casm dataset")    
+        sys.exit(255)
+
+    param_cache = {}
+    param_consistent = []
+    for path, params in dataset_params.items():
+        for param in params:
+            for param_name, param_data in param.items():
+                if not param_name in param_cache:
+                    param_cache[param_name] = param_data
+                    param_consistent.append(param_name)
+                else:
+                    if not param_cache[param_name] == param_data and param_consistent.count(param_name) > 0:
+                        param_consistent.remove(param_name)
+    
+    consistent_params_data = {}
+    for param_name in param_consistent:
+        consistent_params_data[param_name] = param_cache[param_name]
+        
+    # Remove consistent parameters from internal values
+    for path, params in dataset_params.items():
+        for param in params:
+            for consistent_param in consistent_params_data.keys():
+                del param[consistent_param]
+    
+    # Now check if KMC dataset and write time dimension
+
+    for path, params in dataset_params.items():
+        sub_dirs = glob.glob(path+'/*/')
+        for sub_dir in sub_dirs:
+            # TODO copy params
+            dataset_param_meta = {"internal_params": {}, "index_params": {}, "mapped_params": {}}
+            if os.path.exists(sub_dir + "/trajectory.nc"):
+                dataset_param_meta["internal_params"]["time"] = []
+            
+        if len(params) > 0:
+            write_dir(path + output_name, dataset_param_meta)
+
+    # dataset_param_meta_new = {}
+    # if len(dir_params) > 0:
+    #     dataset_param_meta_new = {'conditions': consistent_params_data,
+    #                         'internal_states': internal_run_conditions,
+    #                         'conditions_map': conditions_map, "parameters" : {}} 
+    #     for dir_name, params in dir_params:
+    #         for param_name, param_value in params.items():
+    #             if not param_name in dataset_param_meta_new['parameters']:    
+    #                 dataset_param_meta_new['parameters'][param_name] = []
+    #             dataset_param_meta_new['parameters'][param_name].append({'value': param_value, 'dir': dir_name})
+    dataset_param_meta = {}
+
+    dir_params = {}
+    for dir_name, contents in dataset_params.items():
+        for entry in contents:
+            for name, data_val in entry.items():
+                if not name in dir_params:
+                    dir_params[name] = []
+                dir_params[name].append((dir_name, data_val))
+                if dataset_dirs.count(dir_name) > 0:
+                    dataset_dirs.remove(dir_name)
+
+    from operator import itemgetter
+    for param_name, param_map in dir_params.items():
+        param_map.sort(key=itemgetter(1))
+
+    # if consistent parameter is size 1, we can assume that we are dealing with a single directory, 
+    # so remove the parameter as it should be handled by "dir" already
+    keys_to_remove = []
+    for key in consistent_params_data.keys():
+        if type(consistent_params_data[key]) != list:
+            keys_to_remove.append(key)
+    
+    for key in keys_to_remove:
+        del consistent_params_data[key] 
+
+    if len(dataset_dirs) > 0:
+        dataset_param_meta["mapped_params"] = {"dir": {"value": [i for i in range(len(dataset_dirs))], "dir" : dataset_dirs }}
+    else:
+        for dir_param_name, dir_param_values in dir_params.items():
+            dataset_param_meta["mapped_params"] = {dir_param_name: {"value": [i[1] for i in dir_param_values], "dir" : [i[0] for i in dir_param_values] }}
+    dataset_param_meta["index_params"] = consistent_params_data
+    dataset_param_meta["internal_params"] = {"time": []}
+
+    #if len(dataset_dirs) == 1:
+    #    dataset_param_meta['mapped_params']['dir'] = {}
+        
+    write_dir(output_name, dataset_param_meta)
         
 
             

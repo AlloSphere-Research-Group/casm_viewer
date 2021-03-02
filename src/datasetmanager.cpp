@@ -93,7 +93,6 @@ void DatasetManager::initializeComputation() {
           (int64_t)ps->getDimension("time")->getCurrentIndex();
     }
 
-
     // TODO is this necessary? Shouldn't this happen automatically?
     if (mParameterSpace.getDimension("time") &&
         mParameterSpace.getDimension("time")->size() > 0) {
@@ -103,12 +102,14 @@ void DatasetManager::initializeComputation() {
 
       mShellSiteTypes.set(shellSiteTypes);
     } else {
-      sampleProcessorGraph.process();
+      mParameterSpace.runProcess(sampleProcessorGraph, {}, {});
+      //      sampleProcessorGraph.process();
       if (graphGenerator.getOutputFileNames().size() > 0) {
         currentGraphName.set(graphGenerator.getOutputDirectory() +
                              graphGenerator.getOutputFileNames()[0]);
       }
-      currentPoscarName.set(labelProcessor.getOutputDirectory() +  labelProcessor.getOutputFileNames()[0]);
+      currentPoscarName.set(labelProcessor.getOutputDirectory() +
+                            labelProcessor.getOutputFileNames()[0]);
     }
 
     updateText();
@@ -117,7 +118,7 @@ void DatasetManager::initializeComputation() {
   trajectoryProcessor.setInputFileNames({"trajectory.json.gz"});
   trajectoryProcessor.setOutputFileNames({"trajectory.nc"});
 
-  bool verbose = true;
+  bool verbose = false;
   trajectoryProcessor.setVerbose(verbose);
   graphGenerator.setVerbose(verbose);
   labelProcessor.setVerbose(verbose);
@@ -145,7 +146,8 @@ void DatasetManager::initializeComputation() {
       }
       std::string highlightValue = "0.0";
 
-      if (mParameterSpace.getDimension(xLabel)) {
+      if (mParameterSpace.getDimension(
+              mParameterSpace.parameterNameMap[xLabel])) {
         try {
           datax.reserve(mParameterSpace.getDimension(xLabel)->size());
           for (auto value :
@@ -224,8 +226,8 @@ void DatasetManager::initializeComputation() {
   labelProcessor.setOutputDirectory(getGlobalRootPath() +
                                     mCurrentDataset.get() + "/cached_output");
 
+  labelProcessor.useCache();
   labelProcessor.prepareFunction = [&]() {
-
     std::string condition = labelProcessor.configuration["condition"].valueStr;
     std::string folder = labelProcessor.configuration["dir"].valueStr;
 
@@ -233,14 +235,10 @@ void DatasetManager::initializeComputation() {
     std::string subDir = getSubDir();
 
     std::string positionOutputName = "positions";
-    positionOutputName += "_" + subDir;
+    positionOutputName += "_" + mParameterSpace.currentRelativeRunPath();
+    positionOutputName += "_" + folder;
     positionOutputName += "_" + condition;
 
-    if (labelProcessor.configuration.find("time") !=
-        labelProcessor.configuration.end()) {
-      positionOutputName +=
-          "_" + std::to_string(labelProcessor.configuration["time"].valueInt64);
-    }
     labelProcessor.setOutputFileNames(
         {labelProcessor.sanitizeName(positionOutputName) + ".nc"});
 
@@ -250,7 +248,7 @@ void DatasetManager::initializeComputation() {
     std::string final_state_path =
         conditionSubdir + "final_state.json"; // final_state.json file
     labelProcessor.configuration["final_state_path"] =
-        File::conformPathToOS(currentDataset + subDir + "/" + final_state_path);
+        File::conformPathToOS(currentDataset + final_state_path);
 
     return true;
   };
@@ -403,7 +401,8 @@ void DatasetManager::readParameterSpace() {
   mParameterSpace.enableCache("ps_cache");
 }
 
-void DatasetManager::initDataset() {
+bool DatasetManager::initDataset() {
+  bool ret = true;
   std::unique_lock<std::mutex> lk(mDataLock);
   mParameterSpace.stopSweep();
 
@@ -422,10 +421,12 @@ void DatasetManager::initDataset() {
     int retval, ncid, varid;
     if ((retval =
              nc_open(templatePath.c_str(), NC_NOWRITE | NC_SHARE, &ncid))) {
-      return /*false*/;
+      lastError = "Error cached_output/opening template.nc";
+      return false;
     }
     if ((retval = nc_inq_varid(ncid, "atoms_var", &varid))) {
-      return /*false*/;
+      lastError = "Error getting 'atoms_var' from template.nc";
+      return false;
     }
 
     nc_type xtypep;
@@ -435,22 +436,27 @@ void DatasetManager::initDataset() {
     int *nattsp = nullptr;
     if ((retval = nc_inq_var(ncid, varid, name, &xtypep, &ndimsp, dimidsp,
                              nattsp))) {
-      return /*false*/;
+
+      lastError = "Error getting 'atoms_var' metadata from template.nc";
+      return false;
     }
 
     size_t lenp;
     if ((retval = nc_inq_dimlen(ncid, dimidsp[0], &lenp))) {
-      return /*false*/;
+      lastError = "Error getting 'atoms_var' length from template.nc";
+      return false;
     }
 
     templateData.resize(lenp);
 
     if ((retval = nc_get_var(ncid, varid, templateData.data()))) {
-      return /*false*/;
+      lastError = "Error getting 'atoms_var' data from template.nc";
+      return false;
     }
 
     if ((retval = nc_close(ncid))) {
-      return /*false*/;
+      lastError = "Error closing template.nc";
+      return false;
     }
   }
 
@@ -463,12 +469,13 @@ void DatasetManager::initDataset() {
 
   readParameterSpace();
   loadShellSiteData();
-  analyzeDataset();
+  ret &= analyzeDataset();
   loadTrajectory(); // The time parameter space is loaded here.
 
   std::string conditionDim;
   for (auto dim : mParameterSpace.getDimensions()) {
-    if (dim->getSpaceRepresentationType() == ParameterSpaceDimension::INDEX) {
+    if (dim->getSpaceRepresentationType() == ParameterSpaceDimension::INDEX &&
+        dim->size() > 1) {
       conditionDim = dim->getName();
       std::cout << "Using dimension '" << dim->getName()
                 << "' as condition dimension" << std::endl;
@@ -565,12 +572,13 @@ void DatasetManager::initDataset() {
   std::cout << fullDatasetPath + "slices" << std::endl;
 
   lk.unlock();
+  return ret;
 }
 
-void DatasetManager::analyzeDataset() {
+bool DatasetManager::analyzeDataset() {
   if (mCurrentDataset.get() == "") {
     std::cerr << "ERROR: No datasets found." << std::endl;
-    return;
+    return false;
   }
   std::string datasetId = mCurrentDataset.get();
   // mCurrentDataset might be more current than the internal parameter value
@@ -622,9 +630,8 @@ void DatasetManager::analyzeDataset() {
                       labelString) == mShowAtomElements.end()) {
           mShowAtomElements.push_back(labelString);
         }
-        if (isVacancy &&
-            std::find(mVacancyAtoms.begin(), mVacancyAtoms.end(),
-                      labelString) == mVacancyAtoms.end()) {
+        if (isVacancy && std::find(mVacancyAtoms.begin(), mVacancyAtoms.end(),
+                                   labelString) == mVacancyAtoms.end()) {
           mVacancyAtoms.push_back(labelString);
         }
       }
@@ -669,8 +676,12 @@ void DatasetManager::analyzeDataset() {
       }
     }
   } else {
+
+    lastError = "failed to find prim labels file";
     std::cerr << "ERROR failed to find prim labels file" << std::endl;
+    return false;
   }
+  return true;
 }
 
 void DatasetManager::preProcessDataset() {
@@ -991,11 +1002,11 @@ void DatasetManager::loadTrajectory() {
 
     assert(mParameterSpace.getDimension("time"));
     mParameterSpace.getDimension("time")->clear();
-    mParameterSpace.getDimension("time")
-        ->setSpaceValues(timeValues.data(), timeValues.size());
+    mParameterSpace.getDimension("time")->setSpaceValues(timeValues.data(),
+                                                         timeValues.size());
     //    mParameterSpace.getDimension("time")->conformSpace();
-    mParameterSpace.getDimension("time")
-        ->setSpaceRepresentationType(ParameterSpaceDimension::VALUE);
+    mParameterSpace.getDimension("time")->setSpaceRepresentationType(
+        ParameterSpaceDimension::VALUE);
 
     if (numTimeSteps != mParameterSpace.getDimension("time")->size()) {
       std::cout << "ERROR: Time dimension mismatch!" << std::endl;

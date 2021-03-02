@@ -31,9 +31,9 @@
 #include "al/ui/al_PickableManager.hpp"
 #include "al/ui/al_PickableRotateHandle.hpp"
 
-#include "tinc/vis/AtomRenderer.hpp"
-#include "tinc/VASPReader.hpp"
 #include "tinc/DiskBufferImage.hpp"
+#include "tinc/VASPReader.hpp"
+#include "tinc/vis/AtomRenderer.hpp"
 #include "tinc/vis/TrajectoryRender.hpp"
 
 #include "datasetmanager.hpp"
@@ -114,6 +114,8 @@ public:
   ParameterInt currentSelection{"currentSelection"};
   ParameterInt previousSelection{"previousSelection"};
 
+  ParameterString lastError{"lastError"};
+
   ParameterColor mMarkerColor{"markerColor"};
   Parameter mMarkerScale{"markerScale", "", 1.7, 0.001, 20};
 };
@@ -168,7 +170,7 @@ public:
 
   void init();
 
-  void initDataset();
+  bool initDataset();
 
   // Prepare elements before draw call
   void prepare(Graphics &g, Matrix4f &transformMatrix);

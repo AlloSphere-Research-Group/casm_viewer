@@ -5,12 +5,12 @@
 #include <string>
 #include <vector>
 
-#include "tinc/ProcessorGraph.hpp"
-#include "tinc/ProcessorCpp.hpp"
+#include "tinc/DataPoolJson.hpp"
 #include "tinc/DiskBufferImage.hpp"
 #include "tinc/ParameterSpace.hpp"
+#include "tinc/ProcessorCpp.hpp"
+#include "tinc/ProcessorGraph.hpp"
 #include "tinc/VASPReader.hpp"
-#include "tinc/DataPoolJson.hpp"
 
 #include "al/ui/al_Parameter.hpp"
 
@@ -50,6 +50,8 @@ public:
   json mCurrentBasis;
 
   std::string metaText;
+
+  std::string lastError;
 
   // Template and diffs for time history computation
   //  std::map<std::string, std::vector<float>> mTemplatePositions;
@@ -130,8 +132,8 @@ public:
   std::string getGlobalRootPath();
   std::string fullConditionPath();
 
-  void initDataset();
-  void analyzeDataset();
+  bool initDataset();
+  bool analyzeDataset();
 
   // Run processing scripts across all the dataset prior to starting application
   // TODO we should run this asynchronously

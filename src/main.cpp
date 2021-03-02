@@ -20,9 +20,9 @@
 #include "al_ext/openvr/al_OpenVRDomain.hpp"
 
 #include "tinc/DeferredComputation.hpp"
-#include "tinc/vis/GUI.hpp"
 #include "tinc/PeriodicTask.hpp"
 #include "tinc/TincServer.hpp"
+#include "tinc/vis/GUI.hpp"
 
 #undef AL_BUILD_MPI
 
@@ -300,9 +300,9 @@ public:
       }
     }
 
-//    std::string cwdString = File::currentPath();
-//    mDatasetSelector = new FileSelector(dataRoot, File::isDirectory);
-//    mDatasetSelector->start(cwdString);
+    //    std::string cwdString = File::currentPath();
+    //    mDatasetSelector = new FileSelector(dataRoot, File::isDirectory);
+    //    mDatasetSelector->start(cwdString);
 
 #ifdef AL_EXT_OPENVR
     openVRDomain = OpenVRDomain::enableVR(this);
@@ -782,6 +782,12 @@ public:
         mDatasetSelector = new FileSelector(dataRoot, File::isDirectory);
         mDatasetSelector->start(mPreviousBrowseDir);
       }
+      if (this->dataDisplays[vdvBundle.currentBundle()]->lastError.get() !=
+          "") {
+        ImGui::Text("%s", this->dataDisplays[vdvBundle.currentBundle()]
+                              ->lastError.get()
+                              .c_str());
+      }
       if (this->dataDisplays[vdvBundle.currentBundle()]
               ->mDatasetManager.mParameterSpace.getDimensions()
               .size() > 0) {
@@ -875,7 +881,8 @@ public:
           ImGui::Indent(20.0);
           ParameterGUI::drawBundle(
               &dataDisplays[vdvBundle.currentBundle()]->graphPickable.bundle);
-          for (auto &graphPick: dataDisplays[vdvBundle.currentBundle()]->graphPickables) {
+          for (auto &graphPick :
+               dataDisplays[vdvBundle.currentBundle()]->graphPickables) {
             ParameterGUI::drawBundle(&graphPick->bundle);
           }
           ParameterGUI::drawBundle(&dataDisplays[vdvBundle.currentBundle()]
@@ -1217,7 +1224,7 @@ public:
     templateGen.setOutputFileNames({"cached_output/template.nc"});
     templateGen.useCache();
 
-    bool verbose = true;
+    bool verbose = false;
     parameterSpaceProcessor.setVerbose(verbose);
     transfmatExtractor.setVerbose(verbose);
     templateGen.setVerbose(verbose);
@@ -1286,30 +1293,31 @@ public:
       display->mVisible.registerChangeCallback(
           [this](float) { updateTitle(); });
 
-      display->mDatasetManager.mCurrentDataset.registerChangeCallback([this,
-                                                                       display](
-          std::string value) {
-        std::string path = value;
-        path = path.substr(path.rfind('/') + 1);
-        if (display->mDatasetManager.mGlobalRoot.size() > 0) {
-          presetHandler->setRootPath(display->mDatasetManager.mGlobalRoot);
-          positionPresets->setRootPath(display->mDatasetManager.mGlobalRoot);
-          if (!File::exists(display->mDatasetManager.mGlobalRoot + value +
-                            "/presets")) {
-            Dir::make(value + "/presets");
-          }
-          if (!File::exists(display->mDatasetManager.mGlobalRoot + value +
-                            "/positionPresets")) {
-            Dir::make(value + "/positionPresets");
-          }
-          presetHandler->setSubDirectory(value + "/presets");
-          positionPresets->setSubDirectory(value + "/presets");
-          presetHandler->setCurrentPresetMap("default", true);
-          std::cout << "Preset Handler sub dir set to " << value << std::endl;
-        }
-        updateTitle();
-        mAutoAdvance = 0.0; // Turn off auto advance
-      });
+      display->mDatasetManager.mCurrentDataset.registerChangeCallback(
+          [this, display](std::string value) {
+            std::string path = value;
+            path = path.substr(path.rfind('/') + 1);
+            if (display->mDatasetManager.mGlobalRoot.size() > 0) {
+              presetHandler->setRootPath(display->mDatasetManager.mGlobalRoot);
+              positionPresets->setRootPath(
+                  display->mDatasetManager.mGlobalRoot);
+              if (!File::exists(display->mDatasetManager.mGlobalRoot + value +
+                                "/presets")) {
+                Dir::make(value + "/presets");
+              }
+              if (!File::exists(display->mDatasetManager.mGlobalRoot + value +
+                                "/positionPresets")) {
+                Dir::make(value + "/positionPresets");
+              }
+              presetHandler->setSubDirectory(value + "/presets");
+              positionPresets->setSubDirectory(value + "/presets");
+              presetHandler->setCurrentPresetMap("default", true);
+              std::cout << "Preset Handler sub dir set to " << value
+                        << std::endl;
+            }
+            updateTitle();
+            mAutoAdvance = 0.0; // Turn off auto advance
+          });
     }
 
     // Triggers and callbacks that should only be handled by rank 0

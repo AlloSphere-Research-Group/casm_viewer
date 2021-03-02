@@ -122,8 +122,11 @@ void DataDisplay::init() {
       [&](std::string value) {
         if (value != mDatasetManager.mCurrentDataset.get()) {
           // First force application of value
+          lastError.set("");
           mDatasetManager.mCurrentDataset.setLocking(value);
-          initDataset();
+          if (!initDataset()) {
+            lastError.set(mDatasetManager.lastError);
+          }
           resetSlicing();
         }
       });
@@ -242,7 +245,16 @@ void DataDisplay::init() {
       // value
       mShowAtoms.setNoCalls(value);
       // TODO we should have a less heavy function to turn atoms on and off
-      mDatasetManager.sampleProcessorGraph.process();
+      mDatasetManager.mParameterSpace.runProcess(
+          mDatasetManager.sampleProcessorGraph, {}, {});
+      if (mDatasetManager.graphGenerator.getOutputFileNames().size() > 0) {
+        mDatasetManager.currentGraphName.set(
+            mDatasetManager.graphGenerator.getOutputDirectory() +
+            mDatasetManager.graphGenerator.getOutputFileNames()[0]);
+      }
+      mDatasetManager.currentPoscarName.set(
+          mDatasetManager.labelProcessor.getOutputDirectory() +
+          mDatasetManager.labelProcessor.getOutputFileNames()[0]);
     }
   });
 
@@ -358,10 +370,11 @@ void DataDisplay::init() {
   bundle << mDisplaySlicing;
 }
 
-void DataDisplay::initDataset() {
+bool DataDisplay::initDataset() {
+  bool ret = true;
   mDatasetManager.mLoadedDataset = "";
 
-  mDatasetManager.initDataset();
+  ret &= mDatasetManager.initDataset();
 
   currentSelection.max(mDatasetManager.templateData.size() - 1);
 
@@ -392,6 +405,7 @@ void DataDisplay::initDataset() {
       mShowAtoms.setElementSelected(elementLabel);
     }
   }
+  return ret;
 }
 
 void DataDisplay::prepare(Graphics &g, Matrix4f &transformMatrix) {

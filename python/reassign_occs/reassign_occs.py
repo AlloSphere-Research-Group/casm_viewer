@@ -49,6 +49,7 @@ if __name__ == '__main__':
     parser.add_argument('prim_path', type=str, default="../prim.json", nargs='?')
     parser.add_argument('transfmat', type=str, default="transfmat", nargs='?')
     parser.add_argument('final_state_path', type=str, default="", nargs='?')
+    parser.add_argument('__input_names', type=str, default="final_state.json", nargs='?')
     parser.add_argument('__output_names', type=str, default="template_POSCAR", nargs='?')
     parser.add_argument('__output_path', type=str, default="", nargs='?')
     
@@ -65,7 +66,7 @@ if __name__ == '__main__':
         basis=parse_prim(f)
 
     # read final_state
-    with open(args['final_state_path'],'r') as f:
+    with open(args['__input_names'][0],'r') as f:
         dof=json.load(f)["occupation"]
 
     # sort POSCAR by species

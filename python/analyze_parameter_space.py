@@ -124,6 +124,8 @@ def get_dataset_params():
         for param_name, param_values in all_params.items():
             
             if check_equal(param_values):
+                if len(param_values) > 1:
+                    print("condition is " + param_name)
                 value = param_values[0]
             else:
                 value = param_values
@@ -269,6 +271,16 @@ if __name__ == '__main__':
       
     prim_path = ''
     results = []
+    
+    custom_conditions = []
+    
+    for file in glob.glob("*.json"):
+        with open(file) as f:
+            j = json.load(f)
+            if "driver" in j:
+                print("found config file")
+                if j["driver"]["mode"] == "custom":
+                     custom_conditions = j["driver"]["custom_conditions"][0].keys()
 
 
     dataset_params = {}  
@@ -362,7 +374,8 @@ if __name__ == '__main__':
     keys_to_remove = []
     for key in consistent_params_data.keys():
         if type(consistent_params_data[key]) != list:
-            keys_to_remove.append(key)
+            if key in custom_conditions:
+                keys_to_remove.append(key)
     
     for key in keys_to_remove:
         del consistent_params_data[key] 

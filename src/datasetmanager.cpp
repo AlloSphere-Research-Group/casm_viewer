@@ -46,7 +46,8 @@ void DatasetManager::initializeComputation() {
   // Configure parameter space
   mParameterSpace.parameterNameMap = {{"temperature", "T"},
                                       {"chempotA", "param_chem_pot(a)"},
-                                      {"chempotB", "param_chem_pot(b)"}};
+                                      {"chempotB", "param_chem_pot(b)"},
+                                      {"dir", "dir"}};
   // Parameter space callback
   mParameterSpace.onValueChange = [&](ParameterSpaceDimension *changedDimension,
                                       ParameterSpace *ps) {
@@ -118,10 +119,12 @@ void DatasetManager::initializeComputation() {
   trajectoryProcessor.setInputFileNames({"trajectory.json.gz"});
   trajectoryProcessor.setOutputFileNames({"trajectory.nc"});
 
-  bool verbose = false;
+  bool verbose = true;
   trajectoryProcessor.setVerbose(verbose);
   graphGenerator.setVerbose(verbose);
   labelProcessor.setVerbose(verbose);
+
+  graphGenerator.setOutputFileNames({"cached_output/graph.png"});
 
   graphGenerator.prepareFunction = [&]() {
     std::string datasetId = mCurrentDataset.get();
@@ -135,9 +138,7 @@ void DatasetManager::initializeComputation() {
 
       if (resultsJson.find(yLabel) != resultsJson.end()) {
         try {
-          datay.reserve(resultsJson[yLabel].size());
-          datay.insert(datay.begin(), resultsJson[yLabel].begin(),
-                       resultsJson[yLabel].end());
+          datay = resultsJson[yLabel].get<std::vector<double>>();
         } catch (std::exception &) {
         }
       } else {
@@ -145,9 +146,12 @@ void DatasetManager::initializeComputation() {
         return false;
       }
       std::string highlightValue = "0.0";
+      if (mParameterSpace.parameterNameMap.find(xLabel) !=
+          mParameterSpace.parameterNameMap.end()) {
+        xLabel = mParameterSpace.parameterNameMap[xLabel];
+      }
 
-      if (mParameterSpace.getDimension(
-              mParameterSpace.parameterNameMap[xLabel])) {
+      if (mParameterSpace.getDimension(xLabel)) {
         try {
           datax.reserve(mParameterSpace.getDimension(xLabel)->size());
           for (auto value :
@@ -159,7 +163,8 @@ void DatasetManager::initializeComputation() {
         } catch (std::exception &) {
         }
       } else {
-        std::cerr << "Results file not suitable for graphing" << std::endl;
+        std::cerr << "Results file not suitable for graphing. Dimension "
+                  << xLabel << " not suitable." << std::endl;
         return false;
       }
 
@@ -208,48 +213,12 @@ void DatasetManager::initializeComputation() {
       graphGenerator.configuration["miny"] = std::to_string(dataRange.first);
       graphGenerator.configuration["maxy"] = std::to_string(dataRange.second);
       graphGenerator.configuration["inxFile"] =
-          std::string("cached_output/inx.bin");
+          std::string(fullDatasetPath + "cached_output/inx.bin");
       graphGenerator.configuration["inyFile"] =
-          std::string("cached_output/iny.bin");
-
-      graphGenerator.setOutputDirectory(graphGenerator.getRunningDirectory() +
-                                        "/cached_output");
-      graphGenerator.setOutputFileNames({"_" + highlightValue + "_" +
-                                         ProcessorScript::sanitizeName(subDir) +
-                                         "_" + yLabelSanitized + "_graph.png"});
+          std::string(fullDatasetPath + "cached_output/iny.bin");
     } else {
       return false;
     }
-    return true;
-  };
-
-  labelProcessor.setOutputDirectory(getGlobalRootPath() +
-                                    mCurrentDataset.get() + "/cached_output");
-
-  labelProcessor.useCache();
-  labelProcessor.prepareFunction = [&]() {
-    std::string condition = labelProcessor.configuration["condition"].valueStr;
-    std::string folder = labelProcessor.configuration["dir"].valueStr;
-
-    std::string currentDataset = mCurrentDataset.get();
-    std::string subDir = getSubDir();
-
-    std::string positionOutputName = "positions";
-    positionOutputName += "_" + mParameterSpace.currentRelativeRunPath();
-    positionOutputName += "_" + folder;
-    positionOutputName += "_" + condition;
-
-    labelProcessor.setOutputFileNames(
-        {labelProcessor.sanitizeName(positionOutputName) + ".nc"});
-
-    std::string conditionSubdir =
-        File::conformPathToOS(folder + "conditions." + condition + "/");
-
-    std::string final_state_path =
-        conditionSubdir + "final_state.json"; // final_state.json file
-    labelProcessor.configuration["final_state_path"] =
-        File::conformPathToOS(currentDataset + final_state_path);
-
     return true;
   };
 
@@ -259,6 +228,7 @@ void DatasetManager::initializeComputation() {
   // Configure parameter callbacks
   mPlotYAxis.registerChangeCallback([this](float value) {
     if (mPlotYAxis.get() != value) {
+      mPlotYAxis.setNoCalls(value); // Force internal value, discard old value
       graphGenerator.process();
       // TODO connect to ImageDiskBuffer
     }
@@ -266,6 +236,7 @@ void DatasetManager::initializeComputation() {
 
   mPlotXAxis.registerChangeCallback([this](float value) {
     if (mPlotXAxis.get() != value) {
+      mPlotXAxis.setNoCalls(value); // Force internal value, discard old value
       graphGenerator.process();
       // TODO connect to ImageDiskBuffer
     }
@@ -505,7 +476,11 @@ bool DatasetManager::initDataset() {
   mParameterSpace.setCurrentPathTemplate(pathTemplate);
 
   std::vector<std::string> parameterSpaceNames;
-  parameterSpaceNames.push_back("temperature");
+  for (auto dim : mParameterSpace.getDimensions()) {
+    if (dim->size() > 0) {
+      parameterSpaceNames.push_back(dim->getName());
+    }
+  }
 
   mPlotXAxis.setElements(parameterSpaceNames);
   mPlotYAxis.setNoCalls(0);
@@ -524,6 +499,8 @@ bool DatasetManager::initDataset() {
 
   labelProcessor.setRunningDirectory(fullDatasetPath);
   labelProcessor.setOutputDirectory(fullDatasetPath + "/cached_output");
+  labelProcessor.setOutputFileNames({"positions.nc"});
+  labelProcessor.setInputFileNames({"final_state.json"});
 
   std::string globalRoot = getGlobalRootPath();
   // TODO prim file should only be updated when directory changes.

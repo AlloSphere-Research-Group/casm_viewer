@@ -159,11 +159,14 @@ public:
 
   SlicingAtomRenderer atomrender;
 
+  std::vector<std::shared_ptr<ParameterColor>> mColorList;
   std::vector<Color> colorList = {
       Color(0.0, 1.0, 0.0, 0.0), Color(1.0, 0.0, 0.0, 0.0),
       Color(0.0, 1.0, 1.0, 1.0), Color(1.0, 1.0, 0.0, 1.0),
       Color(1.0, 0.0, 1.0, 1.0), Color(0.5, 1.0, 0.5, 1.0),
       Color(1.0, 1.0, 0.0, 1.0), Color(0.0, 0.0, 1.0, 1.0)};
+
+  Trigger mColorTrigger{"applyColor"};
 
   // Sonification
   PolySynth synth;

@@ -368,6 +368,16 @@ void DataDisplay::init() {
   bundle << mSmallLabel;
   bundle << mDrawLabels;
   bundle << mDisplaySlicing;
+
+  // Colors
+  for (int i = 0; i < 16; i++) {
+    mColorList.emplace_back(
+        std::make_shared<ParameterColor>("atomColor" + std::to_string(i)));
+    mColorList.back()->set(colorList[i % colorList.size()]);
+    mColorList.back()->setHint("hsv", 1.0);
+    bundle << *mColorList.back();
+  }
+  bundle << mColorTrigger;
 }
 
 bool DataDisplay::initDataset() {
@@ -448,7 +458,9 @@ void DataDisplay::prepare(Graphics &g, Matrix4f &transformMatrix) {
     // Schedule processing of changes for next pass to allow drawing one frame.
   }
 
-  if (mDatasetManager.occupationData.newDataAvailable()) {
+  if (mDatasetManager.occupationData.newDataAvailable() ||
+      mColorTrigger.get() == true) {
+    mColorTrigger.set(false);
     updateDisplayBuffers();
   }
   prepareParallelProjection(g, transformMatrix);
@@ -553,16 +565,26 @@ void DataDisplay::updateDisplayBuffers() {
 
   mAtomData.clear();
 
-  auto colorIt = colorList.begin();
-  for (auto visibleAtom : curVisibleAtoms) {
-    if (elementData.find(visibleAtom) != elementData.end()) {
-      mAtomData[visibleAtom] =
-          tinc::AtomData{0, visibleAtom, elementData[visibleAtom].radius,
-                         elementData[visibleAtom].color};
-    } else {
-
-      mAtomData[visibleAtom] = tinc::AtomData{0, visibleAtom, 1.0, *colorIt};
-      colorIt++;
+  auto colorIt = mColorList.begin();
+  for (auto atom : mShowAtoms.getElements()) {
+    for (auto visibleAtom : curVisibleAtoms) {
+      //          if (elementData.find(visibleAtom) != elementData.end()) {
+      //            mAtomData[visibleAtom] =
+      //                tinc::AtomData{0, visibleAtom,
+      //                elementData[visibleAtom].radius,
+      //                               elementData[visibleAtom].color};
+      //          } else {
+      //              mAtomData[visibleAtom] = tinc::AtomData{0,
+      //              visibleAtom, 1.0, *colorIt};
+      //          }
+      if (visibleAtom == atom) {
+        mAtomData[visibleAtom] =
+            tinc::AtomData{0, visibleAtom, 1.0, *colorIt->get()};
+      }
+    }
+    colorIt++;
+    if (colorIt == mColorList.end()) {
+      colorIt = mColorList.begin();
     }
   }
 

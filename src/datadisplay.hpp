@@ -100,14 +100,14 @@ public:
                           0,
                           3}; // Increase layer size in projection view
 
-  Parameter mPerspectiveRotY{"perspectiveRotY", "", -75, "", -90, 90};
+  Parameter mPerspectiveRotY{"perspectiveRotY", "", -75, -90, 90};
 
   ParameterBool mShowGrid{"ShowGrid", "", 0.0};
-  Parameter mGridSpacing{"GridSpacing", "", 10.0, "", 1.0, 20.0};
+  Parameter mGridSpacing{"GridSpacing", "", 10.0, 1.0, 20.0};
   ParameterMenu mGridType{"GridType"};
 
-  Parameter mGridXOffset{"GridXOffset", "", 0.0, "", 0.0, 5.0};
-  Parameter mGridYOffset{"GridYOffset", "", 0.0, "", 0.0, 5.0};
+  Parameter mGridXOffset{"GridXOffset", "", 0.0, 0.0, 5.0};
+  Parameter mGridYOffset{"GridYOffset", "", 0.0, 0.0, 5.0};
 
   ParameterBundle bundle{"CASMDataset"};
 

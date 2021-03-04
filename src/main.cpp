@@ -728,11 +728,11 @@ public:
     parameterSpaceProcessor.setRunningDirectory(path);
     parameterSpaceProcessor.setOutputDirectory(path + "/cached_output");
 
-    shellSiteFileAnalyzer.setRunningDirectory(path);
-
     transfmatExtractor.setDataDirectory(path);
+
     templateGen.setDataDirectory(path);
 
+    initRootProcessorGraph.setRunningDirectory(path);
     initRootProcessorGraph.process();
 
     if (index >= 0) {
@@ -874,6 +874,10 @@ public:
           ParameterGUI::drawParameterMeta(&font);
           ImGui::SameLine();
           ParameterGUI::drawParameterMeta(&fontSize);
+
+          ParameterGUI::drawParameterMeta(
+              &this->dataDisplays[vdvBundle.currentBundle()]
+                   ->atomrender.mClippedMultiplier);
           ImGui::Unindent(20.0);
         }
 
@@ -1206,6 +1210,7 @@ public:
     parameterSpaceProcessor.setScriptName(pythonScriptPath.get() +
                                           "/analyze_parameter_space.py");
     parameterSpaceProcessor.setOutputFileNames({"parameter_space.nc"});
+    // We can use the simple cache as it doesn't depend on parameter space
     parameterSpaceProcessor.useCache();
 
     shellSiteFileAnalyzer.setCommand(pythonBinary);
@@ -1216,15 +1221,17 @@ public:
     transfmatExtractor.setScriptName(pythonScriptPath.get() +
                                      "/extract_transfmat.py");
     transfmatExtractor.setOutputFileNames({"transfmat"});
+    // We can use the simple cache as it doesn't depend on parameter space
     transfmatExtractor.useCache();
 
     templateGen.setCommand(pythonBinary);
     templateGen.setScriptName(pythonScriptPath.get() +
                               "/reassign_occs/template_creator.py");
     templateGen.setOutputFileNames({"cached_output/template.nc"});
+    // We can use the simple cache as it doesn't depend on parameter space
     templateGen.useCache();
 
-    bool verbose = false;
+    bool verbose = true;
     parameterSpaceProcessor.setVerbose(verbose);
     transfmatExtractor.setVerbose(verbose);
     templateGen.setVerbose(verbose);
@@ -1640,62 +1647,6 @@ public:
         }
       }
     });
-  }
-
-  void processNewDataRoot(string rootPath) {
-    auto filelist = itemListInDir(dataRoot + rootPath);
-
-    for (FilePath &element : filelist) {
-      if (File::isDirectory(element.filepath())) {
-        // Attempt to generate data space for all directories in root dir.
-
-        auto subdirs = itemListInDir(element.filepath());
-
-        // Determine if folder contains CASM dataset.
-        // FIXME there should be no need to test this, only check if parameter
-        // space is presen. the python scripts should be the ones to determine a
-        // dataset
-        bool isDataset = false;
-        for (FilePath &subdir : subdirs) {
-          if (subdir.file() == "results.json" || subdir.file() == "prim.json") {
-            isDataset = true;
-            break;
-          }
-        }
-        if (isDataset) {
-          parameterSpaceProcessor.setRunningDirectory(element.filepath());
-          parameterSpaceProcessor.setOutputDirectory(element.filepath() +
-                                                     "/cached_output");
-
-          shellSiteFileAnalyzer.setRunningDirectory(element.filepath());
-          transfmatExtractor.setDataDirectory(element.filepath());
-          templateGen.setDataDirectory(element.filepath());
-
-          initRootProcessorGraph.process();
-
-          std::cout << "Process parameter space for " << element.filepath()
-                    << std::endl;
-        }
-      }
-      updateAvailableDatasets(this->dataRoot + rootPath);
-    }
-  }
-
-  void updateAvailableDatasets(std::string datasetRoot) {
-    auto entries = filterInDir(datasetRoot, [&](const FilePath &fp) {
-      //      std::cout << fp.filepath() <<std::endl;
-      return File::isDirectory(fp.filepath());
-    });
-
-    std::vector<std::string> directories;
-    for (auto entry : entries) {
-      auto spaceFileFullPath =
-          File::conformPathToOS(entry.filepath()) + "/parameter_space.nc";
-      if (File::exists(spaceFileFullPath)) {
-        directories.push_back(entry.file());
-      }
-    }
-    mRecentDatasets.setElements(directories);
   }
 
   Rayd rayTransformAllosphere(Rayd r) {

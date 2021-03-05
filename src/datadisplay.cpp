@@ -347,11 +347,15 @@ void DataDisplay::init() {
   //         << mDatasetManager.mParameterSpaces["chempotB"]->parameter();
   //  bundle << mDatasetManager.mParameterSpaces["time"]->parameter();
   bundle << atomrender.mAtomMarkerSize;
+  bundle << mSliceAtomMarkerFactor;
 
   bundle << mShowAtoms;
   bundle << mDatasetManager.mPlotXAxis;
   bundle << mDatasetManager.mPlotYAxis;
-  bundle << mShowGraph << mShowParallel << mShowPerspective;
+  bundle << mShowPerspective;
+
+  bundle << mDisplaySlicing;
+  bundle << mDisplayGraphs;
 
   bundle << mPerspectiveRotY;
   bundle << atomrender.mLayerSeparation;
@@ -367,7 +371,6 @@ void DataDisplay::init() {
   bundle << mBillboarding;
   bundle << mSmallLabel;
   bundle << mDrawLabels;
-  bundle << mDisplaySlicing;
 
   // Colors
   for (int i = 0; i < 16; i++) {
@@ -482,12 +485,15 @@ void DataDisplay::draw(Graphics &g) { // Load data after drawing frame to allow
   g.texture();
   g.blendTrans();
 
-  if (mDisplaySlicing.get() == 1.0 && mShowParallel.get() == 1.0f) {
+  if (mDisplaySlicing.get() == 1.0) {
     drawParallelProjection(g);
   }
 
   g.blending(false);
-  drawGraph(g);
+
+  if (mDisplayGraphs.get() == 1.0) {
+    drawGraph(g);
+  }
 }
 
 void DataDisplay::setFont(string name, float size) {
@@ -866,10 +872,12 @@ void DataDisplay::prepareParallelProjection(Graphics &g,
       if (atomrender.mShowRadius == 1.0f) {
         g.shader().uniform("markerScale", data.second.radius *
                                               atomrender.mAtomMarkerSize *
-                                              atomrender.mMarkerScale);
+                                              atomrender.mMarkerScale *
+                                              mSliceAtomMarkerFactor);
       } else {
         g.shader().uniform("markerScale", atomrender.mAtomMarkerSize *
-                                              atomrender.mMarkerScale);
+                                              atomrender.mMarkerScale *
+                                              mSliceAtomMarkerFactor);
       }
       g.shader().uniform("is_line", 0.0f);
       g.shader().uniform("is_omni", 0.0f);
@@ -1151,14 +1159,13 @@ void DataDisplay::drawGraphPickable(Graphics &g, PickableBB *graphPickable,
 void DataDisplay::drawGraph(Graphics &g) {
 
   // Update graph textures if new data available
-
-  if (mShowGraph.get() == 1.0f) {
-    if (imageDiskBuffer.newDataAvailable()) {
-      auto imageBuffer = imageDiskBuffer.get();
-      mGraphTexture.resize(imageBuffer->width(), imageBuffer->height());
-      mGraphTexture.submit(imageBuffer->pixels(), GL_RGBA, GL_UNSIGNED_BYTE);
-      mGraphTexture.filter(Texture::LINEAR_MIPMAP_LINEAR);
-    }
+  if (imageDiskBuffer.newDataAvailable()) {
+    auto imageBuffer = imageDiskBuffer.get();
+    mGraphTexture.resize(imageBuffer->width(), imageBuffer->height());
+    mGraphTexture.submit(imageBuffer->pixels(), GL_RGBA, GL_UNSIGNED_BYTE);
+    mGraphTexture.filter(Texture::LINEAR_MIPMAP_LINEAR);
+  }
+  {
     auto *graphTextPtr = mGraphTextures;
     for (auto &imageBuffer : imageDiskBuffers) {
       if (imageBuffer->newDataAvailable()) {
@@ -1174,17 +1181,18 @@ void DataDisplay::drawGraph(Graphics &g) {
                       mBillboarding.get() == 1.0, mDrawLabels.get() == 1.0,
                       mSmallLabel.get());
   }
-
-  auto *graphTextPtr = mGraphTextures;
-  auto showGraphIt = mShowGraphs.begin();
-  graphTextPtr = mGraphTextures;
-  for (auto &pickable : graphPickables) {
-    if ((*showGraphIt)->get() == 1.0) {
-      drawGraphPickable(g, pickable.get(), graphTextPtr,
-                        mBillboarding.get() == 1.0, mDrawLabels.get() == 1.0,
-                        mSmallLabel.get());
+  {
+    auto *graphTextPtr = mGraphTextures;
+    auto showGraphIt = mShowGraphs.begin();
+    graphTextPtr = mGraphTextures;
+    for (auto &pickable : graphPickables) {
+      if ((*showGraphIt)->get() == 1.0) {
+        drawGraphPickable(g, pickable.get(), graphTextPtr,
+                          mBillboarding.get() == 1.0, mDrawLabels.get() == 1.0,
+                          mSmallLabel.get());
+      }
+      showGraphIt++;
+      graphTextPtr++;
     }
-    showGraphIt++;
-    graphTextPtr++;
   }
 }

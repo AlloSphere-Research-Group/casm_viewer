@@ -76,6 +76,7 @@ struct ElementData {
 class DataDisplayParameters {
 public:
   ParameterBool mDisplaySlicing{"displaySlicing", "", 1.0};
+  ParameterBool mDisplayGraphs{"displayGraphs", "", 1.0};
   ParameterVec3 layerDir{"LayerDir", ""}; // Direction of layers in data
 
   ParameterChoice mShowAtoms{"ShowAtoms"};
@@ -85,9 +86,11 @@ public:
   ParameterColor backgroundColor{"projectionBackground", "",
                                  Color(0.1f, 0.1f, 0.1f, 0.8f)};
   ParameterBool mVisible{"Visible", "", 1};
-  ParameterBool mShowGraph{"ShowGraph", "", 1};
-  ParameterBool mShowParallel{"ShowParallel", "", 1};
+  //  ParameterBool mShowGraph{"ShowGraph", "", 1};
+  //  ParameterBool mShowParallel{"ShowParallel", "", 1};
   ParameterBool mShowPerspective{"ShowPerspective", "", 1};
+
+  Parameter mSliceAtomMarkerFactor{"sliceAtomMarkerFactor", "", 1.0, 0.0, 5.0};
 
   ParameterBool mBillboarding{"Billboarding", "", 1};
   ParameterBool mSmallLabel{"SmallLabel", "", 1};

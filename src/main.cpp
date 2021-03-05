@@ -213,8 +213,8 @@ public:
     dataDisplays[0]->perspectivePickable.pose.setPos(Vec3d(0.55, 0.35, -0.7));
     dataDisplays[0]->perspectivePickable.scale = 0.02f;
 
-    dataDisplays[0]->mShowGraph = true;
-    dataDisplays[0]->mShowParallel = true;
+    //    dataDisplays[0]->mShowGraph = true;
+    //    dataDisplays[0]->mShowParallel = true;
     //                dataDisplays[0]->mShowSurface = false;
     dataDisplays[0]->mShowPerspective = true;
     dataDisplays[0]->mBillboarding = false;
@@ -807,6 +807,9 @@ public:
         ParameterGUI::drawParameterMeta(
             &this->dataDisplays[vdvBundle.currentBundle()]
                  ->atomrender.mAtomMarkerSize);
+        ParameterGUI::drawParameterMeta(
+            &this->dataDisplays[vdvBundle.currentBundle()]
+                 ->mSliceAtomMarkerFactor);
         if (this->dataDisplays[vdvBundle.currentBundle()]
                 ->mDatasetManager.mParameterSpace.getDimension("time")) {
           ParameterGUI::drawParameterMeta(&mAutoAdvance);
@@ -831,6 +834,8 @@ public:
         ParameterGUI::drawParameterMeta(&ResetSlicing);
         ParameterGUI::draw(
             &this->dataDisplays[vdvBundle.currentBundle()]->mDisplaySlicing);
+        ParameterGUI::draw(
+            &this->dataDisplays[vdvBundle.currentBundle()]->mDisplayGraphs);
 
         ImGui::Text("%s", dataDisplays[vdvBundle.currentBundle()]
                               ->mDatasetManager.metaText.c_str());

@@ -386,6 +386,12 @@ bool DatasetManager::initDataset() {
   trajectoryProcessor.setInputDirectory(fullDatasetPath);
   trajectoryProcessor.process();
 
+  if (!al::File::isDirectory(fullDatasetPath + "cached_output/")) {
+    if (!al::Dir::make(fullDatasetPath + "cached_output/")) {
+      std::cerr << "Error creating cache diretory: "
+                << fullDatasetPath + "cached_output/" << std::endl;
+    }
+  }
   // Read template
   std::string templatePath = fullDatasetPath + "cached_output/template.nc";
   if (File::exists(templatePath)) {
@@ -546,7 +552,7 @@ bool DatasetManager::initDataset() {
   dataPool.setCacheDirectory(fullDatasetPath + "slices");
   trajectoriesPool.setCacheDirectory(fullDatasetPath + "slices");
   neighborhoodPool.setCacheDirectory(fullDatasetPath + "slices");
-  std::cout << fullDatasetPath + "slices" << std::endl;
+  //  std::cout << fullDatasetPath + "slices" << std::endl;
 
   lk.unlock();
   return ret;
@@ -739,126 +745,6 @@ std::string DatasetManager::getSubDir() {
   }
   return std::string();
 }
-
-// void DatasetManager::processTemplatePositions() {
-//  //  std::unique_lock<std::mutex> lk(mDataLock);
-//  auto templatePoscarName = labelProcessor.outputFile();
-
-//  // Load POSCAR data
-//  if (reader.loadFile(templatePoscarName)) {
-//    mTemplatePositions = reader.getAllPositions();
-//  } else {
-//    std::cerr << "ERROR creating template at time 0 ----------- " <<
-//    std::endl;
-//  }
-//  // Load empty template
-//  VASPReader emptyTemplateReader;
-//  if (emptyTemplateReader.loadFile(
-//          File::conformPathToOS(buildRootPath() + mCurrentDataset.get() +
-//                                "/cached_output/template_POSCAR"))) {
-//    mEmptyTemplate = emptyTemplateReader.getElementPositions("X");
-//  }
-//}
-
-// bool DatasetManager::loadDiff(int timeIndex) {
-//  bool diffLoaded = false;
-//  //         Then accumulate all diffs until current time
-//  int targetIndex = mParameterSpaces["time"]->getCurrentIndex();
-
-//  //      std::cout << timeIndex << " --> " << targetIndex << std::endl;
-//  if (timeIndex < targetIndex) {
-
-//    mHistory.clear();
-//    for (int i = timeIndex; i != targetIndex; i++) {
-//      std::cout << "applying diff " << i << std::endl;
-//      std::pair<Vec3f, Vec3f> historyPoint;
-//      auto this_diff = mDiffs[i];
-//      auto this_diff_indeces = this_diff[0];
-//      auto this_diff_labels = this_diff[1];
-
-//      for (int change = 0; change < this_diff_indeces.size(); change++) {
-//        int changeOffset = this_diff_indeces[change].get<int>() * 4;
-//        if (changeOffset < mEmptyTemplate.size()) {
-//          Vec3f pos(mEmptyTemplate[changeOffset],
-//                    mEmptyTemplate[changeOffset + 1],
-//                    mEmptyTemplate[changeOffset + 2]);
-
-//          int index = -1;
-//          std::string label;
-//          for (auto &positions : mTemplatePositions) {
-//            if (positions.first !=
-//                this_diff_labels[change]) { // Look only for changes
-//              for (int curIndex = 0; curIndex < positions.second.size();
-//                   curIndex += 4) {
-//                //                  float distance = (pos -
-//                //                  Vec3f(positions.second[curIndex],
-//                //                                 positions.second[curIndex
-//                //                                 + 1],
-//                // positions.second[curIndex
-//                //                                                +
-//                // 2])).mag(); if ((pos - Vec3f(positions.second[curIndex],
-//                                 positions.second[curIndex + 1],
-//                                 positions.second[curIndex + 2]))
-//                        .mag() < 0.001f) {
-//                  label = positions.first;
-//                  index = curIndex;
-
-//                  //                      std::cout << "match " <<
-//                  //                      this_diff_indeces[change] << " "
-//                  //                      << pos.x << "," << pos.y <<
-//                  //                      std::endl;
-//                  break;
-//                }
-//              }
-//            }
-//            if (index != -1) {
-//              break;
-//            }
-//          }
-//          if (label == "") {
-//            std::cout << "ERROR: Label not found for index " << timeIndex
-//                      << " label " << this_diff_labels[change] << std::endl;
-//            return false;
-//          }
-//          if (this_diff_labels[change] == "Va") { // Remove atom
-//            historyPoint.first = pos;
-//            //                std::cout << "remove index " << index <<
-//            //                std::endl;
-//            assert(index >= 0);
-//            mTemplatePositions[this_diff_labels[change]].insert(
-//                mTemplatePositions[this_diff_labels[change]].begin(),
-//                mTemplatePositions[label].begin() + index,
-//                mTemplatePositions[label].begin() + index + 4);
-//            mTemplatePositions[label].erase(
-//                mTemplatePositions[label].begin() + index,
-//                mTemplatePositions[label].begin() + index + 4);
-//          } else { // Add Atom
-//            historyPoint.second = pos;
-//            //                std::cout << "add index " << index <<
-//            //                std::endl;
-//            mTemplatePositions[this_diff_labels[change]].push_back(pos.x);
-//            mTemplatePositions[this_diff_labels[change]].push_back(pos.y);
-//            mTemplatePositions[this_diff_labels[change]].push_back(pos.z);
-//            mTemplatePositions[this_diff_labels[change]].push_back(0.0);
-//            mTemplatePositions[label].erase(
-//                mTemplatePositions[label].begin() + index,
-//                mTemplatePositions[label].begin() + index + 4);
-//          }
-//        } else {
-//          std::cerr << " ERROR: diff index greater than template size."
-//                    << std::endl;
-//          break;
-//        }
-//      }
-//      mHistory.push_back(historyPoint);
-//    }
-//    diffLoaded = true;
-//  } else if (timeIndex > targetIndex) {
-//  }
-//  return diffLoaded;
-//}
-
-// void DatasetManager::loadFromPOSCAR() {}
 
 void DatasetManager::updateText() {
   // Meta data texts

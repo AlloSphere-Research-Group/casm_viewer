@@ -103,6 +103,10 @@ void DatasetManager::initializeComputation() {
 
       mShellSiteTypes.set(shellSiteTypes);
     } else {
+
+      labelProcessor.setInputDirectory(
+          mParameterSpace.getRootPath() +
+          mParameterSpace.getCurrentRelativeRunPath());
       mParameterSpace.runProcess(sampleProcessorGraph, {}, {});
       //      sampleProcessorGraph.process();
       if (graphGenerator.getOutputFileNames().size() > 0) {
@@ -124,7 +128,7 @@ void DatasetManager::initializeComputation() {
   graphGenerator.setVerbose(verbose);
   labelProcessor.setVerbose(verbose);
 
-  graphGenerator.setOutputFileNames({"cached_output/graph.png"});
+  graphGenerator.setOutputFileNames({"graph.png"});
 
   graphGenerator.prepareFunction = [&]() {
     std::string datasetId = mCurrentDataset.get();
@@ -165,6 +169,12 @@ void DatasetManager::initializeComputation() {
       } else {
         std::cerr << "Results file not suitable for graphing. Dimension "
                   << xLabel << " not suitable." << std::endl;
+        return false;
+      }
+      if (datax.size() != datay.size()) {
+        std::cerr << "ERROR graph axis size mismatch. " << xLabel << ":"
+                  << datax.size() << " " << yLabel << ":" << datay.size()
+                  << std::endl;
         return false;
       }
 
@@ -483,7 +493,7 @@ bool DatasetManager::initDataset() {
 
   std::vector<std::string> parameterSpaceNames;
   for (auto dim : mParameterSpace.getDimensions()) {
-    if (dim->size() > 0) {
+    if (dim->size() > 1) {
       parameterSpaceNames.push_back(dim->getName());
     }
   }
@@ -502,6 +512,7 @@ bool DatasetManager::initDataset() {
 
   // Configuration for processors
   graphGenerator.setRunningDirectory(fullDatasetPath);
+  graphGenerator.setOutputDirectory(fullDatasetPath + "/cached_output");
 
   labelProcessor.setRunningDirectory(fullDatasetPath);
   labelProcessor.setOutputDirectory(fullDatasetPath + "/cached_output");
@@ -509,7 +520,7 @@ bool DatasetManager::initDataset() {
   labelProcessor.setInputFileNames({"final_state.json"});
 
   std::string globalRoot = getGlobalRootPath();
-  // TODO prim file should only be updated when directory changes.
+
   std::vector<std::string> possiblePrims = {
       fullDatasetPath + "/prim_labels.json",
       fullDatasetPath + "/prim.json",

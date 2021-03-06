@@ -278,9 +278,9 @@ if __name__ == '__main__':
         with open(file) as f:
             j = json.load(f)
             if "driver" in j:
-                print("found config file")
                 if j["driver"]["mode"] == "custom":
                      custom_conditions = j["driver"]["custom_conditions"][0].keys()
+                     print(f"found config file for KMC. Custom conditions: {custom_conditions}")
 
 
     dataset_params = {}  

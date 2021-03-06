@@ -33,7 +33,7 @@ void DataDisplay::init() {
     graphPickables.back()->bb.set(Vec3f(-1.2f, -0.9f, -0.05f),
                                   Vec3f(1.2f, 0.9f, 0.0f));
     graphPickables.back()->pose =
-        Pose(Vec3d(-2.0 + 0.5 * (i + 1), 0.8, -.75), Quatf());
+        Pose(Vec3d(-2.0 + 0.5 * (i + 1), 0.2, -.75), Quatf());
     graphPickables.back()->scale = 0.2f;
 
     mShowGraphs.emplace_back(std::make_unique<ParameterBool>(
@@ -44,7 +44,7 @@ void DataDisplay::init() {
   mPickableManager << graphPickable << parallelPickable << perspectivePickable;
 
   graphPickable.bb.set(Vec3f(-1.2f, -0.9f, -0.05f), Vec3f(1.2f, 0.9f, 0.0f));
-  graphPickable.pose = Pose(Vec3d(-2.0, 0.8, -.75), Quatf());
+  graphPickable.pose = Pose(Vec3d(-2.0, 0.2, -.75), Quatf());
   graphPickable.scale = 0.2f;
 
   parallelPickable.bb.setCenterDim(Vec3f(), Vec3f(4, 4, 0.1f));

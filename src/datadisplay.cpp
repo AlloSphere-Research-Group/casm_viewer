@@ -244,14 +244,6 @@ void DataDisplay::init() {
       // New values must be available for computeNewSample, throws away previous
       // value
       mShowAtoms.setNoCalls(value);
-      // TODO we should have a less heavy function to turn atoms on and off
-      mDatasetManager.mParameterSpace.runProcess(
-          mDatasetManager.sampleProcessorGraph, {}, {});
-      if (mDatasetManager.graphGenerator.getOutputFileNames().size() > 0) {
-        mDatasetManager.currentGraphName.set(
-            mDatasetManager.graphGenerator.getOutputDirectory() +
-            mDatasetManager.graphGenerator.getOutputFileNames()[0]);
-      }
       mDatasetManager.currentPoscarName.set(
           mDatasetManager.labelProcessor.getOutputDirectory() +
           mDatasetManager.labelProcessor.getOutputFileNames()[0]);
@@ -417,6 +409,13 @@ bool DataDisplay::initDataset() {
     if (elementLabel.substr(0, speciesOfInterest.size()) == speciesOfInterest) {
       mShowAtoms.setElementSelected(elementLabel);
     }
+  }
+  mDatasetManager.mParameterSpace.runProcess(
+      mDatasetManager.sampleProcessorGraph, {}, {});
+  if (mDatasetManager.graphGenerator.getOutputFileNames().size() > 0) {
+    mDatasetManager.currentGraphName.set(
+        mDatasetManager.graphGenerator.getOutputDirectory() +
+        mDatasetManager.graphGenerator.getOutputFileNames()[0]);
   }
   return ret;
 }

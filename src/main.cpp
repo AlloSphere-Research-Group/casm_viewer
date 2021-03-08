@@ -1236,7 +1236,7 @@ public:
     // We can use the simple cache as it doesn't depend on parameter space
     templateGen.useCache();
 
-    bool verbose = true;
+    bool verbose = false;
     parameterSpaceProcessor.setVerbose(verbose);
     transfmatExtractor.setVerbose(verbose);
     templateGen.setVerbose(verbose);

@@ -123,7 +123,7 @@ void DatasetManager::initializeComputation() {
   trajectoryProcessor.setInputFileNames({"trajectory.json.gz"});
   trajectoryProcessor.setOutputFileNames({"trajectory.nc"});
 
-  bool verbose = true;
+  bool verbose = false;
   trajectoryProcessor.setVerbose(verbose);
   graphGenerator.setVerbose(verbose);
   labelProcessor.setVerbose(verbose);
@@ -760,32 +760,12 @@ std::string DatasetManager::getSubDir() {
 void DatasetManager::updateText() {
   // Meta data texts
   metaText = "Global Root: " + mGlobalRoot + "\n";
-
-  //    metaText += "Root: " + mRootPath.get() + "\n";
   metaText += "Dataset: " + mCurrentDataset.get() + "\n";
   metaText += "Subdir: " + getSubDir() + "\n";
-
-  //  metaText += " ----- Parameters -----\n";
-  //  for (auto dimension : mParameterSpace.dimensions) {
-  //    if (dimension->type == ParameterSpaceDimension::MAPPED ||
-  //        dimension->type == ParameterSpaceDimension::INTERNAL) {
-  //      metaText +=
-  //          dimension->getName() + " : " + dimension->getCurrentId() + "\n";
-  //    } else {
-
-  //      metaText += "Condition Param: " + dimension->getName() + "
-  //      condition:
-  //      " +
-  //                  std::to_string(dimension->getCurrentIndex()) + "\n";
-  //    }
-  //  }
   metaText += " ----- Data -----\n";
   for (auto compData : getCurrentCompositions()) {
     metaText += compData.first + " = " + std::to_string(compData.second) + "\n";
   }
-  metaText += "Current POSCAR :";
-  metaText += labelProcessor.getOutputDirectory() +
-              labelProcessor.getOutputFileNames()[0];
 }
 
 std::vector<std::string> DatasetManager::getDataNames() {

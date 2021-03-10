@@ -2,7 +2,7 @@
 
 Interactive visualization of CASM output.
 
-![CASM Viewer-Grand Canonical](images/CASM_viewer-GC.PNG)
+![CASM Viewer-Grand Canonical](images/GC.PNG)
 
 ![CASM Viewer-KMC](images/CASM_viewer-KMC-cumulative-path.PNG)
 

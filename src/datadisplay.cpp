@@ -700,6 +700,10 @@ void DataDisplay::updateDisplayBuffers() {
         mDataBoundaries.includePoint(vec);
       }
       templateDataIt++;
+      if (templateDataIt == mDatasetManager.templateData.end()) {
+        std::cout << "Template and occupation size mismatch" << std::endl;
+        break;
+      }
     }
   }
 

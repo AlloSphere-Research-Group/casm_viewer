@@ -462,11 +462,10 @@ bool DatasetManager::initDataset() {
   std::string conditionDim;
   for (auto dim : mParameterSpace.getDimensions()) {
     if (dim->getSpaceRepresentationType() == ParameterSpaceDimension::INDEX &&
-        dim->size() > 1) {
+        dim->size() > 0) {
       conditionDim = dim->getName();
       std::cout << "Using dimension '" << dim->getName()
                 << "' as condition dimension" << std::endl;
-      break;
     }
   }
 
@@ -858,9 +857,9 @@ void DatasetManager::loadTrajectory() {
     mParameterSpace.getDimension("time")->clear();
     mParameterSpace.getDimension("time")->setSpaceValues(timeValues.data(),
                                                          timeValues.size());
-    //    mParameterSpace.getDimension("time")->conformSpace();
     mParameterSpace.getDimension("time")->setSpaceRepresentationType(
         ParameterSpaceDimension::VALUE);
+    mParameterSpace.getDimension("time")->conformSpace();
 
     if (numTimeSteps != mParameterSpace.getDimension("time")->size()) {
       std::cout << "ERROR: Time dimension mismatch!" << std::endl;

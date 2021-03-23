@@ -1270,6 +1270,7 @@ public:
                            << transfmatExtractor << templateGen;
 
     // Configure TINC server
+    tincServer.setVerbose(true);
     tincServer << initRootProcessorGraph;
 
     tincServer << dataDisplays[0]->mDatasetManager.sampleProcessorGraph;
@@ -1296,7 +1297,6 @@ public:
     dataDisplays[0]->mHistoryRender.registerWithTincServer(tincServer);
     dataDisplays[0]->mTrajRender.registerWithTincServer(tincServer);
 
-    tincServer.setVerbose(true);
     tincServer.start();
   }
 

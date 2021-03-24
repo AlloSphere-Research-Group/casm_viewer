@@ -106,6 +106,8 @@ public:
   Trigger mSaveGraphics{"SaveScreenshot"};
   Trigger mAlignTemperatures{"AlignTemperatures"};
   Trigger mAlignChempots{"AlignChempots"};
+
+  ParameterBool mDebugScripts{"DebugScripts"};
   //  Trigger mRecomputeSpace{"RecomputeSpace"};
 
   ParameterBool mAutoAdvance{"autoAdvance"};
@@ -841,22 +843,31 @@ public:
                               ->mDatasetManager.metaText.c_str());
         ParameterGUI::drawParameterMeta(
             &this->dataDisplays[vdvBundle.currentBundle()]->currentSelection);
-        ParameterGUI::drawParameterMeta(
-            &this->dataDisplays[vdvBundle.currentBundle()]
-                 ->mDatasetManager.mShellSiteTypes);
-        ParameterGUI::drawParameterMeta(
-            &this->dataDisplays[vdvBundle.currentBundle()]
-                 ->mDatasetManager.mPercolationTypes);
+        if (this->dataDisplays[vdvBundle.currentBundle()]
+                ->mDatasetManager.mShellSiteTypes.getElements()
+                .size() > 0) {
+          ParameterGUI::drawParameterMeta(
+              &this->dataDisplays[vdvBundle.currentBundle()]
+                   ->mDatasetManager.mShellSiteTypes);
+        } else {
+          ImGui::Text("No Shell site data found.");
+        }
         auto percoSize = this->dataDisplays[vdvBundle.currentBundle()]
                              ->mDatasetManager.mPercolationTypes.getElements()
                              .size();
         if (percoSize > 0) {
+          ParameterGUI::drawParameterMeta(
+              &this->dataDisplays[vdvBundle.currentBundle()]
+                   ->mDatasetManager.mPercolationTypes);
+
           for (size_t i = 0; i < percoSize; i++) {
             ParameterGUI::drawParameterMeta(
                 this->dataDisplays[vdvBundle.currentBundle()]
                     ->mPercoColorList[i]
                     .get());
           }
+        } else {
+          ImGui::Text("No Percolation data found.");
         }
 
         if (this->dataDisplays[vdvBundle.currentBundle()]
@@ -996,6 +1007,7 @@ public:
       if (ImGui::InputText("Python executable", buf, 512)) {
         pythonBinary.set(std::string(buf));
       }
+      ParameterGUI::draw(&mDebugScripts);
 
       ImGui::Separator();
       ImGui::Text("%s", helpText.c_str());
@@ -1039,7 +1051,7 @@ public:
     parameterServer().verbose(true);
   }
 
-  // File IO/ Persisntece
+  // File IO/ Persistence
   void loadConfiguration() {
     TomlLoader configLoader2;
     configLoader2.setFile("casm_viewer.toml");
@@ -1251,7 +1263,7 @@ public:
     // We can use the simple cache as it doesn't depend on parameter space
     templateGen.useCache();
 
-    bool verbose = false;
+    bool verbose = true;
     parameterSpaceProcessor.setVerbose(verbose);
     transfmatExtractor.setVerbose(verbose);
     templateGen.setVerbose(verbose);
@@ -1666,6 +1678,11 @@ public:
           presetHandler->skipParameter(addr + param->getFullAddress(),
                                        value != 1.0f);
         }
+      }
+    });
+    mDebugScripts.registerChangeCallback([&](float value) {
+      for (auto *proc : initRootProcessorGraph.getProcessors()) {
+        proc->setVerbose(value != 0.0);
       }
     });
   }

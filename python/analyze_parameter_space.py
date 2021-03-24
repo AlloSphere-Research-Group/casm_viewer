@@ -307,9 +307,12 @@ if __name__ == '__main__':
                     dataset_param_meta['parameters'][parameter_name] += dataset_param_meta_new['parameters'][parameter_name]
 
         
+    print("Generating shell file and perco lists.")
+    
     if len(dataset_params) == 0:
         print("Directory not a casm dataset")    
         sys.exit(255)
+
 
     param_cache = {}
     param_consistent = []

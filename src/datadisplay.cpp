@@ -339,7 +339,7 @@ void DataDisplay::init() {
   //         << mDatasetManager.mParameterSpaces["chempotB"]->parameter();
   //  bundle << mDatasetManager.mParameterSpaces["time"]->parameter();
   bundle << atomrender.mAtomMarkerSize;
-  bundle << mSliceAtomMarkerFactor;
+  bundle << atomrender.mSliceAtomMarkerFactor;
 
   bundle << mShowAtoms;
   bundle << mDatasetManager.mPlotXAxis;
@@ -365,6 +365,15 @@ void DataDisplay::init() {
   bundle << mDrawLabels;
 
   // Colors
+
+  for (int i = 0; i < DatasetManager::maxPercolationTypes; i++) {
+
+    mPercoColorList.emplace_back(
+        std::make_shared<ParameterColor>("percoColor" + std::to_string(i)));
+    mPercoColorList.back()->set(colorList[(i + 4) % colorList.size()]);
+    mPercoColorList.back()->setHint("hsv", 1.0);
+  }
+
   for (int i = 0; i < 16; i++) {
     mColorList.emplace_back(
         std::make_shared<ParameterColor>("atomColor" + std::to_string(i)));
@@ -388,7 +397,7 @@ bool DataDisplay::initDataset() {
 
   std::vector<std::string> availableAtoms;
   std::vector<std::string> atomLabels;
-  for (auto species : labelMap) {
+  for (auto &species : labelMap) {
     availableAtoms.push_back(species.first);
     if (species.first != "Va") {
       // Vacancy atom names will be there already so we need to skip to avoid
@@ -405,7 +414,7 @@ bool DataDisplay::initDataset() {
   }
   auto speciesOfInterest = mDatasetManager.mAtomOfInterest.getCurrent();
   // Show atoms that begin with atom of interest e.g. Na1 if atom of interest Na
-  for (auto elementLabel : mShowAtoms.getElements()) {
+  for (auto &elementLabel : mShowAtoms.getElements()) {
     if (elementLabel.substr(0, speciesOfInterest.size()) == speciesOfInterest) {
       mShowAtoms.setElementSelected(elementLabel);
     }
@@ -416,6 +425,12 @@ bool DataDisplay::initDataset() {
     mDatasetManager.currentGraphName.set(
         mDatasetManager.graphGenerator.getOutputDirectory() +
         mDatasetManager.graphGenerator.getOutputFileNames()[0]);
+  }
+  size_t count = 0;
+  for (auto &perc : mDatasetManager.mPercolationTypes.getElements()) {
+
+    mPercoColorList[count]->displayName(perc);
+    count++;
   }
   return ret;
 }
@@ -465,6 +480,7 @@ void DataDisplay::prepare(Graphics &g, Matrix4f &transformMatrix) {
     mColorTrigger.set(false);
     updateDisplayBuffers();
   }
+  updatePercolationBuffers();
   prepareParallelProjection(g, transformMatrix);
 }
 
@@ -718,6 +734,43 @@ void DataDisplay::updateDisplayBuffers() {
   }
 }
 
+void DataDisplay::updatePercolationBuffers() {
+
+  for (size_t i = 0; i < mDatasetManager.maxPercolationTypes; i++) {
+    if (mDatasetManager.percolationData[i].newDataAvailable()) {
+      std::string name = std::to_string(i);
+      mPercolationData[i][name].radius = 1.5;
+
+      mPercolationData[i][name].color = mPercoColorList[i]->get();
+
+      mPercolationData[i][name].counts = 0;
+      mAlignedPercolation4fData[i].clear();
+
+      auto allPositions = mDatasetManager.percolationData[i].get();
+      auto templateDataIt = mDatasetManager.templateData.begin();
+      for (auto &atom : *allPositions) {
+        if (atom == 1) {
+          mAlignedPercolation4fData[i].push_back(templateDataIt->x);
+          mAlignedPercolation4fData[i].push_back(templateDataIt->y);
+          mAlignedPercolation4fData[i].push_back(templateDataIt->z);
+
+          auto hue = rgb2hsv(mPercolationData[i][name].color.rgb()).h;
+          mAlignedPercolation4fData[i].push_back(hue);
+          mPercolationData[i][name].counts++;
+
+          Vec3f vec(templateDataIt->x, templateDataIt->y, templateDataIt->z);
+        }
+
+        templateDataIt++;
+        if (templateDataIt == mDatasetManager.templateData.end()) {
+          std::cout << "Template and occupation size mismatch" << std::endl;
+          break;
+        }
+      }
+    }
+  }
+}
+
 void DataDisplay::drawHistory(Graphics &g) {
   g.pushMatrix();
   g.meshColor();
@@ -856,7 +909,7 @@ void DataDisplay::prepareParallelProjection(Graphics &g,
   g.depthTesting(false);
   g.pushMatrix();
 
-  /*if (atomPropertiesProj.size() > 0) */ {
+  {
     // ----------------------------------------
     int cumulativeCount = 0;
     for (auto &data : mAtomData) {
@@ -871,16 +924,16 @@ void DataDisplay::prepareParallelProjection(Graphics &g,
       g.update(); // sends modelview and projection matrices
       g.shader().uniform("dataScale", scalingFactor);
       g.shader().uniform("layerSeparation", 1.0);
-      // A scaling value of 4.0 found empirically...
       if (atomrender.mShowRadius == 1.0f) {
-        g.shader().uniform("markerScale", data.second.radius *
-                                              atomrender.mAtomMarkerSize *
-                                              atomrender.mMarkerScale *
-                                              mSliceAtomMarkerFactor);
+        g.shader().uniform("markerScale",
+                           data.second.radius * atomrender.mAtomMarkerSize *
+                               atomrender.mMarkerScale *
+                               atomrender.mSliceAtomMarkerFactor);
       } else {
-        g.shader().uniform("markerScale", atomrender.mAtomMarkerSize *
-                                              atomrender.mMarkerScale *
-                                              mSliceAtomMarkerFactor);
+        g.shader().uniform("markerScale",
+                           atomrender.mAtomMarkerSize *
+                               atomrender.mMarkerScale *
+                               atomrender.mSliceAtomMarkerFactor);
       }
       g.shader().uniform("is_line", 0.0f);
       g.shader().uniform("is_omni", 0.0f);
@@ -891,8 +944,6 @@ void DataDisplay::prepareParallelProjection(Graphics &g,
       g.shader().uniform("second_plane_distance",
                          atomrender.mSlicingPlaneThickness);
 
-      //                    g.shader().uniform("far_clip", farClip);
-      //                    g.shader().uniform("near_clip", near);
       g.shader().uniform("clipped_mult", 0.0);
 
       atomrender.instancingMesh.draw();
@@ -937,6 +988,20 @@ void DataDisplay::drawPerspective(Graphics &g) {
     drawHistory(g);
 
     atomrender.draw(g, perspectivePickable.scale, mAtomData, mAligned4fData);
+
+    {
+      // draw percolation data
+      g.blendScreen();
+      g.depthTesting(true);
+      auto size = mDatasetManager.mPercolationTypes.getElements().size();
+      auto enabledPerc = mDatasetManager.mPercolationTypes.get();
+      for (size_t i = 0; i < size; i++) {
+        if (enabledPerc & ((uint64_t)1 << i)) {
+          atomrender.draw(g, perspectivePickable.scale, mPercolationData[i],
+                          mAlignedPercolation4fData[i]);
+        }
+      }
+    }
 
     g.depthTesting(true);
     g.blending(true);

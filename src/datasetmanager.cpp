@@ -79,6 +79,7 @@ void DatasetManager::initializeComputation() {
 
         loadTrajectory();
         loadShellSiteData();
+        readPercolation();
         shellSiteTypes =
             getShellSiteTypes(ps->getDimension("time")->getCurrentIndex());
 
@@ -98,6 +99,10 @@ void DatasetManager::initializeComputation() {
     if (mParameterSpace.getDimension("time") &&
         mParameterSpace.getDimension("time")->size() > 0) {
       occupationData.doneWriting(occupationData.getWritable());
+
+      for (auto &percData : percolationData) {
+        percData.doneWriting(percData.getWritable());
+      }
       shellSiteTypes =
           getShellSiteTypes(ps->getDimension("time")->getCurrentIndex());
 
@@ -337,6 +342,14 @@ void DatasetManager::initializeComputation() {
     }
     return paths;
   };
+
+  mPercolationTypes.registerChangeCallback([&](auto val) {
+    if (val != mPercolationTypes.get()) {
+      for (auto &percData : percolationData) {
+        percData.doneWriting(percData.getWritable());
+      }
+    }
+  });
 }
 
 void DatasetManager::setPythonBinary(std::string pythonBinaryPath) {
@@ -456,6 +469,7 @@ bool DatasetManager::initDataset() {
 
   readParameterSpace();
   loadShellSiteData();
+  readPercolation();
   ret &= analyzeDataset();
   loadTrajectory(); // The time parameter space is loaded here.
 
@@ -881,6 +895,65 @@ void DatasetManager::loadTrajectory() {
   }
 }
 
+void DatasetManager::readPercolation() {
+  auto datasetPath =
+      getGlobalRootPath() + mCurrentDataset.get() + "/" + getSubDir();
+  auto percoFiles = datasetPath + "perco_files.json";
+  std::ifstream percoFileStream;
+  percoFileStream.open(percoFiles, std::ofstream::in);
+  std::vector<std::string> siteTypes;
+  if (percoFileStream.good()) {
+    auto j = json::parse(percoFileStream);
+    if (j.is_object()) {
+      size_t counter = 0;
+      for (auto filename : j["files"]) {
+        int ncid, retval;
+        int sizeid;
+        size_t size;
+        if ((retval =
+                 nc_open((datasetPath + filename.get<std::string>()).c_str(),
+                         NC_NOWRITE | NC_SHARE, &ncid))) {
+          std::cerr << "Error opening percolation file: "
+                    << datasetPath + filename.get<std::string>() << std::endl;
+          return;
+        }
+
+        if (counter >= maxPercolationTypes) {
+          std::cerr << "ERROR: Only " << maxPercolationTypes
+                    << " percolation buffers available. Discarding: "
+                    << filename.get<std::string>() << std::endl;
+          continue;
+        }
+        siteTypes.push_back(filename.get<std::string>());
+        auto perco_data = percolationData[counter].getWritable();
+        if ((retval = nc_inq_dimid(ncid, "occupation_size", &sizeid))) {
+          return;
+        }
+        if ((retval = nc_inq_dimlen(ncid, sizeid, &size))) {
+          return;
+        }
+
+        perco_data->resize(size);
+        int shell_sites_id;
+        if ((retval = nc_inq_varid(ncid, "occupation_dof", &shell_sites_id))) {
+          return;
+        }
+
+        if ((retval = nc_get_var(ncid, shell_sites_id, perco_data->data()))) {
+          return;
+        }
+        nc_close(ncid);
+        percolationData[counter].doneWriting(perco_data);
+
+        counter++;
+      }
+    }
+  }
+
+  mPercolationTypes.setElements(siteTypes);
+  mPercolationTypes.setNoCalls(0);
+}
+
 void DatasetManager::loadShellSiteData() {
   auto datasetPath =
       getGlobalRootPath() + mCurrentDataset.get() + "/" + getSubDir();
@@ -949,6 +1022,9 @@ void DatasetManager::loadShellSiteData() {
           continue;
         }
         if ((retval = nc_get_var(ncid, occ_ref_id, occ_ref.data()))) {
+          continue;
+        }
+        if ((retval = nc_close(ncid))) {
           continue;
         }
       }

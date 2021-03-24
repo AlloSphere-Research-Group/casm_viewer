@@ -90,8 +90,6 @@ public:
   //  ParameterBool mShowParallel{"ShowParallel", "", 1};
   ParameterBool mShowPerspective{"ShowPerspective", "", 1};
 
-  Parameter mSliceAtomMarkerFactor{"sliceAtomMarkerFactor", "", 1.0, 0.0, 5.0};
-
   ParameterBool mBillboarding{"Billboarding", "", 1};
   ParameterBool mSmallLabel{"SmallLabel", "", 1};
   ParameterBool mDrawLabels{"DrawLabels", "", 1};
@@ -169,6 +167,8 @@ public:
       Color(1.0, 0.0, 1.0, 1.0), Color(0.5, 1.0, 0.5, 1.0),
       Color(1.0, 1.0, 0.0, 1.0), Color(0.0, 0.0, 1.0, 1.0)};
 
+  std::vector<std::shared_ptr<ParameterColor>> mPercoColorList;
+
   Trigger mColorTrigger{"applyColor"};
 
   // Sonification
@@ -238,6 +238,7 @@ protected:
 
   // This function should be called whenever there is new atom position data
   void updateDisplayBuffers();
+  void updatePercolationBuffers();
 
   void drawHistory(Graphics &g);
   void drawPerspective(Graphics &g);
@@ -270,6 +271,12 @@ private:
 
   std::map<std::string, AtomData> mAtomData;
   std::vector<float> mAligned4fData;
+
+  std::map<std::string, AtomData>
+      mPercolationData[DatasetManager::maxPercolationTypes];
+  std::vector<float>
+      mAlignedPercolation4fData[DatasetManager::maxPercolationTypes];
+
   BoundingBoxData mDataBoundaries;
 };
 

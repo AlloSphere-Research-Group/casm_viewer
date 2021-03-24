@@ -85,6 +85,10 @@ public:
   };
   BufferManager<std::vector<occupation_t>> occupationData{8};
 
+  static const size_t maxPercolationTypes = 10;
+  BufferManager<std::vector<uint16_t>> percolationData[maxPercolationTypes] = {
+      {4}, {4}, {4}, {4}, {4}, {4}, {4}, {4}, {4}, {4}};
+
   struct position_t {
     float x, y, z;
   };
@@ -119,6 +123,7 @@ public:
 
   ParameterMenu mAtomOfInterest{"AtomOfInterest", "", 0};
   ParameterChoice mShellSiteTypes{"ShellSiteTypes"};
+  ParameterChoice mPercolationTypes{"PercolationTypes"};
 
   // Functions --------------
   DatasetManager();
@@ -218,6 +223,8 @@ protected:
                                      std::string subDir) {
     return readJsonFile(datasetId, subDir, {"prim_labels.json", "prim.json"});
   }
+
+  void readPercolation();
 
 private:
 };

@@ -809,7 +809,7 @@ public:
                  ->atomrender.mAtomMarkerSize);
         ParameterGUI::drawParameterMeta(
             &this->dataDisplays[vdvBundle.currentBundle()]
-                 ->mSliceAtomMarkerFactor);
+                 ->atomrender.mSliceAtomMarkerFactor);
         if (this->dataDisplays[vdvBundle.currentBundle()]
                 ->mDatasetManager.mParameterSpace.getDimension("time")) {
           ParameterGUI::drawParameterMeta(&mAutoAdvance);
@@ -844,6 +844,21 @@ public:
         ParameterGUI::drawParameterMeta(
             &this->dataDisplays[vdvBundle.currentBundle()]
                  ->mDatasetManager.mShellSiteTypes);
+        ParameterGUI::drawParameterMeta(
+            &this->dataDisplays[vdvBundle.currentBundle()]
+                 ->mDatasetManager.mPercolationTypes);
+        auto percoSize = this->dataDisplays[vdvBundle.currentBundle()]
+                             ->mDatasetManager.mPercolationTypes.getElements()
+                             .size();
+        if (percoSize > 0) {
+          for (size_t i = 0; i < percoSize; i++) {
+            ParameterGUI::drawParameterMeta(
+                this->dataDisplays[vdvBundle.currentBundle()]
+                    ->mPercoColorList[i]
+                    .get());
+          }
+        }
+
         if (this->dataDisplays[vdvBundle.currentBundle()]
                     ->mDisplaySlicing.get() == 1.0 &&
             ImGui::CollapsingHeader("Slicing")) {
@@ -854,6 +869,10 @@ public:
           ParameterGUI::drawParameterMeta(
               &this->dataDisplays[vdvBundle.currentBundle()]
                    ->atomrender.mSlicingPlaneThickness);
+
+          ParameterGUI::drawParameterMeta(
+              &this->dataDisplays[vdvBundle.currentBundle()]
+                   ->atomrender.mClippedMultiplier);
 
           ParameterGUI::drawParameterMeta(&mJumpLayerNeg);
           ImGui::SameLine();
@@ -879,10 +898,6 @@ public:
           ParameterGUI::drawParameterMeta(&font);
           ImGui::SameLine();
           ParameterGUI::drawParameterMeta(&fontSize);
-
-          ParameterGUI::drawParameterMeta(
-              &this->dataDisplays[vdvBundle.currentBundle()]
-                   ->atomrender.mClippedMultiplier);
           ImGui::Unindent(20.0);
         }
 
@@ -1276,6 +1291,7 @@ public:
     tincServer << dataDisplays[0]->mDatasetManager.sampleProcessorGraph;
     tincServer << dataDisplays[0]->mDatasetManager.mParameterSpace;
     tincServer << dataDisplays[0]->mDatasetManager.mShellSiteTypes;
+    tincServer << dataDisplays[0]->mDatasetManager.mPercolationTypes;
     tincServer << dataDisplays[0]->mDatasetManager.dataPool;
     tincServer << dataDisplays[0]->mDatasetManager.trajectoriesPool;
     tincServer << dataDisplays[0]->mDatasetManager.neighborhoodPool;

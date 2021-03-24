@@ -21,12 +21,16 @@ json_files = glob.glob(args['__input_dir'] + "*.json")
 found_transfmat = None
 
 for open_file in json_files:
+    found_transfmat = False
     with open(open_file) as f:
         if args['__verbose']==   True:
             print(f)
-        j =json.load(f)
-        if 'supercell' in j:
-            found_transfmat = j['supercell']
+        try:
+            j =json.load(f)
+            if 'supercell' in j:
+                found_transfmat = j['supercell']
+        except:
+            print("failed to parse json: " + open_file)
     if found_transfmat:
         break
 write_name = args['__output_dir'] + args['__output_names'][0]

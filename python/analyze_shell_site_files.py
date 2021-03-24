@@ -26,17 +26,27 @@ if __name__ == '__main__':
 
             files = glob.glob(sub_dir + "*.nc")
             shell_sites_files = []
+            perco_files = []
 
             for filename in files:
                 ncfile = netCDF4.Dataset(filename, mode='r', format='NETCDF4') 
                 varnames = ncfile.variables.keys()
                 if "shell_sites" in varnames and "occ_ref" in varnames:
                     shell_sites_files.append(filename[len(sub_dir):])
+                if "occupation_dof" in varnames:
+                    perco_files.append(filename[len(sub_dir):])
 
             if len(shell_sites_files) > 0:
                 names = {"files": shell_sites_files}
                 print(f"Writing shell_site_files.nc in {sub_dir}")
                 with open(sub_dir + "shell_site_files.json", 'w') as j:
+                    json.dump( names, j)
+            
+            
+            if len(perco_files) > 0:
+                names = {"files": perco_files}
+                print(f"Writing perco_files.nc in {sub_dir}")
+                with open(sub_dir + "perco_files.json", 'w') as j:
                     json.dump( names, j)
 
         

@@ -39,3 +39,17 @@ Make sure you run:
 To get all the needed submodules.
 
 You can then use the ```run.sh``` script inside a bash shell (on Windows, Linux or macOS) or open the CMakeLists.txt file in an IDE that supports cmake.
+
+# Running
+
+You will need python3, numpy and netcdf4 installed and accessible. You can set the python 
+to be used in the Help tab.
+
+## Windows
+For anaconda on Windows use:
+
+    c:/Users/YourName/anaconda3/Scripts/conda.exe run -n base python
+
+There is a bug in anaconda that will prevent it from running if the path to conda
+has spaces. In this case, you can install another version of python like the
+one provided in the Microsoft Store and install numpy in a shell through pip.

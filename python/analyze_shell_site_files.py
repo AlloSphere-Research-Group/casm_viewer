@@ -33,8 +33,10 @@ if __name__ == '__main__':
                 varnames = ncfile.variables.keys()
                 if "shell_sites" in varnames and "occ_ref" in varnames:
                     shell_sites_files.append(filename[len(sub_dir):])
-                if "occupation_dof" in varnames:
+                elif "occupation_dof" in varnames:
                     perco_files.append(filename[len(sub_dir):])
+                else:
+                    print("Unrecognized file:" + filename)
 
             if len(shell_sites_files) > 0:
                 names = {"files": shell_sites_files}

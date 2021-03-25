@@ -275,15 +275,15 @@ if __name__ == '__main__':
     custom_conditions = []
     
     for file in glob.glob("*.json"):
-        with open(file) as f:
-            try:
-                j = json.load(f)
-                if "driver" in j:
-                    if j["driver"]["mode"] == "custom":
-                        custom_conditions = j["driver"]["custom_conditions"][0].keys()
-                        print(f"found config file for KMC. Custom conditions: {custom_conditions}")
-            except:
-                print("failed to load: " + file +". Invalid json?")
+        try:
+            with open(file) as f:
+                    j = json.load(f)
+                    if "driver" in j:
+                        if j["driver"]["mode"] == "custom":
+                            custom_conditions = j["driver"]["custom_conditions"][0].keys()
+                            print(f"found config file for KMC. Custom conditions: {custom_conditions}")
+        except:
+            print("failed to load: " + file +". Invalid json? Symlink?")
 
 
     dataset_params = {}  
@@ -308,7 +308,7 @@ if __name__ == '__main__':
 
         
     print("Generating shell file and perco lists.")
-    
+
     if len(dataset_params) == 0:
         print("Directory not a casm dataset")    
         sys.exit(255)

@@ -995,12 +995,17 @@ void DataDisplay::drawPerspective(Graphics &g) {
       g.depthTesting(true);
       auto size = mDatasetManager.mPercolationTypes.getElements().size();
       auto enabledPerc = mDatasetManager.mPercolationTypes.get();
+      auto previousScale = atomrender.mAtomMarkerSize.get();
+
+      atomrender.mAtomMarkerSize.setNoCalls(previousScale *
+                                            mPercoMarkerScale.get());
       for (size_t i = 0; i < size; i++) {
         if (enabledPerc & ((uint64_t)1 << i)) {
           atomrender.draw(g, perspectivePickable.scale, mPercolationData[i],
                           mAlignedPercolation4fData[i]);
         }
       }
+      atomrender.mAtomMarkerSize.setNoCalls(previousScale);
     }
 
     g.depthTesting(true);

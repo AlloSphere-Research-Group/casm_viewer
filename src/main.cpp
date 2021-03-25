@@ -810,6 +810,8 @@ public:
             &this->dataDisplays[vdvBundle.currentBundle()]
                  ->atomrender.mAtomMarkerSize);
         ParameterGUI::drawParameterMeta(
+            &this->dataDisplays[vdvBundle.currentBundle()]->mPercoMarkerScale);
+        ParameterGUI::drawParameterMeta(
             &this->dataDisplays[vdvBundle.currentBundle()]
                  ->atomrender.mSliceAtomMarkerFactor);
         if (this->dataDisplays[vdvBundle.currentBundle()]
@@ -1314,6 +1316,7 @@ public:
     }
 
     tincServer << dataDisplays[0]->mMarkerColor << dataDisplays[0]->mMarkerScale
+               << dataDisplays[0]->mPercoMarkerScale
                << dataDisplays[0]->currentSelection
                << dataDisplays[0]->previousSelection;
 

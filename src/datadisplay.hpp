@@ -94,11 +94,7 @@ public:
   ParameterBool mSmallLabel{"SmallLabel", "", 1};
   ParameterBool mDrawLabels{"DrawLabels", "", 1};
 
-  Parameter mLayerScaling{"LayerScaling",
-                          "",
-                          1.0,
-                          "",
-                          0,
+  Parameter mLayerScaling{"LayerScaling", "", 1.0, 0,
                           3}; // Increase layer size in projection view
 
   Parameter mPerspectiveRotY{"perspectiveRotY", "", -75, -90, 90};
@@ -119,6 +115,7 @@ public:
 
   ParameterColor mMarkerColor{"markerColor"};
   Parameter mMarkerScale{"markerScale", "", 1.7, 0.001, 20};
+  Parameter mPercoMarkerScale{"percoMarkerScaleFactor", "", 1.5, 0.01, 8.0};
 };
 
 // -----------------------------------------------------------------

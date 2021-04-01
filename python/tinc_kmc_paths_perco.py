@@ -28,8 +28,8 @@ eci4_param=tclient.create_parameter(Parameter,\
                                     "tet_tet_NN","casm",0.0,0.5,[0.0,0.5],0.0)
     
 # Connect sliders to filesystem
-#root_dir = "D:/data_for_visualization/visualization/"
-root_dir = "C:/Users/Andres/source/repos/vdv_data/visualization-new/"
+root_dir = "D:/data_for_visualization/visualization/"
+#root_dir = "C:/Users/Andres/source/repos/vdv_data/visualization-new/"
 import shutil
 def create_dir_string_from_eci_param(eci_value):
     prefix= "AMX2_spinel_diffusion_0.0_0.0"+ \
@@ -58,15 +58,15 @@ def create_dir_string_from_eci_param(eci_value):
     corr_fact_buffer.done_writing_file(fname)
     return
 
-eci1_param.register_callback(create_dir_string_from_eci_param)
-eci2_param.register_callback(create_dir_string_from_eci_param)
-eci3_param.register_callback(create_dir_string_from_eci_param)
-eci4_param.register_callback(create_dir_string_from_eci_param)
+change_dataset_button=tclient.create_parameter(Trigger,"change_dataset","casm")
+change_dataset_button.register_callback(create_dir_string_from_eci_param)
 
 eci1_param.value=0.125
-eci2_param.value=2.0
+eci2_param.value=6.0
 eci3_param.value=0.0
 eci4_param.value=0.0
+#force update on load
+create_dir_string_from_eci_param(0.1)
 tclient.wait_for_server_available()
 
 ####  

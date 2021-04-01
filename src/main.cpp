@@ -1073,13 +1073,13 @@ public:
                                   string("C:\\Windows\\Fonts\\arial.ttf"));
     configLoader2.setDefaultValueVector(
         "dataRootPaths", std::vector<std::string>({string("e:\\NaxCoO2")}));
-    configLoader2.setDefaultValue("pythonScriptsPath", string("../python"));
+    configLoader2.setDefaultValue("pythonScriptsPath", string("./python"));
 #elif defined(AL_OSX)
     configLoader2.setDefaultValue("font", string("/Library/Fonts/arial.ttf"));
     configLoader2.setDefaultValueVector(
         "dataRootPaths",
         std::vector<std::string>({string("/alloshare/vdv group/NaxCoO2")}));
-    configLoader2.setDefaultValue("pythonScriptsPath", string("../python"));
+    configLoader2.setDefaultValue("pythonScriptsPath", string("./python"));
 #else
     configLoader2.setDefaultValue(
         "font", string("/usr/share/fonts/truetype/freefont/FreeMono.ttf"));
@@ -1089,7 +1089,7 @@ public:
         "dataRootPaths",
         std::vector<std::string>({string("/alloshare/vdv group/NaxCoO2"),
                                   string("/alloshare/vdv group")}));
-    configLoader2.setDefaultValue("pythonScriptsPath", string("../python"));
+    configLoader2.setDefaultValue("pythonScriptsPath", string("./python"));
 #endif
     configLoader2.setDefaultValue("fontSize", 32);
     configLoader2.setDefaultValue("pythonBinary", string("python3"));

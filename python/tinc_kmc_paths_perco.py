@@ -24,7 +24,6 @@ from multiprocessing import Lock
 
 from parameter import *
 
-# Connect sliders to filesystem
 #root_dir = "D:/data_for_visualization/visualization/"
 root_dir = "C:/Users/Andres/source/repos/vdv_data/visualization-new/"
 full_stop=True
@@ -313,6 +312,14 @@ reset_button.register_callback(reset_atom_selection_slider)
 
 calc_traj_buffer=tclient.create_parameter(Trigger,"calc_siingle_trajectory","casm")
 calc_traj_buffer.register_callback(calc_traj,False)
+
+eci1_param.value=0.125
+eci2_param.value=6.0
+eci3_param.value=0.0
+eci4_param.value=0.0
+#force update on load
+load_dataset(0.1)
+tclient.wait_for_server_available()
 
 try:
     while True:

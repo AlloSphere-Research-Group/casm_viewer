@@ -152,14 +152,17 @@ def correct_arrow(single_coord_list):
     elementary_hop_dist=2.2
     return -single_arr/np.linalg.norm(single_arr)*elementary_hop_dist
 
+def load_current_template():
+    template_path=ps.get_root_path() + tclient.get_processor("TemplateGenerator").output_files[0]
+    template_atoms=xr.open_dataset(template_path)['atoms_var']
+    template_atoms.load() # load full dataset into memory
+    return template_atoms
+
 def calc_summed_trajectory(value):
     print("registered click")
     [steps_changed,swap_pairs] = ps.run_process(step_generator,dependencies=[eci1_param, eci2_param,eci3_param,eci4_param,ps.get_parameter('dir')])
     arrows=[[[35,35,35]]]
-    
-    template_path=ps.get_root_path() + tclient.get_processor("TemplateGenerator").output_files[0]
-    template_atoms=xr.open_dataset(template_path)['atoms_var']
-    template_atoms.load() # load full dataset into memory
+    template_atoms = load_current_template()
     
     for i in range(1,len(swap_pairs)):
         disap,ap=swap_pairs[i]
@@ -179,8 +182,8 @@ def calc_summed_trajectory(value):
 
 def individual_trajectories(v):
     time_param=tclient.get_parameter("time")
-    template_path=ps.get_root_path() + tclient.get_processor("TemplateGenerator").output_files[0]
-    template_atoms=xr.open_dataset(template_path)['atoms_var']
+    
+    template_atoms = load_current_template()
     global full_stop
     full_stop=True
     [steps_changed,swap_pairs] = ps.run_process(step_generator,dependencies=[eci1_param, eci2_param,eci3_param,eci4_param,ps.get_parameter('dir')])
@@ -240,8 +243,7 @@ def calc_traj(value):
     idx=int(tclient.get_parameter("moving_atoms").value)
     arrows=[]
     
-    template_path=ps.get_root_path() + tclient.get_processor("TemplateGenerator").output_files[0]
-    template_atoms=xr.open_dataset(template_path)['atoms_var']
+    template_atoms = load_current_template()
     print(f"playing {len(steps_changed[idx])}")
     if len(steps_changed[idx])>0:
         for t in steps_changed[idx]:

@@ -951,6 +951,8 @@ public:
     imguiBeginFrame();
     ImGui::SetNextWindowBgAlpha(0.9f);
     ImGui::PushID("CASMViewer");
+    ImGui::SetNextWindowPos(ImVec2(10, 10), ImGuiCond_FirstUseEver);
+    ImGui::SetNextWindowSize(ImVec2(380, 600), ImGuiCond_FirstUseEver);
     ParameterGUI::beginPanel("CASM Viewer");
 
     static int selected = 0;
@@ -1009,6 +1011,12 @@ public:
       if (ImGui::InputText("Python executable", buf, 512)) {
         pythonBinary.set(std::string(buf));
       }
+#ifdef AL_WINDOWS
+      if (ImGui::Button("Use anaconda")) {
+        pythonBinary.set(
+            "%userprofile%\\anaconda3\\Scripts\\conda.exe run -n base python");
+      }
+#endif
       ParameterGUI::draw(&mDebugScripts);
 
       ImGui::Separator();
@@ -1019,6 +1027,8 @@ public:
     ImGui::PopID();
 
     auto params = tincServer.dimensions();
+    ImGui::SetNextWindowPos(ImVec2(400, 10), ImGuiCond_FirstUseEver);
+    ImGui::SetNextWindowSize(ImVec2(300, 400), ImGuiCond_FirstUseEver);
     ImGui::Begin("TINC controls");
     vis::drawTincServerInfo(tincServer, true);
     for (auto *param : params) {

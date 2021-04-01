@@ -1050,7 +1050,7 @@ public:
                       << stepChempotNeg << stepChempot2Pos << stepChempot2Neg
                       << mJumpLayerNeg << mJumpLayerPos;
 
-    parameterServer().verbose(true);
+    parameterServer().verbose(false);
   }
 
   // File IO/ Persistence
@@ -1265,7 +1265,7 @@ public:
     // We can use the simple cache as it doesn't depend on parameter space
     templateGen.useCache();
 
-    bool verbose = true;
+    bool verbose = false;
     parameterSpaceProcessor.setVerbose(verbose);
     transfmatExtractor.setVerbose(verbose);
     templateGen.setVerbose(verbose);

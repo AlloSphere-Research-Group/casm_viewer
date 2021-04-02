@@ -168,6 +168,8 @@ public:
   ObjectTransformHandler object_transform;
   bool showGui{true};
 
+  PersistentConfig config;
+
 #ifdef AL_EXT_OPENVR
   std::shared_ptr<OpenVRDomain> openVRDomain;
   VAOMesh mControllerMesh;
@@ -227,9 +229,10 @@ public:
     }
 
     // ----------
-    registerParameterCallbacks();
-    loadConfiguration();
     initializeComputation();
+    registerParameterCallbacks();
+
+    loadConfiguration();
     setupParameterServer();
     readElementsIni();
 
@@ -1067,73 +1070,64 @@ public:
   void loadConfiguration() {
     TomlLoader configLoader2;
     configLoader2.setFile("casm_viewer.toml");
-// Set default values
-#ifdef AL_WINDOWS
-    configLoader2.setDefaultValue("font",
-                                  string("C:\\Windows\\Fonts\\arial.ttf"));
-    configLoader2.setDefaultValueVector(
-        "dataRootPaths", std::vector<std::string>({string("e:\\NaxCoO2")}));
-    configLoader2.setDefaultValue("pythonScriptsPath", string("./python"));
-#elif defined(AL_OSX)
-    configLoader2.setDefaultValue("font", string("/Library/Fonts/arial.ttf"));
-    configLoader2.setDefaultValueVector(
-        "dataRootPaths",
-        std::vector<std::string>({string("/alloshare/vdv group/NaxCoO2")}));
-    configLoader2.setDefaultValue("pythonScriptsPath", string("./python"));
-#else
-    configLoader2.setDefaultValue(
-        "font", string("/usr/share/fonts/truetype/freefont/FreeMono.ttf"));
-    //        ["/alloshare/vdv group", "/alloshare/vdv group/TiAlO",
-    //        "/alloshare/vdv group/NaxCoO2", "/alloshare/vdv group/proj1"]
-    configLoader2.setDefaultValueVector<string>(
-        "dataRootPaths",
-        std::vector<std::string>({string("/alloshare/vdv group/NaxCoO2"),
-                                  string("/alloshare/vdv group")}));
-    configLoader2.setDefaultValue("pythonScriptsPath", string("./python"));
-#endif
-    configLoader2.setDefaultValue("fontSize", 32);
-    configLoader2.setDefaultValue("pythonBinary", string("python3"));
 
-    configLoader2.writeFile();
-
-    std::string scriptPath = configLoader2.gets("pythonScriptsPath");
-    if (scriptPath.substr(0, 2) == "..") { // Make path absolute
-      std::string cwdString = File::currentPath();
-      scriptPath =
-          cwdString.substr(0, cwdString.rfind('/', cwdString.size() - 2)) +
-          scriptPath.substr(2);
-    }
-    vector<double> bgRGB = configLoader2.getVector<double>("background");
-    if (bgRGB.size() == 4) {
-      backgroundColor = Color(bgRGB[0], bgRGB[1], bgRGB[2], bgRGB[3]);
-    }
-    bgRGB = configLoader2.getVector<double>("sliceBackground");
-    if (bgRGB.size() == 4) {
-      sliceBackground = Color(bgRGB[0], bgRGB[1], bgRGB[2], bgRGB[3]);
-    }
-
-    std::string pythonBinaryConf = configLoader2.gets("pythonBinary");
-
-    std::replace(scriptPath.begin(), scriptPath.end(), '\\', '/');
-    std::replace(pythonBinaryConf.begin(), pythonBinaryConf.end(), '\\', '/');
-    pythonScriptPath.set(scriptPath);
-    pythonBinary.set(pythonBinaryConf);
-
+    // There is no support for string lists yet in PersistentConfig, so do
+    // manually
     auto paths = configLoader2.getVector<string>("openedDatasets");
     mRecentDatasets.setElements(paths);
-    //    if (rank == 0) {
-    //      //      for (auto path: paths) {
-    //      //        processParameterSpace(path);
-    //      //      }
+
+// Set default values
+#ifdef AL_WINDOWS
+    font.setNoCalls("C:\\Windows\\Fonts\\arial.ttf");
+#elif defined(AL_OSX)
+    font.setNoCalls(string("/Library/Fonts/arial.ttf"));
+#else
+    font.setNoCalls(string("/usr/share/fonts/truetype/freefont/FreeMono.ttf"));
+#endif
+    pythonScriptsPath.setNoCalls(string("./python"));
+    pythonBinary.setNoCalls(string("python3"));
+
+    //    std::string scriptPath = configLoader2.gets("pythonScriptsPath");
+    //    if (scriptPath.substr(0, 2) == "..") { // Make path absolute
+    //      std::string cwdString = File::currentPath();
+    //      scriptPath =
+    //          cwdString.substr(0, cwdString.rfind('/', cwdString.size() - 2))
+    //          + scriptPath.substr(2);
     //    }
 
-    std::string fontPath = configLoader2.gets("font");
-    std::replace(fontPath.begin(), fontPath.end(), '\\', '/');
-    font.set(fontPath);
-    fontSize = configLoader2.getd("fontSize");
+    //    std::string pythonBinaryConf = configLoader2.gets("pythonBinary");
 
-    configLoader2.setDefaultValue("previousBrowseDir", std::string(""));
-    mPreviousBrowseDir = configLoader2.gets("previousBrowseDir");
+    //    std::replace(scriptPath.begin(), scriptPath.end(), '\\', '/');
+    //    std::replace(pythonBinaryConf.begin(), pythonBinaryConf.end(), '\\',
+    //    '/'); pythonScriptPath.set(scriptPath);
+    //    pythonBinary.set(pythonBinaryConf);
+
+    //    std::string fontPath = configLoader2.gets("font");
+    //    std::replace(fontPath.begin(), fontPath.end(), '\\', '/');
+    //    font.set(fontPath);
+
+    ///
+    config.setAppName("casm_viewer");
+    config.registerParameter(fontSize);
+    config.registerString("previousBrowseDir", &mPreviousBrowseDir);
+    config.registerParameter(backgroundColor);
+    config.registerParameter(sliceBackground);
+
+    config.registerParameter(pythonScriptsPath);
+    config.registerParameter(pythonBinary);
+    config.registerParameter(font);
+
+    auto *display = dataDisplays[0];
+    for (auto color : display->mPercoColorList) {
+      config.registerParameter(*color);
+    }
+    config.read();
+
+    backgroundColor.processChange();
+    sliceBackground.processChange();
+    pythonScriptsPath.processChange();
+    pythonBinary.processChange();
+    font.processChange();
   }
 
   void storeConfiguration() {
@@ -1143,31 +1137,11 @@ public:
     TomlLoader configLoader2;
     configLoader2.setFile("casm_viewer.toml");
 
-    vector<double> rgba;
-    rgba.resize(4);
-    Color bg = backgroundColor.get();
-    rgba[0] = bg.r;
-    rgba[1] = bg.g;
-    rgba[2] = bg.b;
-    rgba[3] = bg.a;
-    configLoader2.setVector<double>("background", rgba);
-    bg = sliceBackground.get();
-    rgba[0] = bg.r;
-    rgba[1] = bg.g;
-    rgba[2] = bg.b;
-    rgba[3] = bg.a;
-    configLoader2.setVector<double>("sliceBackground", rgba);
-
-    configLoader2.set<std::string>("font", font.get());
-    configLoader2.set<float>("fontSize", fontSize.get());
-
     configLoader2.setVector<std::string>("openedDatasets",
                                          mRecentDatasets.getElements());
-
-    configLoader2.set<std::string>("pythonBinary", pythonBinary.get());
-
-    configLoader2.set<std::string>("previousBrowseDir", mPreviousBrowseDir);
     configLoader2.writeFile();
+
+    config.write();
   }
 
   void readElementsIni() {
@@ -1251,25 +1225,25 @@ public:
 
   void initializeComputation() {
     parameterSpaceProcessor.setCommand(pythonBinary);
-    parameterSpaceProcessor.setScriptName(pythonScriptPath.get() +
+    parameterSpaceProcessor.setScriptName(pythonScriptsPath.get() +
                                           "/analyze_parameter_space.py");
     parameterSpaceProcessor.setOutputFileNames({"parameter_space.nc"});
     // We can use the simple cache as it doesn't depend on parameter space
     parameterSpaceProcessor.useCache();
 
     shellSiteFileAnalyzer.setCommand(pythonBinary);
-    shellSiteFileAnalyzer.setScriptName(pythonScriptPath.get() +
+    shellSiteFileAnalyzer.setScriptName(pythonScriptsPath.get() +
                                         "/analyze_shell_site_files.py");
 
     transfmatExtractor.setCommand(pythonBinary);
-    transfmatExtractor.setScriptName(pythonScriptPath.get() +
+    transfmatExtractor.setScriptName(pythonScriptsPath.get() +
                                      "/extract_transfmat.py");
     transfmatExtractor.setOutputFileNames({"transfmat"});
     // We can use the simple cache as it doesn't depend on parameter space
     transfmatExtractor.useCache();
 
     templateGen.setCommand(pythonBinary);
-    templateGen.setScriptName(pythonScriptPath.get() +
+    templateGen.setScriptName(pythonScriptsPath.get() +
                               "/reassign_occs/template_creator.py");
     templateGen.setOutputFileNames({"cached_output/template.nc"});
     // We can use the simple cache as it doesn't depend on parameter space
@@ -1648,7 +1622,7 @@ public:
     X.registerChangeCallback(
         [this](float value) { this->nav().pos()[0] = value; });
 
-    pythonScriptPath.registerChangeCallback([&](std::string value) {
+    pythonScriptsPath.registerChangeCallback([&](std::string value) {
       for (auto *display : dataDisplays) {
         display->mDatasetManager.setPythonScriptPath(value);
       }

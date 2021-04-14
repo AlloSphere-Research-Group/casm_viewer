@@ -340,11 +340,9 @@ def write_netcdf(superlattice, supercart_coords, out_name = 'template.nc'):
 #matrix must be integers and have integer determinant
 
 if __name__ == "__main__":
-    #process args function to allow command line args or json config as only command line flag
+    #TincArgumentParser to allow command line args or json config as only command line flag
     import sys, os
-    sys.path.append(
-        os.path.abspath(os.path.join(os.path.dirname(__file__), "../../external/tinc/tinc-python/tinc-python")))
-    from process_args import *
+    from tinc import *
     parser = TincArgumentParser(description='POSCAR Template generator')
 
     parser.add_argument('__input_dir', type=str, default="./", nargs='?')

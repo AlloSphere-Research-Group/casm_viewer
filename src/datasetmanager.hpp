@@ -50,13 +50,7 @@ public:
   json mCurrentBasis;
 
   std::string metaText;
-
   std::string lastError;
-
-  // Template and diffs for time history computation
-  //  std::map<std::string, std::vector<float>> mTemplatePositions;
-  //  std::vector<float> mEmptyTemplate;
-  //  json mDiffs;
 
   std::vector<std::pair<Vec3f, Vec3f>>
       mHistory; // From ->to (first, second) of pair
@@ -74,14 +68,11 @@ public:
   DataPoolJson trajectoriesPool{"trajectories", mParameterSpace, "slices"};
   DataPoolJson neighborhoodPool{"neighborhood", mParameterSpace, "slices"};
 
-  // TINC Buffers.
-  //  BufferManager<std::map<std::string, std::vector<float>>>
-  //  positionBuffers{8};
+  // -----------------
 
   struct occupation_t {
     int8_t basis_index;
     int8_t occupancy_dof;
-    //    float x, y, z;
   };
   BufferManager<std::vector<occupation_t>> occupationData{8};
 

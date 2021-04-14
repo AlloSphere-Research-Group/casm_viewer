@@ -6,7 +6,7 @@
 # Not needed if tinc-python is installed
 import sys
 sys.path.append('../external/tinc/tinc-python/tinc-python')
-from tinc_client import *
+from tinc import *
 tclient = TincClient()
 
 tclient.wait_for_server_available()
@@ -324,7 +324,7 @@ load_dataset(0.1)
 tclient.wait_for_server_available()
 
 try:
-    while True:
+    while tclient.connected:
         pass
 except:
     tclient.stop()

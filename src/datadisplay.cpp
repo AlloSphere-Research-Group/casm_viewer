@@ -310,7 +310,7 @@ void DataDisplay::init() {
         // New image module puts origin on top right
         //        if (mGraphTextureLock.try_lock()) {
         //            if (mGraphFilePathToLoad.size() > 0) {
-        imageDiskBuffer.updateData(value);
+        imageDiskBuffer.loadData(value);
       });
 
   for (size_t i = 0; i < graphCount; i++) {
@@ -325,7 +325,7 @@ void DataDisplay::init() {
       // New image module puts origin on top right
       //        if (mGraphTextureLock.try_lock()) {
       //            if (mGraphFilePathToLoad.size() > 0) {
-      imageDiskBuffers[i]->updateData(value);
+      imageDiskBuffers[i]->loadData(value);
     });
   }
 
@@ -334,12 +334,8 @@ void DataDisplay::init() {
   //  bundle << mDatasetManager.mRootPath;
   bundle << mDatasetManager.mCurrentDataset;
   bundle << mVisible;
-  //  bundle << mDatasetManager.mParameterSpaces["temperature"]->parameter();
-  //  bundle << mDatasetManager.mParameterSpaces["chempotA"]->parameter()
-  //         << mDatasetManager.mParameterSpaces["chempotB"]->parameter();
-  //  bundle << mDatasetManager.mParameterSpaces["time"]->parameter();
+  bundle << atomrender.mDataScale;
   bundle << atomrender.mAtomMarkerSize;
-  bundle << atomrender.mSliceAtomMarkerFactor;
 
   bundle << mShowAtoms;
   bundle << mDatasetManager.mPlotXAxis;
@@ -350,16 +346,12 @@ void DataDisplay::init() {
   bundle << mDisplayGraphs;
 
   bundle << mPerspectiveRotY;
-  bundle << atomrender.mLayerSeparation;
   bundle << atomrender.mSlicingPlaneNormal;
   bundle << atomrender.mSliceRotationPitch << atomrender.mSliceRotationRoll;
   bundle << atomrender.mSlicingPlanePoint << atomrender.mSlicingPlaneThickness
          << mLayerScaling;
   bundle << mShowGrid << mGridType << mGridSpacing << mGridXOffset
          << mGridYOffset;
-
-  bundle << atomrender.mShowRadius;
-  //  bundle << mCumulativeTrajectory << mIndividualTrajectory;
   bundle << mBillboarding;
   bundle << mSmallLabel;
   bundle << mDrawLabels;
@@ -481,7 +473,7 @@ void DataDisplay::prepare(Graphics &g, Matrix4f &transformMatrix) {
     updateDisplayBuffers();
   }
   updatePercolationBuffers();
-  prepareParallelProjection(g, transformMatrix);
+  //  prepareParallelProjection(g, transformMatrix);
 }
 
 void DataDisplay::draw(Graphics &g) { // Load data after drawing frame to allow
@@ -589,15 +581,6 @@ void DataDisplay::updateDisplayBuffers() {
   auto colorIt = mColorList.begin();
   for (auto atom : mShowAtoms.getElements()) {
     for (auto visibleAtom : curVisibleAtoms) {
-      //          if (elementData.find(visibleAtom) != elementData.end()) {
-      //            mAtomData[visibleAtom] =
-      //                tinc::AtomData{0, visibleAtom,
-      //                elementData[visibleAtom].radius,
-      //                               elementData[visibleAtom].color};
-      //          } else {
-      //              mAtomData[visibleAtom] = tinc::AtomData{0,
-      //              visibleAtom, 1.0, *colorIt};
-      //          }
       if (visibleAtom == atom) {
         mAtomData[visibleAtom] =
             tinc::AtomData{0, visibleAtom, 1.0, *colorIt->get()};
@@ -633,7 +616,6 @@ void DataDisplay::updateDisplayBuffers() {
 
     atomAdded.clear();
     atomRemoved.clear();
-
     uint64_t counter = 0;
     uint64_t atomsInBasis = mDatasetManager.templateData.size() /
                             mDatasetManager.mCurrentBasis.size();
@@ -731,6 +713,7 @@ void DataDisplay::updateDisplayBuffers() {
                          Vec3f(b.max.x, b.max.y, (b.max.z - b.min.z) * 0.25f));
     // rh.pose.pos().set(perspectivePickable.bb.cen);
     atomrender.setDataBoundaries(b);
+    atomrender.setPositions(mAligned4fData.data(), mAligned4fData.size());
   }
 }
 
@@ -843,9 +826,6 @@ void DataDisplay::prepareParallelProjection(Graphics &g,
   g.clear(backgroundColor);
 
   g.pushViewMatrix();
-  //            g.viewMatrix(getLookAt({ 0.0f, 0.0f, cameraZ },
-  //            { 0.0f, 0.0f, 0.0f },
-  //            { 0.0f, 1.0f, 0.0f }));
   g.viewMatrix(getLookAt(atomrender.mSlicingPlanePoint,
                          atomrender.mSlicingPlanePoint.get() -
                              atomrender.mSlicingPlaneNormal.get().normalized(),
@@ -922,19 +902,17 @@ void DataDisplay::prepareParallelProjection(Graphics &g,
       // now draw data with custom shader
       g.shader(atomrender.instancingMesh.shader);
       g.update(); // sends modelview and projection matrices
-      g.shader().uniform("dataScale", scalingFactor);
-      g.shader().uniform("layerSeparation", 1.0);
-      if (atomrender.mShowRadius == 1.0f) {
-        g.shader().uniform("markerScale",
-                           data.second.radius * atomrender.mAtomMarkerSize *
-                               atomrender.mMarkerScale *
-                               atomrender.mSliceAtomMarkerFactor);
-      } else {
-        g.shader().uniform("markerScale",
-                           atomrender.mAtomMarkerSize *
-                               atomrender.mMarkerScale *
-                               atomrender.mSliceAtomMarkerFactor);
-      }
+                  //      g.shader().uniform("dataScale", scalingFactor);
+      //      if (atomrender.mShowRadius == 1.0f) {
+      //        g.shader().uniform("markerScale",
+      //                           data.second.radius *
+      //                           atomrender.mAtomMarkerSize *
+      //                               atomrender.mSliceAtomMarkerFactor);
+      //      } else {
+      //        g.shader().uniform("markerScale",
+      //                           atomrender.mAtomMarkerSize *
+      //                               atomrender.mSliceAtomMarkerFactor);
+      //      }
       g.shader().uniform("is_line", 0.0f);
       g.shader().uniform("is_omni", 0.0f);
 
@@ -987,7 +965,15 @@ void DataDisplay::drawPerspective(Graphics &g) {
 
     drawHistory(g);
 
-    atomrender.draw(g, perspectivePickable.scale, mAtomData, mAligned4fData);
+    atomrender.scale.set({50, 50, 50});
+
+    {
+      g.pushMatrix();
+      g.scale(perspectivePickable.scale);
+      atomrender.applyTransformations(g);
+      atomrender.onProcess(g);
+      g.popMatrix();
+    }
 
     {
       // draw percolation data
@@ -1001,8 +987,13 @@ void DataDisplay::drawPerspective(Graphics &g) {
                                             mPercoMarkerScale.get());
       for (size_t i = 0; i < size; i++) {
         if (enabledPerc & ((uint64_t)1 << i)) {
-          atomrender.draw(g, perspectivePickable.scale, mPercolationData[i],
-                          mAlignedPercolation4fData[i]);
+          {
+            g.pushMatrix();
+            g.scale(perspectivePickable.scale);
+            atomrender.applyTransformations(g);
+            atomrender.onProcess(g);
+            g.popMatrix();
+          }
         }
       }
       atomrender.mAtomMarkerSize.setNoCalls(previousScale);
@@ -1042,7 +1033,7 @@ void DataDisplay::drawPerspective(Graphics &g) {
       //      glLineWidth(5);
       g.polygonLine();
       g.color(0.8f, 0.8f, 1.0f, 0.9f);
-      g.scale(1.0f, 1.0f, 1.0f + atomrender.mLayerSeparation);
+      g.scale(atomrender.mDataScale.get());
       // g.translate(atomrender.mSlicingPlanePoint.get());
       g.translate(slicePickable.pose.get().pos());
       g.rotate(atomrender.mSliceRotationPitch * 360.0f / (M_2PI), 1.0f, 0.0,

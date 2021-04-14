@@ -7,12 +7,10 @@
 from __future__ import print_function
 
 
-#process args function to allow command line args or json config as only command line flag
+# TincArgumentParser to allow command line args or json config as only command line flag
 import sys, os
-sys.path.append(
-    os.path.abspath(os.path.join(os.path.dirname(__file__), "../../external/tinc/tinc-python/tinc-python")))
 
-from process_args import *
+from tinc import *
 
 parser = TincArgumentParser(description='Graph generator')
 

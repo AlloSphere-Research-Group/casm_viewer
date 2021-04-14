@@ -155,7 +155,7 @@ public:
 
   std::mutex mDrawLock;
 
-  SlicingAtomRenderer atomrender;
+  SlicingAtomRenderer atomrender{"atomRender"};
 
   std::vector<std::shared_ptr<ParameterColor>> mColorList;
   std::vector<Color> colorList = {

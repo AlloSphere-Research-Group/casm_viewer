@@ -16,7 +16,7 @@
 
 #include "datasetmanager.hpp"
 
-#include "tinc/DiskBufferNetCDF.hpp"
+#include "tinc/DiskBufferNetCDFData.hpp"
 
 using namespace al;
 

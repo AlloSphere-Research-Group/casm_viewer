@@ -1,9 +1,8 @@
 
 import sys
 import os
-sys.path.append(
-    os.path.abspath(os.path.join(os.path.dirname(__file__), "../external/tinc/tinc-python/tinc-python")))
-from process_args import *
+
+from tinc import *
 parser = TincArgumentParser(description='Transfmat extraction')
 
 parser.add_argument('__input_dir', type=str, default="./", nargs='?')

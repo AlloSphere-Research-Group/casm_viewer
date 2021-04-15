@@ -41,7 +41,7 @@ if __name__ == '__main__':
     import sys, os
     sys.path.append(
         os.path.abspath(os.path.join(os.path.dirname(__file__), "../../external/tinc/tinc-python/tinc-python")))
-    from process_args import *
+    from tinc import *
     
     parser = TincArgumentParser(description='POSCAR Template generator')
 

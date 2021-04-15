@@ -75,6 +75,30 @@ struct ObjectTransformHandler : WindowEventHandler {
   }
 };
 
+class ScriptRunner {
+public:
+  void init() {
+    kmcPercoTools.setScriptName("python\\tinc_kmc_paths_perco.py");
+    asyncWrapper.setProcessor(&kmcPercoTools);
+    kmcPercoTools.enableJsonConfig(false);
+  }
+
+  void start() {
+    auto curPath = al::File::currentPath();
+    std::cout << curPath << std::endl;
+    kmcPercoTools.setCommand(
+        "start cmd.exe /K %userprofile%\\anaconda3\\Scripts\\conda.exe run "
+        "--cwd " +
+        curPath + " -n base python");
+    asyncWrapper.process();
+  }
+
+  void stop() {}
+
+  ProcessorScript kmcPercoTools{"kmcPercoTools"};
+  ProcessorAsyncWrapper asyncWrapper{"asyncWrapper"};
+};
+
 class MyApp : public DistributedAppWithState<State> {
 public:
   // Parameters and triggers for interaction commands
@@ -130,7 +154,7 @@ public:
                                  Color(0.0f, 0.0f, 0.0f, 1.0f)};
   ParameterString font{"font"};
   Parameter fontSize{"fontSize", "", 32, 2, 128};
-  ParameterString pythonScriptPath{"pythonScriptPath"};
+  ParameterString pythonScriptsPath{"pythonScriptsPath"};
   ParameterString pythonBinary{"pythonBinary"};
 
   ParameterBool recallPositions{"recallPositions", "", 1.0};
@@ -160,6 +184,8 @@ public:
   ProcessorScript transfmatExtractor{"TransfmatExtractor"};
   ProcessorScript templateGen{"TemplateGenerator"};
 
+  ScriptRunner percoTools;
+
   TincServer tincServer;
 
   // --------
@@ -183,23 +209,12 @@ public:
     sequencer = std::make_unique<PresetSequencer>();
     recorder = std::make_unique<SequenceRecorder>();
     presetServer = std::make_unique<PresetServer>();
-  }
-
-  virtual void onCreate() override {
-    imguiInit();
-
-    // disable nav control mouse drag to look
-    navControl().useMouse(false);
-
-    fps(60);
-    title("Casm Viewer");
-    dimensions(1200, 800);
 
     // Create and configure displays
     int numDisplays = 1;
 
     for (int i = 0; i < numDisplays; i++) {
-      dataDisplays.push_back(new DataDisplay);
+      dataDisplays.emplace_back(new DataDisplay);
       //      dataDisplays.back()->mDatasetManager.mParameterSpace.setId(
       //          "casm_space_" + std::to_string(i));
       dataDisplays.back()->init();
@@ -229,14 +244,12 @@ public:
     }
 
     // ----------
+    loadConfiguration();
     initializeComputation();
     registerParameterCallbacks();
 
-    loadConfiguration();
     setupParameterServer();
     readElementsIni();
-
-    //    mDataRootPath.set(0); // Force loading available
 
     if (isPrimary()) {
       for (auto *display : dataDisplays) {
@@ -269,6 +282,23 @@ public:
           sliceBackground.get()); // Set current value to update on renderers
     }
 
+    fps(60);
+    title("Casm Viewer");
+    dimensions(1200, 800);
+
+    backgroundColor.processChange();
+    sliceBackground.processChange();
+    pythonScriptsPath.processChange();
+    pythonBinary.processChange();
+  }
+
+  virtual void onCreate() override {
+    imguiInit();
+
+    // disable nav control mouse drag to look
+    navControl().useMouse(false);
+
+    font.processChange(); // Loads font
     // use object control for model matrix
     defaultWindow().append(object_transform);
     object_transform.setHome(Vec3f(0, 0, 0));
@@ -814,9 +844,6 @@ public:
                  ->atomrender.mAtomMarkerSize);
         ParameterGUI::drawParameterMeta(
             &this->dataDisplays[vdvBundle.currentBundle()]->mPercoMarkerScale);
-        ParameterGUI::drawParameterMeta(
-            &this->dataDisplays[vdvBundle.currentBundle()]
-                 ->atomrender.mSliceAtomMarkerFactor);
         if (this->dataDisplays[vdvBundle.currentBundle()]
                 ->mDatasetManager.mParameterSpace.getDimension("time")) {
           ParameterGUI::drawParameterMeta(&mAutoAdvance);
@@ -1033,6 +1060,9 @@ public:
     ImGui::SetNextWindowPos(ImVec2(400, 10), ImGuiCond_FirstUseEver);
     ImGui::SetNextWindowSize(ImVec2(300, 400), ImGuiCond_FirstUseEver);
     ImGui::Begin("TINC controls");
+    if (ImGui::Button("Start KMC analysis script")) {
+      percoTools.start();
+    }
     vis::drawTincServerInfo(tincServer, true);
     for (auto *param : params) {
       if (param->getGroup() == "casm") {
@@ -1122,12 +1152,6 @@ public:
       config.registerParameter(*color);
     }
     config.read();
-
-    backgroundColor.processChange();
-    sliceBackground.processChange();
-    pythonScriptsPath.processChange();
-    pythonBinary.processChange();
-    font.processChange();
   }
 
   void storeConfiguration() {
@@ -1313,6 +1337,8 @@ public:
     dataDisplays[0]->mTrajRender.registerWithTincServer(tincServer);
 
     tincServer.start();
+
+    percoTools.init();
   }
 
   void registerParameterCallbacks() {
@@ -1670,6 +1696,12 @@ public:
     mDebugScripts.registerChangeCallback([&](float value) {
       for (auto *proc : initRootProcessorGraph.getProcessors()) {
         proc->setVerbose(value != 0.0);
+      }
+      for (auto d : dataDisplays) {
+        for (auto *proc :
+             d->mDatasetManager.sampleProcessorGraph.getProcessors()) {
+          proc->setVerbose(value != 0.0);
+        }
       }
     });
   }

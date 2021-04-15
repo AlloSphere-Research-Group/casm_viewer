@@ -258,9 +258,7 @@ def pushd(new_dir):
 if __name__ == '__main__':
 
     import sys, os
-    sys.path.append(
-        os.path.abspath(os.path.join(os.path.dirname(__file__), "../external/tinc/tinc-python/tinc-python")))
-    from process_args import TincArgumentParser
+    from tinc import *
     parser = TincArgumentParser(description='Analyze parameter space')
     parser.add_argument('__output_names', type=str, default="parameter_space.nc", nargs='?')
     args = parser.get_args()

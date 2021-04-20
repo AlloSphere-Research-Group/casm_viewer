@@ -6,7 +6,7 @@ set(APP_NAME casm_viewer)
 project(${APP_NAME})
 
 # path to main source file
-add_executable(${APP_NAME}
+add_executable(${APP_NAME} MACOSX_BUNDLE
   src/main.cpp
   src/datadisplay.cpp
   src/datasetmanager.cpp
@@ -107,9 +107,13 @@ if (BUILD_CASMVIEWER_RELEASE)
 #    endif()
 
   elseif(APPLE)
+    install(TARGETS casm_viewer
+      BUNDLE DESTINATION . COMPONENT Runtime
+      RUNTIME DESTINATION bin COMPONENT Runtime
+      )
 
     # Note Mac specific extension .app
-    set(APPS "${CMAKE_CURRENT_LIST_DIR}/CASM_Viewer.app")
+    set(APPS "${CMAKE_CURRENT_LIST_DIR}/bin/casm_viewer.app")
 
     # Directories to look for dependencies
     set(DIRS ${CMAKE_BINARY_DIR})
@@ -127,7 +131,7 @@ if (BUILD_CASMVIEWER_RELEASE)
     set(CPACK_PACKAGE_FILE_NAME "CASM_Viewer")
     set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "CASM_Viewer")
     set(CPACK_PACKAGE_VENDOR "Allosphere Research Group, Van der Ven Research group")
-    set(CPACK_PACKAGE_DESCRIPTION_FILE "${CMAKE_CURRENT_LIST_DIR}/res/readme.md")
+    set(CPACK_PACKAGE_DESCRIPTION_FILE "${CMAKE_CURRENT_LIST_DIR}/readme.md")
     set(CPACK_PACKAGE_ICON "${CMAKE_CURRENT_LIST_DIR}/res/macos/myrioi_icon.icns")
     #  set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_CURRENT_SOURCE_DIR}/Copyright.txt")
     set(CPACK_PACKAGE_VERSION_MAJOR "1")

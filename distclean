@@ -3,6 +3,7 @@
 rm -rf build
 rm -rf bin/casm_viewer
 rm -rf bin/casm_viewer.exe
+rm -rf bin/casm_viewer.app
 rm -rf allolib/build
 rm -rf allolib/bin
 rm -rf vdv_group/build

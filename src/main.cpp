@@ -78,7 +78,7 @@ struct ObjectTransformHandler : WindowEventHandler {
 class ScriptRunner {
 public:
   void init() {
-    kmcPercoTools.setScriptName("python\\tinc_kmc_paths_perco.py");
+    kmcPercoTools.setScriptName("..\\python\\tinc_kmc_paths_perco.py");
     asyncWrapper.setProcessor(&kmcPercoTools);
     kmcPercoTools.enableJsonConfig(false);
   }
@@ -149,7 +149,7 @@ public:
 
   // Settings
   ParameterColor backgroundColor{"background", "",
-                                 Color(0.0f, 0.0f, 0.0f, 1.0f)};
+                                 Color(0.12f, 0.12f, 0.12f, 1.0f)};
   ParameterColor sliceBackground{"sliceBackground", "",
                                  Color(0.0f, 0.0f, 0.0f, 1.0f)};
   ParameterString font{"font"};
@@ -205,7 +205,7 @@ public:
 
   void onInit() override {
     presetHandler = std::make_unique<PresetHandler>();
-    positionPresets = std::make_unique<PresetHandler>("positionPresets");
+    positionPresets = std::make_unique<PresetHandler>();
     sequencer = std::make_unique<PresetSequencer>();
     recorder = std::make_unique<SequenceRecorder>();
     presetServer = std::make_unique<PresetServer>();
@@ -352,6 +352,10 @@ public:
 
   virtual void onAnimate(double /*dt*/) override {
     object_transform.step();
+
+    if (mWindowTitle.processChange()) {
+      title(mWindowTitle.get());
+    }
     if (isPrimary()) {
       if (showGui) {
         prepareGui();
@@ -436,9 +440,6 @@ public:
 
   virtual void onDraw(Graphics &g) override {
     g.clear(backgroundColor);
-    if (mWindowTitle.processChange()) {
-      title(mWindowTitle.get());
-    }
     drawScene(g);
     if (isPrimary()) {
       processScreenshot();
@@ -1060,9 +1061,9 @@ public:
     ImGui::SetNextWindowPos(ImVec2(400, 10), ImGuiCond_FirstUseEver);
     ImGui::SetNextWindowSize(ImVec2(300, 400), ImGuiCond_FirstUseEver);
     ImGui::Begin("TINC controls");
-    if (ImGui::Button("Start KMC analysis script")) {
-      percoTools.start();
-    }
+    //    if (ImGui::Button("Start KMC analysis script")) {
+    //      percoTools.start();
+    //    }
     vis::drawTincServerInfo(tincServer, true);
     for (auto *param : params) {
       if (param->getGroup() == "casm") {
@@ -1108,9 +1109,9 @@ public:
 
 // Set default values
 #ifdef AL_WINDOWS
-    font.setNoCalls("C:\\Windows\\Fonts\\arial.ttf");
+    font.setNoCalls(al::Font::defaultFont());
 #elif defined(AL_OSX)
-    font.setNoCalls(string("/Library/Fonts/arial.ttf"));
+    font.setNoCalls(al::Font::defaultFont());
 #else
     font.setNoCalls(string("/usr/share/fonts/truetype/freefont/FreeMono.ttf"));
 #endif
@@ -1350,24 +1351,30 @@ public:
           [this, display](std::string value) {
             std::string path = value;
             path = path.substr(path.rfind('/') + 1);
-            if (display->mDatasetManager.mGlobalRoot.size() > 0) {
-              presetHandler->setRootPath(display->mDatasetManager.mGlobalRoot);
-              positionPresets->setRootPath(
-                  display->mDatasetManager.mGlobalRoot);
-              if (!File::exists(display->mDatasetManager.mGlobalRoot + value +
-                                "/presets")) {
-                Dir::make(value + "/presets");
-              }
-              if (!File::exists(display->mDatasetManager.mGlobalRoot + value +
-                                "/positionPresets")) {
-                Dir::make(value + "/positionPresets");
-              }
-              presetHandler->setSubDirectory(value + "/presets");
-              positionPresets->setSubDirectory(value + "/presets");
-              presetHandler->setCurrentPresetMap("default", true);
-              std::cout << "Preset Handler sub dir set to " << value
-                        << std::endl;
+            std::string datasetPath;
+            if (display->mDatasetManager.mGlobalRoot.size() > 0 &&
+                display->mDatasetManager.mGlobalRoot != "./") {
+              datasetPath = display->mDatasetManager.mGlobalRoot;
+              //              if
+              //              (!File::exists(display->mDatasetManager.mGlobalRoot
+              //              + value +
+              //                                "/presets")) {
+              //                Dir::make(value + "/presets");
+              //              }
+              //              if
+              //              (!File::exists(display->mDatasetManager.mGlobalRoot
+              //              + value +
+              //                                "/positionPresets")) {
+              //                Dir::make(value + "/positionPresets");
+              //              }
             }
+            datasetPath += value + "/presets";
+            presetHandler->setRootPath(datasetPath);
+            positionPresets->setRootPath(datasetPath);
+            //            presetHandler->setSubDirectory(value + "/presets");
+            //            positionPresets->setSubDirectory(value + "/presets");
+            presetHandler->setCurrentPresetMap("default", true);
+            std::cout << "Preset Handler sub dir set to " << value << std::endl;
             updateTitle();
             mAutoAdvance = 0.0; // Turn off auto advance
           });

@@ -48,6 +48,30 @@ void DatasetManager::initializeComputation() {
                                       {"chempotA", "param_chem_pot(a)"},
                                       {"chempotB", "param_chem_pot(b)"},
                                       {"dir", "dir"}};
+
+  mParameterSpace.generateRelativeRunPath =
+      [&](std::map<std::string, size_t> indices, ParameterSpace *ps) {
+        bool isMultiId = false;
+
+        for (auto dim : mParameterSpace.getDimensions()) {
+          if (dim->getCurrentIds().size() > 1) {
+            isMultiId = true;
+            break;
+          }
+        }
+
+        std::string path;
+
+        if (isMultiId) {
+          path = ps->resolveFilename(
+              ps->getCommonId() + ps->getCurrentPathTemplate(), indices);
+          ;
+        } else {
+          path = ps->resolveFilename(ps->getCurrentPathTemplate(), indices);
+        }
+        return al::File::conformDirectory(al::File::conformPathToOS(path));
+      };
+
   // Parameter space callback
   mParameterSpace.onValueChange = [&](ParameterSpaceDimension *changedDimension,
                                       ParameterSpace *ps) {
@@ -483,10 +507,10 @@ bool DatasetManager::initDataset() {
     }
   }
 
-  std::string idDim;
+  std::vector<std::string> idDims;
   for (auto dim : mParameterSpace.getDimensions()) {
     if (dim->getSpaceRepresentationType() == ParameterSpaceDimension::ID) {
-      idDim = dim->getName();
+      idDims.push_back(dim->getName());
       std::cout << "Using dimension '" << dim->getName()
                 << "' as subdir dimension" << std::endl;
       break;
@@ -497,11 +521,26 @@ bool DatasetManager::initDataset() {
 
   if (mParameterSpace.getDimension("dir") &&
       mParameterSpace.getDimension("dir")->size() > 0) {
-    if (idDim != mParameterSpace.getDimension("dir")->getName()) {
+    if (idDims.at(0) != mParameterSpace.getDimension("dir")->getName()) {
       pathTemplate = "%%dir%%";
     }
   }
-  pathTemplate += "%%" + idDim + "%%conditions.%%" + conditionDim + "%%";
+  bool isMultiId = false;
+
+  for (auto dim : mParameterSpace.getDimensions()) {
+    if (dim->getCurrentIds().size() > 1) {
+      isMultiId = true;
+      break;
+    }
+  }
+
+  if (isMultiId) {
+    pathTemplate = "/conditions.%%" + conditionDim + "%%";
+  } else {
+    pathTemplate +=
+        "%%" + idDims.at(0) + "%%conditions.%%" + conditionDim + "%%";
+  }
+
   mParameterSpace.setCurrentPathTemplate(pathTemplate);
 
   std::vector<std::string> parameterSpaceNames;
@@ -762,12 +801,16 @@ bool DatasetManager::valid() {
 std::string DatasetManager::currentDataset() { return mLoadedDataset; }
 
 std::string DatasetManager::getSubDir() {
-  for (auto ps : mParameterSpace.getDimensions()) {
-    if (ps->getSpaceRepresentationType() == ParameterSpaceDimension::ID) {
-      return ps->getCurrentId();
+
+  auto commonId = mParameterSpace.getCommonId();
+  if (commonId.size() == 0) {
+    for (auto ps : mParameterSpace.getDimensions()) {
+      if (ps->getSpaceRepresentationType() == ParameterSpaceDimension::ID) {
+        return ps->getCurrentId();
+      }
     }
   }
-  return std::string();
+  return commonId;
 }
 
 void DatasetManager::updateText() {

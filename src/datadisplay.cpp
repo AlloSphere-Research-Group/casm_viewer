@@ -41,94 +41,17 @@ void DataDisplay::init() {
   }
   synth.gain(5.0);
 
-  mPickableManager << graphPickable << parallelPickable << perspectivePickable;
-
-  graphPickable.bb.set(Vec3f(-1.2f, -0.9f, -0.05f), Vec3f(1.2f, 0.9f, 0.0f));
-  graphPickable.pose = Pose(Vec3d(-2.0, 0.2, -.75), Quatf());
-  graphPickable.scale = 0.2f;
-
-  parallelPickable.bb.setCenterDim(Vec3f(), Vec3f(4, 4, 0.1f));
-  parallelPickable.pose = Pose(Vec3d(-0.68, 1.1, -1.5), Quatf());
-  parallelPickable.scale = 0.4f;
-
-  perspectivePickable.pose =
-      Pose(Vec3d(0.55, 0.35, -0.7), Quatf().fromEuler(75.0 * M_DEG2RAD, 0, 0));
-  perspectivePickable.scale = 0.02f;
-  //    perspectivePickable.scaleVec = mPerspectiveScale.get();
-  // perspectivePickable.addChild(rh);
-  // rh.size = 25;
-  // rh.dr = 2.2;
-
-  perspectivePickable.addChild(slicePickable);
-  perspectivePickable.testChildren = false;
-  perspectivePickable.containChildren = true;
-
-  addSphere(mMarker, 1, 6, 6);
-  mMarker.update();
-
-  EasyFBOSetting setting;
-  setting.mUseMipmap = true;
-  setting.filterMin = GL_LINEAR_MIPMAP_LINEAR;
-  setting.filterMag = GL_LINEAR_MIPMAP_LINEAR;
-
-  // Settings for parallel projection rendering fbo
-  fbo_iso.init(2048, 2048, setting);
-
-  mGraphTexture.mipmap(true);
-  for (auto &graph : mGraphTextures) {
-    graph.mipmap(true);
-  }
-
-  int num_verts_added;
-  Mat4f transform;
-
-  // Prepare axis mesh
-  // x
-  num_verts_added = addCube(axis);
-  transform.setIdentity();
-  transform *= Matrix4f::rotation(M_PI / 2, 2, 0); // rotate from z to x
-  transform *= Matrix4f::translation(0, 0, 0.3);
-  transform *= Matrix4f::scaling(0.02, 0.02, 1);
-  axis.transform(transform, axis.vertices().size() - num_verts_added);
-  for (int i = 0; i < num_verts_added; i += 1) {
-    axis.color(1, 0, 0);
-  }
-
-  // y
-  num_verts_added = addCube(axis);
-  transform.setIdentity();
-  transform *= Matrix4f::rotation(M_PI / 2, 2, 1); // rotate from z to y
-  transform *= Matrix4f::translation(0, 0, 0.3);
-  transform *= Matrix4f::scaling(0.02, 0.02, 1);
-  axis.transform(transform, axis.vertices().size() - num_verts_added);
-  for (int i = 0; i < num_verts_added; i += 1) {
-    axis.color(0, 1, 0);
-  }
-
-  // z
-  num_verts_added = addCube(axis);
-  transform.setIdentity();
-  transform *= Matrix4f::translation(0, 0, 0.3);
-  transform *= Matrix4f::scaling(0.02, 0.02, 1);
-  axis.transform(transform, axis.vertices().size() - num_verts_added);
-  for (int i = 0; i < num_verts_added; i += 1) {
-    axis.color(0, 0, 1);
-  }
-  axis.update();
-
   // We need to process the callbacks for this within the graphics thread.
-  mDatasetManager.mCurrentDataset.setSynchronousCallbacks();
+  mDatasetManager.mCurrentDataset.setSynchronousCallbacks(false);
   mDatasetManager.mCurrentDataset.registerChangeCallback(
       [&](std::string value) {
-        if (value != mDatasetManager.mCurrentDataset.get()) {
-          // First force application of value
-          lastError.set("");
-          mDatasetManager.mCurrentDataset.setLocking(value);
-          if (!initDataset()) {
-            lastError.set(mDatasetManager.lastError);
-          }
-          resetSlicing();
+        // First force application of value
+        lastError.set("");
+        //        mDatasetManager.mCurrentDataset.setNoCalls(value);
+        if (!initDataset()) {
+          lastError.set(mDatasetManager.lastError);
         }
+        resetSlicing();
       });
 
   mDatasetManager.mShellSiteTypes.registerChangeCallback([&](uint16_t value) {
@@ -256,10 +179,12 @@ void DataDisplay::init() {
     slicePickable.bb.set(slicePickable.bb.min, m);
   });
 
-  atomrender.mSlicingPlanePoint.registerChangeCallback([this](Vec3f v) {
+  atomrender.mSlicingPlaneCorner.registerChangeCallback([this](Vec3f v) {
     auto p = Pose(v - slicePickable.bb.min, slicePickable.pose.get().quat());
     slicePickable.pose.setNoCalls(p);
   });
+
+  atomrender.mSlicingPlaneNormal.setHint("hide", 0.0);
 
   atomrender.init();
 
@@ -277,7 +202,7 @@ void DataDisplay::init() {
 
   slicePickable.pose.registerChangeCallback([this](Pose pose) {
     auto p = pose.pos() + slicePickable.bb.min;
-    atomrender.mSlicingPlanePoint.setNoCalls(p);
+    atomrender.mSlicingPlaneCorner.setNoCalls(p);
   });
 
   backgroundColor.setHint("showAlpha", 1.0);
@@ -348,7 +273,7 @@ void DataDisplay::init() {
   bundle << mPerspectiveRotY;
   bundle << atomrender.mSlicingPlaneNormal;
   bundle << atomrender.mSliceRotationPitch << atomrender.mSliceRotationRoll;
-  bundle << atomrender.mSlicingPlanePoint << atomrender.mSlicingPlaneThickness
+  bundle << atomrender.mSlicingPlaneCorner << atomrender.mSlicingPlaneThickness
          << mLayerScaling;
   bundle << mShowGrid << mGridType << mGridSpacing << mGridXOffset
          << mGridYOffset;
@@ -374,6 +299,109 @@ void DataDisplay::init() {
     bundle << *mColorList.back();
   }
   bundle << mColorTrigger;
+
+  // Pickable
+
+  mPickableManager << graphPickable << parallelPickable << perspectivePickable;
+
+  graphPickable.bb.set(Vec3f(-1.2f, -0.9f, -0.05f), Vec3f(1.2f, 0.9f, 0.0f));
+  graphPickable.pose = Pose(Vec3d(-2.0, 0.2, -.75), Quatf());
+  graphPickable.scale = 0.2f;
+
+  parallelPickable.bb.setCenterDim(Vec3f(), Vec3f(4, 4, 0.1f));
+  parallelPickable.pose = Pose(Vec3d(-0.68, 1.1, -1.5), Quatf());
+  parallelPickable.scale = 0.4f;
+
+  perspectivePickable.pose =
+      Pose(Vec3d(0.55, 0.35, -0.7), Quatf().fromEuler(75.0 * M_DEG2RAD, 0, 0));
+  perspectivePickable.scale = 0.02f;
+  //    perspectivePickable.scaleVec = mPerspectiveScale.get();
+  // perspectivePickable.addChild(rh);
+  // rh.size = 25;
+  // rh.dr = 2.2;
+
+  perspectivePickable.addChild(slicePickable);
+  perspectivePickable.testChildren = false;
+  perspectivePickable.containChildren = true;
+
+  initGL();
+}
+
+void DataDisplay::initGL() {
+
+  addSphere(mMarker, 1, 6, 6);
+  mMarker.update();
+
+  // Box mesh for slicing
+  boxMesh.reset();
+  boxMesh.primitive(Mesh::LINES);
+
+  const float x[2] = {0, 1};
+  const float y[2] = {0, 1};
+  const float z[2] = {0, 1};
+
+  for (int k = 0; k <= 1; k++) {
+    for (int j = 0; j <= 1; j++) {
+      for (int i = 0; i <= 1; i++) {
+        boxMesh.vertex(x[i], y[j], z[k]);
+      }
+    }
+  }
+
+  static const int I[] = {0, 1, 2, 3, 4, 5, 6, 7, 0, 2, 1, 3,
+                          4, 6, 5, 7, 0, 4, 1, 5, 2, 6, 3, 7};
+  boxMesh.index(I, sizeof(I) / sizeof(*I), 0);
+  boxMesh.update();
+
+  EasyFBOSetting setting;
+  setting.mUseMipmap = true;
+  setting.filterMin = GL_LINEAR_MIPMAP_LINEAR;
+  setting.filterMag = GL_LINEAR_MIPMAP_LINEAR;
+
+  // Settings for parallel projection rendering fbo
+  fbo_iso.init(2048, 2048, setting);
+
+  mGraphTexture.mipmap(true);
+  for (auto &graph : mGraphTextures) {
+    graph.mipmap(true);
+  }
+
+  int num_verts_added;
+  Mat4f transform;
+
+  // Prepare axis mesh
+  // x
+  num_verts_added = addCube(axis);
+  transform.setIdentity();
+  transform *= Matrix4f::rotation(M_PI / 2, 2, 0); // rotate from z to x
+  transform *= Matrix4f::translation(0, 0, 0.3);
+  transform *= Matrix4f::scaling(0.02, 0.02, 1);
+  axis.transform(transform, axis.vertices().size() - num_verts_added);
+  for (int i = 0; i < num_verts_added; i += 1) {
+    axis.color(1, 0, 0);
+  }
+
+  // y
+  num_verts_added = addCube(axis);
+  transform.setIdentity();
+  transform *= Matrix4f::rotation(M_PI / 2, 2, 1); // rotate from z to y
+  transform *= Matrix4f::translation(0, 0, 0.3);
+  transform *= Matrix4f::scaling(0.02, 0.02, 1);
+  axis.transform(transform, axis.vertices().size() - num_verts_added);
+  for (int i = 0; i < num_verts_added; i += 1) {
+    axis.color(0, 1, 0);
+  }
+
+  // z
+  num_verts_added = addCube(axis);
+  transform.setIdentity();
+  transform *= Matrix4f::translation(0, 0, 0.3);
+  transform *= Matrix4f::scaling(0.02, 0.02, 1);
+  axis.transform(transform, axis.vertices().size() - num_verts_added);
+  for (int i = 0; i < num_verts_added; i += 1) {
+    axis.color(0, 0, 1);
+  }
+  axis.update();
 }
 
 bool DataDisplay::initDataset() {
@@ -473,7 +501,7 @@ void DataDisplay::prepare(Graphics &g, Matrix4f &transformMatrix) {
     updateDisplayBuffers();
   }
   updatePercolationBuffers();
-  //  prepareParallelProjection(g, transformMatrix);
+  prepareParallelProjection(g, transformMatrix);
 }
 
 void DataDisplay::draw(Graphics &g) { // Load data after drawing frame to allow
@@ -681,6 +709,10 @@ void DataDisplay::updateDisplayBuffers() {
     auto allPositions = mDatasetManager.occupationData.get();
     auto templateDataIt = mDatasetManager.templateData.begin();
     for (auto &atom : *allPositions) {
+      if (templateDataIt == mDatasetManager.templateData.end()) {
+        std::cout << "Template and occupation size mismatch" << std::endl;
+        break;
+      }
       std::string atomName =
           mDatasetManager.mCurrentBasis[atom.basis_index]["occupant_dof"]
                                        [atom.occupancy_dof];
@@ -698,10 +730,6 @@ void DataDisplay::updateDisplayBuffers() {
         mDataBoundaries.includePoint(vec);
       }
       templateDataIt++;
-      if (templateDataIt == mDatasetManager.templateData.end()) {
-        std::cout << "Template and occupation size mismatch" << std::endl;
-        break;
-      }
     }
   }
 
@@ -826,8 +854,8 @@ void DataDisplay::prepareParallelProjection(Graphics &g,
   g.clear(backgroundColor);
 
   g.pushViewMatrix();
-  g.viewMatrix(getLookAt(atomrender.mSlicingPlanePoint,
-                         atomrender.mSlicingPlanePoint.get() -
+  g.viewMatrix(getLookAt(atomrender.mSlicingPlaneCorner,
+                         atomrender.mSlicingPlaneCorner.get() -
                              atomrender.mSlicingPlaneNormal.get().normalized(),
                          {0.0f, 1.0f, 0.0f}));
 
@@ -913,10 +941,14 @@ void DataDisplay::prepareParallelProjection(Graphics &g,
       //                           atomrender.mAtomMarkerSize *
       //                               atomrender.mSliceAtomMarkerFactor);
       //      }
+
+      g.shader().uniform("dataScale", 0.01);
       g.shader().uniform("is_line", 0.0f);
       g.shader().uniform("is_omni", 0.0f);
+      g.shader().uniform("eye_sep", g.lens().eyeSep() * g.eye() / 2.0f);
+      g.shader().uniform("alpha", 1.0);
 
-      g.shader().uniform("plane_point", atomrender.mSlicingPlanePoint.get());
+      g.shader().uniform("plane_point", atomrender.mSlicingPlaneCorner.get());
       g.shader().uniform("plane_normal",
                          atomrender.mSlicingPlaneNormal.get().normalized());
       g.shader().uniform("second_plane_distance",
@@ -1004,42 +1036,30 @@ void DataDisplay::drawPerspective(Graphics &g) {
 
     if (mDisplaySlicing.get() == 1.0) {
       g.pushMatrix();
-      boxMesh.reset();
-      boxMesh.primitive(Mesh::LINES);
+      //      g.shader().uniform("eye_sep", perspectivePickable.scale *
+      //                                        g.lens().eyeSep() * g.eye()
+      //                                        / 2.0f);
 
-      const float x[2] = {slicePickable.bb.max.x, slicePickable.bb.min.x};
-      const float y[2] = {slicePickable.bb.max.y, slicePickable.bb.min.y};
-      const float z[2] = {slicePickable.bb.max.z, slicePickable.bb.min.z};
-
-      for (int k = 0; k <= 1; k++) {
-        for (int j = 0; j <= 1; j++) {
-          for (int i = 0; i <= 1; i++) {
-            boxMesh.vertex(x[i], y[j], z[k]);
-          }
-        }
-      }
-
-      static const int I[] = {0, 1, 2, 3, 4, 5, 6, 7, 0, 2, 1, 3,
-                              4, 6, 5, 7, 0, 4, 1, 5, 2, 6, 3, 7};
-      boxMesh.index(I, sizeof(I) / sizeof(*I), 0);
-      boxMesh.update();
-      g.shader().uniform("eye_sep", perspectivePickable.scale *
-                                        g.lens().eyeSep() * g.eye() / 2.0f);
-
-      g.shader().uniform("eye_sep",
-                         /*perspectivePickable.scale * */ g.lens().eyeSep() *
-                             g.eye() / 2.0f);
+      //      g.shader().uniform("eye_sep",
+      //                         /*perspectivePickable.scale * */
+      //                         g.lens().eyeSep() *
+      //                             g.eye() / 2.0f);
 
       //      glLineWidth(5);
       g.polygonLine();
       g.color(0.8f, 0.8f, 1.0f, 0.9f);
       g.scale(atomrender.mDataScale.get());
+      //      g.translate();
+      g.scale(50);
       // g.translate(atomrender.mSlicingPlanePoint.get());
       g.translate(slicePickable.pose.get().pos());
       g.rotate(atomrender.mSliceRotationPitch * 360.0f / (M_2PI), 1.0f, 0.0,
                0.0);
       g.rotate(atomrender.mSliceRotationRoll * 360.0f / (M_2PI), 0.0, -1.0f,
                0.0);
+      //      g.scale(slicePickable.bb.max.x - slicePickable.bb.min.x,
+      //              slicePickable.bb.max.y - slicePickable.bb.min.y,
+      //              slicePickable.bb.max.z - slicePickable.bb.min.z);
       g.draw(boxMesh);
       g.polygonFill();
       //      glLineWidth(1);
@@ -1097,7 +1117,7 @@ void DataDisplay::drawPerspective(Graphics &g) {
   g.polygonFill();
   g.depthTesting(false);
   g.blendAdd();
-  {
+  { // Draw label
     g.pushMatrix();
     // TODO billboard this text
     perspectivePickable.updateAABB();

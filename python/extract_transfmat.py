@@ -16,6 +16,7 @@ import json
 import os
 
 json_files = glob.glob(args['__input_dir'] + "*.json")
+json_files += glob.glob(args['__input_dir'] + "*/*.json")
 
 found_transfmat = None
 

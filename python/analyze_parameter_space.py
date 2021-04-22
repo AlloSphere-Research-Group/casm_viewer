@@ -287,6 +287,7 @@ if __name__ == '__main__':
     dataset_params = {}  
 
     dataset_param_common = {}  
+    dataset_param_meta = {}  
     for dataset_path in dataset_dirs:
         with pushd(dataset_path): 
             results = get_dataset_params()
@@ -343,6 +344,7 @@ if __name__ == '__main__':
             dataset_param_meta = {"internal_params": {}, "index_params": {}, "mapped_params": {}}
             if os.path.exists(sub_dir + "/trajectory.nc"):
                 dataset_param_meta["internal_params"]["time"] = []
+                break
             
         if len(params) > 0:
             write_dir(path + output_name, dataset_param_meta)
@@ -387,8 +389,9 @@ if __name__ == '__main__':
     if len(dataset_dirs) > 0:
         dataset_param_meta["mapped_params"] = {"dir": {"value": [i for i in range(len(dataset_dirs))], "dir" : dataset_dirs }}
     else:
+        dataset_param_meta["mapped_params"] = {}
         for dir_param_name, dir_param_values in dir_params.items():
-            dataset_param_meta["mapped_params"] = {dir_param_name: {"value": [i[1] for i in dir_param_values], "dir" : [i[0] for i in dir_param_values] }}
+            dataset_param_meta["mapped_params"][dir_param_name] = {"value": [i[1] for i in dir_param_values], "dir" : [i[0] for i in dir_param_values] }
     dataset_param_meta["index_params"] = consistent_params_data
     dataset_param_meta["internal_params"] = {"time": []}
 

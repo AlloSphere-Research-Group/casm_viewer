@@ -172,6 +172,7 @@ public:
   PolySynth synth;
 
   void init();
+  void initGL();
 
   bool initDataset();
 
@@ -215,14 +216,14 @@ public:
                 << mDataBoundaries.max.y << std::endl;
       std::cout << "Z " << mDataBoundaries.min.z << " -> "
                 << mDataBoundaries.max.z << std::endl;
-      Vec3f point = atomrender.mSlicingPlanePoint;
+      Vec3f point = atomrender.mSlicingPlaneCorner;
       point.z = mDataBoundaries.min.z;
-      atomrender.mSlicingPlanePoint = point;
+      atomrender.mSlicingPlaneCorner = point;
     }
   }
 
   void resetSlicing() {
-    atomrender.mSlicingPlanePoint.set(slicePickable.bb.min);
+    atomrender.mSlicingPlaneCorner.set(slicePickable.bb.min);
 
     atomrender.mSlicingPlaneThickness =
         mDataBoundaries.max.z - mDataBoundaries.min.z;

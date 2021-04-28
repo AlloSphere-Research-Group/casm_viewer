@@ -273,8 +273,7 @@ void DataDisplay::init() {
   bundle << mPerspectiveRotY;
   bundle << atomrender.mSlicingPlaneNormal;
   bundle << atomrender.mSliceRotationPitch << atomrender.mSliceRotationRoll;
-  bundle << atomrender.mSlicingPlaneCorner << atomrender.mSlicingPlaneThickness
-         << mLayerScaling;
+  bundle << atomrender.mSlicingPlaneCorner << atomrender.mSlicingPlaneThickness;
   bundle << mShowGrid << mGridType << mGridSpacing << mGridXOffset
          << mGridYOffset;
   bundle << mBillboarding;
@@ -536,14 +535,27 @@ void DataDisplay::setFont(string name, float size) {
   if (File::exists(name)) {
     if (!mLabelFont.load(name.c_str(), size, 1024)) {
       std::cout << "Failed to load font: " << name << std::endl;
+#ifdef AL_WINDOWS
       if (!mLabelFont.load("C:\\Windows\\Fonts\\arial.ttf", size, 1024)) {
+        std::cout
+            << "Attempt to load alternate font: C:\\Windows\\Fonts\\arial.ttf"
+            << std::endl;
       }
-
+#elif defined(AL_LINUX)
       if (!mLabelFont.load(
               "/usr/share/fonts/truetype/ttf-bitstream-vera/Vera.ttf", size,
               1024)) {
-        throw;
+        std::cout << "Attempt to load alternate font: "
+                     "/usr/share/fonts/truetype/ttf-bitstream-vera/Vera.ttf"
+                  << std::endl;
       }
+#elif defined(AL_OSX)
+      if (!mLabelFont.load("/Library/Fonts/Arial Unicode.ttf", size, 1024)) {
+        std::cout << "Attempt to load alternate font: /Library/Fonts/Arial "
+                     "Unicode.ttf"
+                  << std::endl;
+      }
+#endif
     } else {
       std::cout << "Loaded font " << name << std::endl;
     }
@@ -595,6 +607,16 @@ void DataDisplay::previousTime() {
 void DataDisplay::nextLayer() { atomrender.nextLayer(); }
 
 void DataDisplay::previousLayer() { atomrender.previousLayer(); }
+
+void DataDisplay::resetSlicing() {
+  atomrender.mSlicingPlaneCorner.set(slicePickable.bb.min);
+
+  atomrender.mSlicingPlaneThickness = atomrender.dataBoundary.dim.z;
+  atomrender.mSlicingPlaneSize =
+      std::max(atomrender.dataBoundary.dim.x, atomrender.dataBoundary.dim.y);
+  atomrender.mSliceRotationRoll.set(0);
+  atomrender.mSliceRotationPitch.set(0);
+}
 
 void DataDisplay::updateDisplayBuffers() {
   //  std::map<string, int> elementCounts;
@@ -819,27 +841,28 @@ void DataDisplay::prepareParallelProjection(Graphics &g,
 
   float ar = float(fbo_iso.width()) / fbo_iso.height();
   //        float rangeSizeZ = mDataBoundaries.maxz - mDataBoundaries.minz;
-  float centerX = (mDataBoundaries.max.x + mDataBoundaries.min.x) / 2.0f;
-  float centerY = (mDataBoundaries.max.y + mDataBoundaries.min.y) / 2.0f;
-  float rangeSizeX = mDataBoundaries.max.x - mDataBoundaries.min.x;
-  float rangeSizeY = mDataBoundaries.max.y - mDataBoundaries.min.y;
-  float maxrange = std::max(rangeSizeX, rangeSizeY);
+  //  float centerX = (mDataBoundaries.max.x + mDataBoundaries.min.x) / 2.0f;
+  //  float centerY = (mDataBoundaries.max.y + mDataBoundaries.min.y) / 2.0f;
+  float maxrange =
+      std::max(atomrender.dataBoundary.dim.x, atomrender.dataBoundary.dim.y);
   float padding = maxrange * 0.05f;
-  float left = centerX - 0.5f * maxrange * mLayerScaling - padding;
-  float right = centerX + 0.5f * maxrange * mLayerScaling + padding;
-  float top = centerY + 0.5f * maxrange * mLayerScaling + padding;
-  float bottom = centerY - 0.5f * maxrange * mLayerScaling - padding;
-  //        const float near = mDataBoundaries.minz + (mNearClip * rangeSizeZ);
-  //        const float farClip = mDataBoundaries.minz + (mFarClip *
-  //        rangeSizeZ); float minxy = std::min(mDataBoundaries.minx,
-  //        mDataBoundaries.miny);
+
+  float scaling = atomrender.mSlicingPlaneSize;
+  //  float left = centerX - 0.5f * maxrange * scaling - padding;
+  //  float right = centerX + 0.5f * maxrange * scaling + padding;
+  //  float top = centerY + 0.5f * maxrange * scaling + padding;
+  //  float bottom = centerY - 0.5f * maxrange * scaling - padding;
+
+  float left = atomrender.mSlicingPlaneCorner.get().x;
+  float right =
+      atomrender.mSlicingPlaneCorner.get().x + atomrender.mSlicingPlaneSize;
+  float top =
+      atomrender.mSlicingPlaneCorner.get().y + atomrender.mSlicingPlaneSize;
+  float bottom = atomrender.mSlicingPlaneCorner.get().y;
+
   g.projMatrix(Matrix4f::ortho(ar * left, ar * right, bottom, top,
                                mDataBoundaries.min.z - 100,
                                mDataBoundaries.max.z + 100));
-
-  double scalingFactor = 1.0 / (mDataBoundaries.max.y - mDataBoundaries.min.y);
-
-  // std::cout << near << "..." << farClip <<std::endl;
 
   // save for later
   GLboolean last_enable_scissor_test = glIsEnabled(GL_SCISSOR_TEST);
@@ -866,7 +889,7 @@ void DataDisplay::prepareParallelProjection(Graphics &g,
 
   if (mShowGrid == 1.0f) {
     mGridMesh.reset();
-    addRect(mGridMesh, 0, -2.0, 0.1f / (maxrange * mLayerScaling), 4.0f);
+    addRect(mGridMesh, 0, -2.0, 0.1f / (scaling), 4.0f);
     mGridMesh.update();
     if (backgroundColor.get().luminance() > 0.5f) {
       g.color(0.2f);
@@ -877,20 +900,20 @@ void DataDisplay::prepareParallelProjection(Graphics &g,
       if (mGridType.getCurrent() == "square") {
         g.pushMatrix();
         g.translate(mGridXOffset, mGridYOffset + mGridSpacing * i, 0);
-        g.scale(maxrange * mLayerScaling);
+        g.scale(scaling);
         g.rotate(90, 0, 0, 1);
         g.draw(mGridMesh);
         g.popMatrix();
         g.pushMatrix();
         g.translate(mGridXOffset + mGridSpacing * i, mGridYOffset, 0);
-        g.scale(maxrange * mLayerScaling);
+        g.scale(scaling);
         g.draw(mGridMesh);
         g.popMatrix();
       } else if (mGridType.getCurrent() == "triangle") {
         float spacing = 0.86602540378f * mGridSpacing; // sin(60)
         g.pushMatrix();
         g.translate(mGridXOffset, mGridYOffset + spacing * i, 0);
-        g.scale(maxrange * mLayerScaling);
+        g.scale(scaling);
         g.rotate(90, 0, 0, 1);
         g.draw(mGridMesh);
         g.popMatrix();
@@ -898,14 +921,14 @@ void DataDisplay::prepareParallelProjection(Graphics &g,
         g.translate(mGridXOffset, mGridYOffset, 0);
         g.rotate(30, 0, 0, 1);
         g.translate(spacing * i, 0, 0);
-        g.scale(maxrange * mLayerScaling);
+        g.scale(scaling);
         g.draw(mGridMesh);
         g.popMatrix();
         g.pushMatrix();
         g.translate(mGridXOffset, mGridYOffset, 0);
         g.rotate(-30, 0, 0, 1);
         g.translate(spacing * i, 0, 0);
-        g.scale(maxrange * mLayerScaling);
+        g.scale(scaling);
         g.draw(mGridMesh);
         g.popMatrix();
       }
@@ -930,32 +953,26 @@ void DataDisplay::prepareParallelProjection(Graphics &g,
       // now draw data with custom shader
       g.shader(atomrender.instancingMesh.shader);
       g.update(); // sends modelview and projection matrices
-                  //      g.shader().uniform("dataScale", scalingFactor);
-      //      if (atomrender.mShowRadius == 1.0f) {
-      //        g.shader().uniform("markerScale",
-      //                           data.second.radius *
-      //                           atomrender.mAtomMarkerSize *
-      //                               atomrender.mSliceAtomMarkerFactor);
-      //      } else {
-      //        g.shader().uniform("markerScale",
-      //                           atomrender.mAtomMarkerSize *
-      //                               atomrender.mSliceAtomMarkerFactor);
-      //      }
-
-      g.shader().uniform("dataScale", 0.01);
-      g.shader().uniform("is_line", 0.0f);
+      g.shader().uniform("dataScale", atomrender.mDataScale.get());
       g.shader().uniform("is_omni", 0.0f);
       g.shader().uniform("eye_sep", g.lens().eyeSep() * g.eye() / 2.0f);
+      //      g.shader().uniform("foc_len", g.lens().focalLength());
+
       g.shader().uniform("alpha", 1.0);
+      g.shader().uniform("markerScale", atomrender.mAtomMarkerSize);
 
       g.shader().uniform("plane_point", atomrender.mSlicingPlaneCorner.get());
       g.shader().uniform("plane_normal",
                          atomrender.mSlicingPlaneNormal.get().normalized());
+
+      // TODO add rotation vectors
+
+      g.shader().uniform("slice_size", atomrender.mSlicingPlaneSize.get());
       g.shader().uniform("second_plane_distance",
                          atomrender.mSlicingPlaneThickness);
-
       g.shader().uniform("clipped_mult", 0.0);
 
+      g.shader().uniform("is_line", 0.0f);
       atomrender.instancingMesh.draw();
     }
 
@@ -1003,7 +1020,16 @@ void DataDisplay::drawPerspective(Graphics &g) {
       g.pushMatrix();
       g.scale(perspectivePickable.scale);
       atomrender.applyTransformations(g);
+      {
+        g.pushMatrix();
+        g.polygonLine();
+        g.scale(atomrender.dataBoundary.dim);
+        g.color(0.3f, 0.3f, 0.4f, 0.6f);
+        g.draw(boxMesh);
+        g.popMatrix();
+      }
       atomrender.onProcess(g);
+
       g.popMatrix();
     }
 
@@ -1036,34 +1062,22 @@ void DataDisplay::drawPerspective(Graphics &g) {
 
     if (mDisplaySlicing.get() == 1.0) {
       g.pushMatrix();
-      //      g.shader().uniform("eye_sep", perspectivePickable.scale *
-      //                                        g.lens().eyeSep() * g.eye()
-      //                                        / 2.0f);
 
-      //      g.shader().uniform("eye_sep",
-      //                         /*perspectivePickable.scale * */
-      //                         g.lens().eyeSep() *
-      //                             g.eye() / 2.0f);
+      g.scale(perspectivePickable.scale);
+      atomrender.applyTransformations(g);
 
-      //      glLineWidth(5);
-      g.polygonLine();
-      g.color(0.8f, 0.8f, 1.0f, 0.9f);
-      g.scale(atomrender.mDataScale.get());
-      //      g.translate();
-      g.scale(50);
-      // g.translate(atomrender.mSlicingPlanePoint.get());
-      g.translate(slicePickable.pose.get().pos());
+      g.translate(atomrender.mSlicingPlaneCorner.get());
       g.rotate(atomrender.mSliceRotationPitch * 360.0f / (M_2PI), 1.0f, 0.0,
                0.0);
       g.rotate(atomrender.mSliceRotationRoll * 360.0f / (M_2PI), 0.0, -1.0f,
                0.0);
-      //      g.scale(slicePickable.bb.max.x - slicePickable.bb.min.x,
-      //              slicePickable.bb.max.y - slicePickable.bb.min.y,
-      //              slicePickable.bb.max.z - slicePickable.bb.min.z);
+      g.scale(atomrender.mSlicingPlaneSize, atomrender.mSlicingPlaneSize,
+              atomrender.mSlicingPlaneThickness.get());
+
+      g.polygonLine();
+      g.color(0.8f, 0.8f, 1.0f, 0.9f);
       g.draw(boxMesh);
       g.polygonFill();
-      //      glLineWidth(1);
-
       g.popMatrix();
     }
 

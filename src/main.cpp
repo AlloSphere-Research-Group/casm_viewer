@@ -184,7 +184,7 @@ public:
   ProcessorScript transfmatExtractor{"TransfmatExtractor"};
   ProcessorScript templateGen{"TemplateGenerator"};
 
-  ScriptRunner percoTools;
+  //  ScriptRunner percoTools;
 
   TincServer tincServer;
 
@@ -470,14 +470,6 @@ public:
         case 'v':
           dataDisplays[vdvBundle.currentBundle()]->mPerspectiveRotY =
               dataDisplays[vdvBundle.currentBundle()]->mPerspectiveRotY - 5;
-          break;
-        case '[':
-          dataDisplays[vdvBundle.currentBundle()]->mLayerScaling =
-              dataDisplays[vdvBundle.currentBundle()]->mLayerScaling + 0.05f;
-          break;
-        case ']':
-          dataDisplays[vdvBundle.currentBundle()]->mLayerScaling =
-              dataDisplays[vdvBundle.currentBundle()]->mLayerScaling - 0.05f;
           break;
         case '-':
           mJumpLayerNeg.trigger(); // This will trigger a change
@@ -855,15 +847,7 @@ public:
                                std::to_string(mAutoAdvanceFreq);
             ImGui::Text("%s", text.c_str());
           }
-          //          ParameterGUI::drawParameterMeta(
-          //              &this->dataDisplays[vdvBundle.currentBundle()]
-          //                   ->mCumulativeTrajectory);
-          //          ParameterGUI::drawParameterMeta(
-          //              &this->dataDisplays[vdvBundle.currentBundle()]
-          //                   ->mIndividualTrajectory);
         }
-        //          ImGui::Separator();
-        //          ParameterGUI::drawParameterMeta(&mViewMenu);
         ParameterGUI::drawTrigger(&mSaveGraphics);
         ImGui::SameLine();
         ParameterGUI::drawParameterMeta(&ResetSlicing);
@@ -909,10 +893,16 @@ public:
           ImGui::Indent(20.0);
           ParameterGUI::drawParameterMeta(
               &this->dataDisplays[vdvBundle.currentBundle()]
+                   ->atomrender.mSlicingPlaneCorner);
+          ParameterGUI::drawParameterMeta(
+              &this->dataDisplays[vdvBundle.currentBundle()]
                    ->atomrender.mSlicingPlaneNormal);
           ParameterGUI::drawParameterMeta(
               &this->dataDisplays[vdvBundle.currentBundle()]
                    ->atomrender.mSlicingPlaneThickness);
+          ParameterGUI::drawParameterMeta(
+              &this->dataDisplays[vdvBundle.currentBundle()]
+                   ->atomrender.mSlicingPlaneSize);
 
           ParameterGUI::drawParameterMeta(
               &this->dataDisplays[vdvBundle.currentBundle()]
@@ -921,7 +911,6 @@ public:
           ParameterGUI::drawParameterMeta(&mJumpLayerNeg);
           ImGui::SameLine();
           ParameterGUI::drawParameterMeta(&mJumpLayerPos);
-          //        ParameterGUI::drawParameterMeta(&CalculateSlicing);
           ImGui::SameLine();
           ParameterGUI::drawParameterMeta(&pitchAngleStep);
           ParameterGUI::drawParameterMeta(&stepPitchAngleNeg);
@@ -957,9 +946,6 @@ public:
                                         ->parallelPickable.bundle);
           ParameterGUI::drawBundle(&dataDisplays[vdvBundle.currentBundle()]
                                         ->perspectivePickable.bundle);
-          //          ParameterGUI::drawBundle(&dataDisplays[vdvBundle.currentBundle()]->slicePickable.bundle);
-          //          // Slice pickable is already exposed enough above
-
           ImGui::Unindent(20.0);
         }
         ParameterGUI::drawPresetHandler(positionPresets.get());
@@ -1339,7 +1325,7 @@ public:
 
     tincServer.start();
 
-    percoTools.init();
+    //    percoTools.init();
   }
 
   void registerParameterCallbacks() {

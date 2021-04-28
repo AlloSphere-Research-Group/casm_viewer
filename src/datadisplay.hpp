@@ -80,22 +80,14 @@ public:
   ParameterVec3 layerDir{"LayerDir", ""}; // Direction of layers in data
 
   ParameterChoice mShowAtoms{"ShowAtoms"};
-  //  ParameterBool mCumulativeTrajectory{"ShowCumulativeTrajectory", "", 1.0};
-  //  ParameterBool mIndividualTrajectory{"ShowIndividualTrajectory", "", 1.0};
-
   ParameterColor backgroundColor{"projectionBackground", "",
                                  Color(0.1f, 0.1f, 0.1f, 0.8f)};
   ParameterBool mVisible{"Visible", "", 1};
-  //  ParameterBool mShowGraph{"ShowGraph", "", 1};
-  //  ParameterBool mShowParallel{"ShowParallel", "", 1};
   ParameterBool mShowPerspective{"ShowPerspective", "", 1};
 
   ParameterBool mBillboarding{"Billboarding", "", 1};
   ParameterBool mSmallLabel{"SmallLabel", "", 1};
   ParameterBool mDrawLabels{"DrawLabels", "", 1};
-
-  Parameter mLayerScaling{"LayerScaling", "", 1.0, 0,
-                          3}; // Increase layer size in projection view
 
   Parameter mPerspectiveRotY{"perspectiveRotY", "", -75, -90, 90};
 
@@ -222,14 +214,7 @@ public:
     }
   }
 
-  void resetSlicing() {
-    atomrender.mSlicingPlaneCorner.set(slicePickable.bb.min);
-
-    atomrender.mSlicingPlaneThickness =
-        mDataBoundaries.max.z - mDataBoundaries.min.z;
-    atomrender.mSliceRotationRoll.set(0);
-    atomrender.mSliceRotationPitch.set(0);
-  }
+  void resetSlicing();
 
 protected:
   Texture &iso_scene() { return fbo_iso.tex(); }

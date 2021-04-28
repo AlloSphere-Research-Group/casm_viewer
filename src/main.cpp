@@ -132,7 +132,7 @@ public:
   Trigger mAlignChempots{"AlignChempots"};
 
   ParameterBool mDebugScripts{"DebugScripts"};
-  //  Trigger mRecomputeSpace{"RecomputeSpace"};
+  ParameterBool mComputeCache{"ComputeCache"};
 
   ParameterBool mAutoAdvance{"autoAdvance"};
   Parameter mAutoAdvanceFreq{"autoAdvanceFreq", "", 5, 0.25, 10.0};
@@ -788,7 +788,6 @@ public:
         ImGui::Text("Data root: %s", dataRoot.c_str());
       }
       ParameterGUI::draw(&mRecentDatasets);
-      //      ParameterGUI::draw(&mRecomputeSpace);
       //      ImGui::Separator();
       // Directory GUI
       if (mDatasetSelector->isActive()) {
@@ -797,8 +796,6 @@ public:
           if (selectedItems.count() > 0) {
             auto selection = selectedItems[0];
             mDataset.set(File::conformPathToOS(selection.filepath()));
-            //            loadDataset(selection.filepath(),
-            //            vdvBundle.currentBundle());
             mPreviousBrowseDir = selection.path();
           }
           delete mDatasetSelector;
@@ -823,17 +820,12 @@ public:
       if (this->dataDisplays[vdvBundle.currentBundle()]
               ->mDatasetManager.mParameterSpace.getDimensions()
               .size() > 0) {
-        if (mAutoAdvance == 0.0) {
-          int currentBundle = vdvBundle.currentBundle();
 
+        ParameterGUI::draw(&mComputeCache);
+        if (mAutoAdvance == 0.0) {
           ImGui::Separator();
           vis::drawControls(this->dataDisplays[vdvBundle.currentBundle()]
                                 ->mDatasetManager.mParameterSpace);
-          // auto &ps = this->dataDisplays[vdvBundle.currentBundle()]
-          //    ->mDatasetManager.mParameterSpace;
-          // for (size_t i = 0; i < ps.dimensions.size(); i++) {
-          //    gui::drawControl(ps.dimensions[i]);
-          //}
           ImGui::Separator();
         }
         ParameterGUI::drawParameterMeta(
@@ -1108,25 +1100,6 @@ public:
     pythonScriptsPath.setNoCalls(string("./python"));
     pythonBinary.setNoCalls(string("python3"));
 
-    //    std::string scriptPath = configLoader2.gets("pythonScriptsPath");
-    //    if (scriptPath.substr(0, 2) == "..") { // Make path absolute
-    //      std::string cwdString = File::currentPath();
-    //      scriptPath =
-    //          cwdString.substr(0, cwdString.rfind('/', cwdString.size() - 2))
-    //          + scriptPath.substr(2);
-    //    }
-
-    //    std::string pythonBinaryConf = configLoader2.gets("pythonBinary");
-
-    //    std::replace(scriptPath.begin(), scriptPath.end(), '\\', '/');
-    //    std::replace(pythonBinaryConf.begin(), pythonBinaryConf.end(), '\\',
-    //    '/'); pythonScriptPath.set(scriptPath);
-    //    pythonBinary.set(pythonBinaryConf);
-
-    //    std::string fontPath = configLoader2.gets("font");
-    //    std::replace(fontPath.begin(), fontPath.end(), '\\', '/');
-    //    font.set(fontPath);
-
     ///
     config.setAppName("casm_viewer");
     config.registerParameter(fontSize);
@@ -1321,12 +1294,14 @@ public:
 
     tincServer << mDataset;
 
+    // Expose buffers from renderers to TINC
     dataDisplays[0]->mHistoryRender.trajectoryWidth.max(100);
     dataDisplays[0]->mTrajRender.trajectoryWidth.max(100);
 
     dataDisplays[0]->mHistoryRender.registerWithTincServer(tincServer);
     dataDisplays[0]->mTrajRender.registerWithTincServer(tincServer);
 
+    // Start TINC server
     tincServer.start();
 
     //    percoTools.init();
@@ -1345,24 +1320,10 @@ public:
             if (display->mDatasetManager.mGlobalRoot.size() > 0 &&
                 display->mDatasetManager.mGlobalRoot != "./") {
               datasetPath = display->mDatasetManager.mGlobalRoot;
-              //              if
-              //              (!File::exists(display->mDatasetManager.mGlobalRoot
-              //              + value +
-              //                                "/presets")) {
-              //                Dir::make(value + "/presets");
-              //              }
-              //              if
-              //              (!File::exists(display->mDatasetManager.mGlobalRoot
-              //              + value +
-              //                                "/positionPresets")) {
-              //                Dir::make(value + "/positionPresets");
-              //              }
             }
             datasetPath += value + "/presets";
             presetHandler->setRootPath(datasetPath);
             positionPresets->setRootPath(datasetPath);
-            //            presetHandler->setSubDirectory(value + "/presets");
-            //            positionPresets->setSubDirectory(value + "/presets");
             presetHandler->setCurrentPresetMap("default", true);
             std::cout << "Preset Handler sub dir set to " << value << std::endl;
             updateTitle();
@@ -1699,6 +1660,18 @@ public:
              d->mDatasetManager.sampleProcessorGraph.getProcessors()) {
           proc->setVerbose(value != 0.0);
         }
+      }
+    });
+
+    mComputeCache.registerChangeCallback([&](float value) {
+      if (value != 0.0) {
+        dataDisplays[vdvBundle.currentBundle()]
+            ->mDatasetManager.mParameterSpace.sweep(
+                dataDisplays[vdvBundle.currentBundle()]
+                    ->mDatasetManager.sampleProcessorGraph);
+      } else {
+        dataDisplays[vdvBundle.currentBundle()]
+            ->mDatasetManager.mParameterSpace.stopSweep();
       }
     });
   }

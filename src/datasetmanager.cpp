@@ -54,7 +54,7 @@ void DatasetManager::initializeComputation() {
         bool isMultiId = false;
 
         for (auto dim : mParameterSpace.getDimensions()) {
-          if (dim->getCurrentIds().size() > 1) {
+          if (dim->getSpaceStride() > 1) {
             isMultiId = true;
             break;
           }
@@ -158,6 +158,7 @@ void DatasetManager::initializeComputation() {
   labelProcessor.setVerbose(verbose);
 
   graphGenerator.setOutputFileNames({"graph.png"});
+  graphGenerator.ignoreFail = true; // It doesn't matter if graph fails.
 
   graphGenerator.prepareFunction = [&]() {
     std::string datasetId = mCurrentDataset.get();
@@ -802,15 +803,25 @@ std::string DatasetManager::currentDataset() { return mLoadedDataset; }
 
 std::string DatasetManager::getSubDir() {
 
-  auto commonId = mParameterSpace.getCommonId();
-  if (commonId.size() == 0) {
+  bool isMultiId = false;
+
+  for (auto dim : mParameterSpace.getDimensions()) {
+    if (dim->getSpaceStride() > 1) {
+      isMultiId = true;
+      break;
+    }
+  }
+  if (isMultiId) {
+    return mParameterSpace.getCommonId();
+
+  } else {
     for (auto ps : mParameterSpace.getDimensions()) {
       if (ps->getSpaceRepresentationType() == ParameterSpaceDimension::ID) {
         return ps->getCurrentId();
       }
     }
   }
-  return commonId;
+  return "";
 }
 
 void DatasetManager::updateText() {

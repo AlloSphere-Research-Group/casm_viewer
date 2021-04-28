@@ -226,7 +226,9 @@ public:
 
     char *szBuff;
     szBuff = std::getenv("USERPROFILE");
-    mPreviousBrowseDir = szBuff;
+    if (szBuff) {
+      mPreviousBrowseDir = szBuff;
+    }
 
     // Initialize default view.
     dataDisplays[0]->graphPickable.pose.setPos(Vec3d(-2.0, 0.8, -.75));

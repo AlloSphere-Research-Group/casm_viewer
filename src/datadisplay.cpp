@@ -41,94 +41,17 @@ void DataDisplay::init() {
   }
   synth.gain(5.0);
 
-  mPickableManager << graphPickable << parallelPickable << perspectivePickable;
-
-  graphPickable.bb.set(Vec3f(-1.2f, -0.9f, -0.05f), Vec3f(1.2f, 0.9f, 0.0f));
-  graphPickable.pose = Pose(Vec3d(-2.0, 0.2, -.75), Quatf());
-  graphPickable.scale = 0.2f;
-
-  parallelPickable.bb.setCenterDim(Vec3f(), Vec3f(4, 4, 0.1f));
-  parallelPickable.pose = Pose(Vec3d(-0.68, 1.1, -1.5), Quatf());
-  parallelPickable.scale = 0.4f;
-
-  perspectivePickable.pose =
-      Pose(Vec3d(0.55, 0.35, -0.7), Quatf().fromEuler(75.0 * M_DEG2RAD, 0, 0));
-  perspectivePickable.scale = 0.02f;
-  //    perspectivePickable.scaleVec = mPerspectiveScale.get();
-  // perspectivePickable.addChild(rh);
-  // rh.size = 25;
-  // rh.dr = 2.2;
-
-  perspectivePickable.addChild(slicePickable);
-  perspectivePickable.testChildren = false;
-  perspectivePickable.containChildren = true;
-
-  addSphere(mMarker, 1, 6, 6);
-  mMarker.update();
-
-  EasyFBOSetting setting;
-  setting.mUseMipmap = true;
-  setting.filterMin = GL_LINEAR_MIPMAP_LINEAR;
-  setting.filterMag = GL_LINEAR_MIPMAP_LINEAR;
-
-  // Settings for parallel projection rendering fbo
-  fbo_iso.init(2048, 2048, setting);
-
-  mGraphTexture.mipmap(true);
-  for (auto &graph : mGraphTextures) {
-    graph.mipmap(true);
-  }
-
-  int num_verts_added;
-  Mat4f transform;
-
-  // Prepare axis mesh
-  // x
-  num_verts_added = addCube(axis);
-  transform.setIdentity();
-  transform *= Matrix4f::rotation(M_PI / 2, 2, 0); // rotate from z to x
-  transform *= Matrix4f::translation(0, 0, 0.3);
-  transform *= Matrix4f::scaling(0.02, 0.02, 1);
-  axis.transform(transform, axis.vertices().size() - num_verts_added);
-  for (int i = 0; i < num_verts_added; i += 1) {
-    axis.color(1, 0, 0);
-  }
-
-  // y
-  num_verts_added = addCube(axis);
-  transform.setIdentity();
-  transform *= Matrix4f::rotation(M_PI / 2, 2, 1); // rotate from z to y
-  transform *= Matrix4f::translation(0, 0, 0.3);
-  transform *= Matrix4f::scaling(0.02, 0.02, 1);
-  axis.transform(transform, axis.vertices().size() - num_verts_added);
-  for (int i = 0; i < num_verts_added; i += 1) {
-    axis.color(0, 1, 0);
-  }
-
-  // z
-  num_verts_added = addCube(axis);
-  transform.setIdentity();
-  transform *= Matrix4f::translation(0, 0, 0.3);
-  transform *= Matrix4f::scaling(0.02, 0.02, 1);
-  axis.transform(transform, axis.vertices().size() - num_verts_added);
-  for (int i = 0; i < num_verts_added; i += 1) {
-    axis.color(0, 0, 1);
-  }
-  axis.update();
-
   // We need to process the callbacks for this within the graphics thread.
-  mDatasetManager.mCurrentDataset.setSynchronousCallbacks();
+  mDatasetManager.mCurrentDataset.setSynchronousCallbacks(false);
   mDatasetManager.mCurrentDataset.registerChangeCallback(
       [&](std::string value) {
-        if (value != mDatasetManager.mCurrentDataset.get()) {
-          // First force application of value
-          lastError.set("");
-          mDatasetManager.mCurrentDataset.setLocking(value);
-          if (!initDataset()) {
-            lastError.set(mDatasetManager.lastError);
-          }
-          resetSlicing();
+        // First force application of value
+        lastError.set("");
+        //        mDatasetManager.mCurrentDataset.setNoCalls(value);
+        if (!initDataset()) {
+          lastError.set(mDatasetManager.lastError);
         }
+        resetSlicing();
       });
 
   mDatasetManager.mShellSiteTypes.registerChangeCallback([&](uint16_t value) {
@@ -256,10 +179,12 @@ void DataDisplay::init() {
     slicePickable.bb.set(slicePickable.bb.min, m);
   });
 
-  atomrender.mSlicingPlanePoint.registerChangeCallback([this](Vec3f v) {
+  atomrender.mSlicingPlaneCorner.registerChangeCallback([this](Vec3f v) {
     auto p = Pose(v - slicePickable.bb.min, slicePickable.pose.get().quat());
     slicePickable.pose.setNoCalls(p);
   });
+
+  atomrender.mSlicingPlaneNormal.setHint("hide", 0.0);
 
   atomrender.init();
 
@@ -277,7 +202,7 @@ void DataDisplay::init() {
 
   slicePickable.pose.registerChangeCallback([this](Pose pose) {
     auto p = pose.pos() + slicePickable.bb.min;
-    atomrender.mSlicingPlanePoint.setNoCalls(p);
+    atomrender.mSlicingPlaneCorner.setNoCalls(p);
   });
 
   backgroundColor.setHint("showAlpha", 1.0);
@@ -348,8 +273,7 @@ void DataDisplay::init() {
   bundle << mPerspectiveRotY;
   bundle << atomrender.mSlicingPlaneNormal;
   bundle << atomrender.mSliceRotationPitch << atomrender.mSliceRotationRoll;
-  bundle << atomrender.mSlicingPlanePoint << atomrender.mSlicingPlaneThickness
-         << mLayerScaling;
+  bundle << atomrender.mSlicingPlaneCorner << atomrender.mSlicingPlaneThickness;
   bundle << mShowGrid << mGridType << mGridSpacing << mGridXOffset
          << mGridYOffset;
   bundle << mBillboarding;
@@ -374,6 +298,109 @@ void DataDisplay::init() {
     bundle << *mColorList.back();
   }
   bundle << mColorTrigger;
+
+  // Pickable
+
+  mPickableManager << graphPickable << parallelPickable << perspectivePickable;
+
+  graphPickable.bb.set(Vec3f(-1.2f, -0.9f, -0.05f), Vec3f(1.2f, 0.9f, 0.0f));
+  graphPickable.pose = Pose(Vec3d(-2.0, 0.2, -.75), Quatf());
+  graphPickable.scale = 0.2f;
+
+  parallelPickable.bb.setCenterDim(Vec3f(), Vec3f(4, 4, 0.1f));
+  parallelPickable.pose = Pose(Vec3d(-0.68, 1.1, -1.5), Quatf());
+  parallelPickable.scale = 0.4f;
+
+  perspectivePickable.pose =
+      Pose(Vec3d(0.55, 0.35, -0.7), Quatf().fromEuler(75.0 * M_DEG2RAD, 0, 0));
+  perspectivePickable.scale = 0.02f;
+  //    perspectivePickable.scaleVec = mPerspectiveScale.get();
+  // perspectivePickable.addChild(rh);
+  // rh.size = 25;
+  // rh.dr = 2.2;
+
+  perspectivePickable.addChild(slicePickable);
+  perspectivePickable.testChildren = false;
+  perspectivePickable.containChildren = true;
+
+  initGL();
+}
+
+void DataDisplay::initGL() {
+
+  addSphere(mMarker, 1, 6, 6);
+  mMarker.update();
+
+  // Box mesh for slicing
+  boxMesh.reset();
+  boxMesh.primitive(Mesh::LINES);
+
+  const float x[2] = {0, 1};
+  const float y[2] = {0, 1};
+  const float z[2] = {0, 1};
+
+  for (int k = 0; k <= 1; k++) {
+    for (int j = 0; j <= 1; j++) {
+      for (int i = 0; i <= 1; i++) {
+        boxMesh.vertex(x[i], y[j], z[k]);
+      }
+    }
+  }
+
+  static const int I[] = {0, 1, 2, 3, 4, 5, 6, 7, 0, 2, 1, 3,
+                          4, 6, 5, 7, 0, 4, 1, 5, 2, 6, 3, 7};
+  boxMesh.index(I, sizeof(I) / sizeof(*I), 0);
+  boxMesh.update();
+
+  EasyFBOSetting setting;
+  setting.mUseMipmap = true;
+  setting.filterMin = GL_LINEAR_MIPMAP_LINEAR;
+  setting.filterMag = GL_LINEAR_MIPMAP_LINEAR;
+
+  // Settings for parallel projection rendering fbo
+  fbo_iso.init(2048, 2048, setting);
+
+  mGraphTexture.mipmap(true);
+  for (auto &graph : mGraphTextures) {
+    graph.mipmap(true);
+  }
+
+  int num_verts_added;
+  Mat4f transform;
+
+  // Prepare axis mesh
+  // x
+  num_verts_added = addCube(axis);
+  transform.setIdentity();
+  transform *= Matrix4f::rotation(M_PI / 2, 2, 0); // rotate from z to x
+  transform *= Matrix4f::translation(0, 0, 0.3);
+  transform *= Matrix4f::scaling(0.02, 0.02, 1);
+  axis.transform(transform, axis.vertices().size() - num_verts_added);
+  for (int i = 0; i < num_verts_added; i += 1) {
+    axis.color(1, 0, 0);
+  }
+
+  // y
+  num_verts_added = addCube(axis);
+  transform.setIdentity();
+  transform *= Matrix4f::rotation(M_PI / 2, 2, 1); // rotate from z to y
+  transform *= Matrix4f::translation(0, 0, 0.3);
+  transform *= Matrix4f::scaling(0.02, 0.02, 1);
+  axis.transform(transform, axis.vertices().size() - num_verts_added);
+  for (int i = 0; i < num_verts_added; i += 1) {
+    axis.color(0, 1, 0);
+  }
+
+  // z
+  num_verts_added = addCube(axis);
+  transform.setIdentity();
+  transform *= Matrix4f::translation(0, 0, 0.3);
+  transform *= Matrix4f::scaling(0.02, 0.02, 1);
+  axis.transform(transform, axis.vertices().size() - num_verts_added);
+  for (int i = 0; i < num_verts_added; i += 1) {
+    axis.color(0, 0, 1);
+  }
+  axis.update();
 }
 
 bool DataDisplay::initDataset() {
@@ -473,7 +500,7 @@ void DataDisplay::prepare(Graphics &g, Matrix4f &transformMatrix) {
     updateDisplayBuffers();
   }
   updatePercolationBuffers();
-  //  prepareParallelProjection(g, transformMatrix);
+  prepareParallelProjection(g, transformMatrix);
 }
 
 void DataDisplay::draw(Graphics &g) { // Load data after drawing frame to allow
@@ -508,14 +535,27 @@ void DataDisplay::setFont(string name, float size) {
   if (File::exists(name)) {
     if (!mLabelFont.load(name.c_str(), size, 1024)) {
       std::cout << "Failed to load font: " << name << std::endl;
+#ifdef AL_WINDOWS
       if (!mLabelFont.load("C:\\Windows\\Fonts\\arial.ttf", size, 1024)) {
+        std::cout
+            << "Attempt to load alternate font: C:\\Windows\\Fonts\\arial.ttf"
+            << std::endl;
       }
-
+#elif defined(AL_LINUX)
       if (!mLabelFont.load(
               "/usr/share/fonts/truetype/ttf-bitstream-vera/Vera.ttf", size,
               1024)) {
-        throw;
+        std::cout << "Attempt to load alternate font: "
+                     "/usr/share/fonts/truetype/ttf-bitstream-vera/Vera.ttf"
+                  << std::endl;
       }
+#elif defined(AL_OSX)
+      if (!mLabelFont.load("/Library/Fonts/Arial Unicode.ttf", size, 1024)) {
+        std::cout << "Attempt to load alternate font: /Library/Fonts/Arial "
+                     "Unicode.ttf"
+                  << std::endl;
+      }
+#endif
     } else {
       std::cout << "Loaded font " << name << std::endl;
     }
@@ -567,6 +607,16 @@ void DataDisplay::previousTime() {
 void DataDisplay::nextLayer() { atomrender.nextLayer(); }
 
 void DataDisplay::previousLayer() { atomrender.previousLayer(); }
+
+void DataDisplay::resetSlicing() {
+  atomrender.mSlicingPlaneCorner.set(slicePickable.bb.min);
+
+  atomrender.mSlicingPlaneThickness = atomrender.dataBoundary.dim.z;
+  atomrender.mSlicingPlaneSize =
+      std::max(atomrender.dataBoundary.dim.x, atomrender.dataBoundary.dim.y);
+  atomrender.mSliceRotationRoll.set(0);
+  atomrender.mSliceRotationPitch.set(0);
+}
 
 void DataDisplay::updateDisplayBuffers() {
   //  std::map<string, int> elementCounts;
@@ -681,6 +731,10 @@ void DataDisplay::updateDisplayBuffers() {
     auto allPositions = mDatasetManager.occupationData.get();
     auto templateDataIt = mDatasetManager.templateData.begin();
     for (auto &atom : *allPositions) {
+      if (templateDataIt == mDatasetManager.templateData.end()) {
+        std::cout << "Template and occupation size mismatch" << std::endl;
+        break;
+      }
       std::string atomName =
           mDatasetManager.mCurrentBasis[atom.basis_index]["occupant_dof"]
                                        [atom.occupancy_dof];
@@ -698,10 +752,6 @@ void DataDisplay::updateDisplayBuffers() {
         mDataBoundaries.includePoint(vec);
       }
       templateDataIt++;
-      if (templateDataIt == mDatasetManager.templateData.end()) {
-        std::cout << "Template and occupation size mismatch" << std::endl;
-        break;
-      }
     }
   }
 
@@ -791,27 +841,28 @@ void DataDisplay::prepareParallelProjection(Graphics &g,
 
   float ar = float(fbo_iso.width()) / fbo_iso.height();
   //        float rangeSizeZ = mDataBoundaries.maxz - mDataBoundaries.minz;
-  float centerX = (mDataBoundaries.max.x + mDataBoundaries.min.x) / 2.0f;
-  float centerY = (mDataBoundaries.max.y + mDataBoundaries.min.y) / 2.0f;
-  float rangeSizeX = mDataBoundaries.max.x - mDataBoundaries.min.x;
-  float rangeSizeY = mDataBoundaries.max.y - mDataBoundaries.min.y;
-  float maxrange = std::max(rangeSizeX, rangeSizeY);
+  //  float centerX = (mDataBoundaries.max.x + mDataBoundaries.min.x) / 2.0f;
+  //  float centerY = (mDataBoundaries.max.y + mDataBoundaries.min.y) / 2.0f;
+  float maxrange =
+      std::max(atomrender.dataBoundary.dim.x, atomrender.dataBoundary.dim.y);
   float padding = maxrange * 0.05f;
-  float left = centerX - 0.5f * maxrange * mLayerScaling - padding;
-  float right = centerX + 0.5f * maxrange * mLayerScaling + padding;
-  float top = centerY + 0.5f * maxrange * mLayerScaling + padding;
-  float bottom = centerY - 0.5f * maxrange * mLayerScaling - padding;
-  //        const float near = mDataBoundaries.minz + (mNearClip * rangeSizeZ);
-  //        const float farClip = mDataBoundaries.minz + (mFarClip *
-  //        rangeSizeZ); float minxy = std::min(mDataBoundaries.minx,
-  //        mDataBoundaries.miny);
+
+  float scaling = atomrender.mSlicingPlaneSize;
+  //  float left = centerX - 0.5f * maxrange * scaling - padding;
+  //  float right = centerX + 0.5f * maxrange * scaling + padding;
+  //  float top = centerY + 0.5f * maxrange * scaling + padding;
+  //  float bottom = centerY - 0.5f * maxrange * scaling - padding;
+
+  float left = atomrender.mSlicingPlaneCorner.get().x;
+  float right =
+      atomrender.mSlicingPlaneCorner.get().x + atomrender.mSlicingPlaneSize;
+  float top =
+      atomrender.mSlicingPlaneCorner.get().y + atomrender.mSlicingPlaneSize;
+  float bottom = atomrender.mSlicingPlaneCorner.get().y;
+
   g.projMatrix(Matrix4f::ortho(ar * left, ar * right, bottom, top,
                                mDataBoundaries.min.z - 100,
                                mDataBoundaries.max.z + 100));
-
-  double scalingFactor = 1.0 / (mDataBoundaries.max.y - mDataBoundaries.min.y);
-
-  // std::cout << near << "..." << farClip <<std::endl;
 
   // save for later
   GLboolean last_enable_scissor_test = glIsEnabled(GL_SCISSOR_TEST);
@@ -826,8 +877,8 @@ void DataDisplay::prepareParallelProjection(Graphics &g,
   g.clear(backgroundColor);
 
   g.pushViewMatrix();
-  g.viewMatrix(getLookAt(atomrender.mSlicingPlanePoint,
-                         atomrender.mSlicingPlanePoint.get() -
+  g.viewMatrix(getLookAt(atomrender.mSlicingPlaneCorner,
+                         atomrender.mSlicingPlaneCorner.get() -
                              atomrender.mSlicingPlaneNormal.get().normalized(),
                          {0.0f, 1.0f, 0.0f}));
 
@@ -838,7 +889,7 @@ void DataDisplay::prepareParallelProjection(Graphics &g,
 
   if (mShowGrid == 1.0f) {
     mGridMesh.reset();
-    addRect(mGridMesh, 0, -2.0, 0.1f / (maxrange * mLayerScaling), 4.0f);
+    addRect(mGridMesh, 0, -2.0, 0.1f / (scaling), 4.0f);
     mGridMesh.update();
     if (backgroundColor.get().luminance() > 0.5f) {
       g.color(0.2f);
@@ -849,20 +900,20 @@ void DataDisplay::prepareParallelProjection(Graphics &g,
       if (mGridType.getCurrent() == "square") {
         g.pushMatrix();
         g.translate(mGridXOffset, mGridYOffset + mGridSpacing * i, 0);
-        g.scale(maxrange * mLayerScaling);
+        g.scale(scaling);
         g.rotate(90, 0, 0, 1);
         g.draw(mGridMesh);
         g.popMatrix();
         g.pushMatrix();
         g.translate(mGridXOffset + mGridSpacing * i, mGridYOffset, 0);
-        g.scale(maxrange * mLayerScaling);
+        g.scale(scaling);
         g.draw(mGridMesh);
         g.popMatrix();
       } else if (mGridType.getCurrent() == "triangle") {
         float spacing = 0.86602540378f * mGridSpacing; // sin(60)
         g.pushMatrix();
         g.translate(mGridXOffset, mGridYOffset + spacing * i, 0);
-        g.scale(maxrange * mLayerScaling);
+        g.scale(scaling);
         g.rotate(90, 0, 0, 1);
         g.draw(mGridMesh);
         g.popMatrix();
@@ -870,14 +921,14 @@ void DataDisplay::prepareParallelProjection(Graphics &g,
         g.translate(mGridXOffset, mGridYOffset, 0);
         g.rotate(30, 0, 0, 1);
         g.translate(spacing * i, 0, 0);
-        g.scale(maxrange * mLayerScaling);
+        g.scale(scaling);
         g.draw(mGridMesh);
         g.popMatrix();
         g.pushMatrix();
         g.translate(mGridXOffset, mGridYOffset, 0);
         g.rotate(-30, 0, 0, 1);
         g.translate(spacing * i, 0, 0);
-        g.scale(maxrange * mLayerScaling);
+        g.scale(scaling);
         g.draw(mGridMesh);
         g.popMatrix();
       }
@@ -902,28 +953,26 @@ void DataDisplay::prepareParallelProjection(Graphics &g,
       // now draw data with custom shader
       g.shader(atomrender.instancingMesh.shader);
       g.update(); // sends modelview and projection matrices
-                  //      g.shader().uniform("dataScale", scalingFactor);
-      //      if (atomrender.mShowRadius == 1.0f) {
-      //        g.shader().uniform("markerScale",
-      //                           data.second.radius *
-      //                           atomrender.mAtomMarkerSize *
-      //                               atomrender.mSliceAtomMarkerFactor);
-      //      } else {
-      //        g.shader().uniform("markerScale",
-      //                           atomrender.mAtomMarkerSize *
-      //                               atomrender.mSliceAtomMarkerFactor);
-      //      }
-      g.shader().uniform("is_line", 0.0f);
+      g.shader().uniform("dataScale", atomrender.mDataScale.get());
       g.shader().uniform("is_omni", 0.0f);
+      g.shader().uniform("eye_sep", g.lens().eyeSep() * g.eye() / 2.0f);
+      //      g.shader().uniform("foc_len", g.lens().focalLength());
 
-      g.shader().uniform("plane_point", atomrender.mSlicingPlanePoint.get());
+      g.shader().uniform("alpha", 1.0);
+      g.shader().uniform("markerScale", atomrender.mAtomMarkerSize);
+
+      g.shader().uniform("plane_point", atomrender.mSlicingPlaneCorner.get());
       g.shader().uniform("plane_normal",
                          atomrender.mSlicingPlaneNormal.get().normalized());
+
+      // TODO add rotation vectors
+
+      g.shader().uniform("slice_size", atomrender.mSlicingPlaneSize.get());
       g.shader().uniform("second_plane_distance",
                          atomrender.mSlicingPlaneThickness);
-
       g.shader().uniform("clipped_mult", 0.0);
 
+      g.shader().uniform("is_line", 0.0f);
       atomrender.instancingMesh.draw();
     }
 
@@ -971,7 +1020,16 @@ void DataDisplay::drawPerspective(Graphics &g) {
       g.pushMatrix();
       g.scale(perspectivePickable.scale);
       atomrender.applyTransformations(g);
+      {
+        g.pushMatrix();
+        g.polygonLine();
+        g.scale(atomrender.dataBoundary.dim);
+        g.color(0.3f, 0.3f, 0.4f, 0.6f);
+        g.draw(boxMesh);
+        g.popMatrix();
+      }
       atomrender.onProcess(g);
+
       g.popMatrix();
     }
 
@@ -1004,46 +1062,22 @@ void DataDisplay::drawPerspective(Graphics &g) {
 
     if (mDisplaySlicing.get() == 1.0) {
       g.pushMatrix();
-      boxMesh.reset();
-      boxMesh.primitive(Mesh::LINES);
 
-      const float x[2] = {slicePickable.bb.max.x, slicePickable.bb.min.x};
-      const float y[2] = {slicePickable.bb.max.y, slicePickable.bb.min.y};
-      const float z[2] = {slicePickable.bb.max.z, slicePickable.bb.min.z};
+      g.scale(perspectivePickable.scale);
+      atomrender.applyTransformations(g);
 
-      for (int k = 0; k <= 1; k++) {
-        for (int j = 0; j <= 1; j++) {
-          for (int i = 0; i <= 1; i++) {
-            boxMesh.vertex(x[i], y[j], z[k]);
-          }
-        }
-      }
-
-      static const int I[] = {0, 1, 2, 3, 4, 5, 6, 7, 0, 2, 1, 3,
-                              4, 6, 5, 7, 0, 4, 1, 5, 2, 6, 3, 7};
-      boxMesh.index(I, sizeof(I) / sizeof(*I), 0);
-      boxMesh.update();
-      g.shader().uniform("eye_sep", perspectivePickable.scale *
-                                        g.lens().eyeSep() * g.eye() / 2.0f);
-
-      g.shader().uniform("eye_sep",
-                         /*perspectivePickable.scale * */ g.lens().eyeSep() *
-                             g.eye() / 2.0f);
-
-      //      glLineWidth(5);
-      g.polygonLine();
-      g.color(0.8f, 0.8f, 1.0f, 0.9f);
-      g.scale(atomrender.mDataScale.get());
-      // g.translate(atomrender.mSlicingPlanePoint.get());
-      g.translate(slicePickable.pose.get().pos());
+      g.translate(atomrender.mSlicingPlaneCorner.get());
       g.rotate(atomrender.mSliceRotationPitch * 360.0f / (M_2PI), 1.0f, 0.0,
                0.0);
       g.rotate(atomrender.mSliceRotationRoll * 360.0f / (M_2PI), 0.0, -1.0f,
                0.0);
+      g.scale(atomrender.mSlicingPlaneSize, atomrender.mSlicingPlaneSize,
+              atomrender.mSlicingPlaneThickness.get());
+
+      g.polygonLine();
+      g.color(0.8f, 0.8f, 1.0f, 0.9f);
       g.draw(boxMesh);
       g.polygonFill();
-      //      glLineWidth(1);
-
       g.popMatrix();
     }
 
@@ -1097,7 +1131,7 @@ void DataDisplay::drawPerspective(Graphics &g) {
   g.polygonFill();
   g.depthTesting(false);
   g.blendAdd();
-  {
+  { // Draw label
     g.pushMatrix();
     // TODO billboard this text
     perspectivePickable.updateAABB();

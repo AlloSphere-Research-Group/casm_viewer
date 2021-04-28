@@ -78,7 +78,7 @@ struct ObjectTransformHandler : WindowEventHandler {
 class ScriptRunner {
 public:
   void init() {
-    kmcPercoTools.setScriptName("python\\tinc_kmc_paths_perco.py");
+    kmcPercoTools.setScriptName("..\\python\\tinc_kmc_paths_perco.py");
     asyncWrapper.setProcessor(&kmcPercoTools);
     kmcPercoTools.enableJsonConfig(false);
   }
@@ -132,7 +132,7 @@ public:
   Trigger mAlignChempots{"AlignChempots"};
 
   ParameterBool mDebugScripts{"DebugScripts"};
-  //  Trigger mRecomputeSpace{"RecomputeSpace"};
+  ParameterBool mComputeCache{"ComputeCache"};
 
   ParameterBool mAutoAdvance{"autoAdvance"};
   Parameter mAutoAdvanceFreq{"autoAdvanceFreq", "", 5, 0.25, 10.0};
@@ -149,7 +149,7 @@ public:
 
   // Settings
   ParameterColor backgroundColor{"background", "",
-                                 Color(0.0f, 0.0f, 0.0f, 1.0f)};
+                                 Color(0.12f, 0.12f, 0.12f, 1.0f)};
   ParameterColor sliceBackground{"sliceBackground", "",
                                  Color(0.0f, 0.0f, 0.0f, 1.0f)};
   ParameterString font{"font"};
@@ -184,7 +184,7 @@ public:
   ProcessorScript transfmatExtractor{"TransfmatExtractor"};
   ProcessorScript templateGen{"TemplateGenerator"};
 
-  ScriptRunner percoTools;
+  //  ScriptRunner percoTools;
 
   TincServer tincServer;
 
@@ -205,7 +205,7 @@ public:
 
   void onInit() override {
     presetHandler = std::make_unique<PresetHandler>();
-    positionPresets = std::make_unique<PresetHandler>("positionPresets");
+    positionPresets = std::make_unique<PresetHandler>();
     sequencer = std::make_unique<PresetSequencer>();
     recorder = std::make_unique<SequenceRecorder>();
     presetServer = std::make_unique<PresetServer>();
@@ -223,6 +223,10 @@ public:
         dataDisplays.back()->mDatasetManager.mGlobalRoot = dataRoot;
       }
     }
+
+    char *szBuff;
+    szBuff = std::getenv("USERPROFILE");
+    mPreviousBrowseDir = szBuff;
 
     // Initialize default view.
     dataDisplays[0]->graphPickable.pose.setPos(Vec3d(-2.0, 0.8, -.75));
@@ -352,6 +356,10 @@ public:
 
   virtual void onAnimate(double /*dt*/) override {
     object_transform.step();
+
+    if (mWindowTitle.processChange()) {
+      title(mWindowTitle.get());
+    }
     if (isPrimary()) {
       if (showGui) {
         prepareGui();
@@ -436,9 +444,6 @@ public:
 
   virtual void onDraw(Graphics &g) override {
     g.clear(backgroundColor);
-    if (mWindowTitle.processChange()) {
-      title(mWindowTitle.get());
-    }
     drawScene(g);
     if (isPrimary()) {
       processScreenshot();
@@ -469,14 +474,6 @@ public:
         case 'v':
           dataDisplays[vdvBundle.currentBundle()]->mPerspectiveRotY =
               dataDisplays[vdvBundle.currentBundle()]->mPerspectiveRotY - 5;
-          break;
-        case '[':
-          dataDisplays[vdvBundle.currentBundle()]->mLayerScaling =
-              dataDisplays[vdvBundle.currentBundle()]->mLayerScaling + 0.05f;
-          break;
-        case ']':
-          dataDisplays[vdvBundle.currentBundle()]->mLayerScaling =
-              dataDisplays[vdvBundle.currentBundle()]->mLayerScaling - 0.05f;
           break;
         case '-':
           mJumpLayerNeg.trigger(); // This will trigger a change
@@ -791,7 +788,6 @@ public:
         ImGui::Text("Data root: %s", dataRoot.c_str());
       }
       ParameterGUI::draw(&mRecentDatasets);
-      //      ParameterGUI::draw(&mRecomputeSpace);
       //      ImGui::Separator();
       // Directory GUI
       if (mDatasetSelector->isActive()) {
@@ -800,8 +796,6 @@ public:
           if (selectedItems.count() > 0) {
             auto selection = selectedItems[0];
             mDataset.set(File::conformPathToOS(selection.filepath()));
-            //            loadDataset(selection.filepath(),
-            //            vdvBundle.currentBundle());
             mPreviousBrowseDir = selection.path();
           }
           delete mDatasetSelector;
@@ -826,17 +820,12 @@ public:
       if (this->dataDisplays[vdvBundle.currentBundle()]
               ->mDatasetManager.mParameterSpace.getDimensions()
               .size() > 0) {
-        if (mAutoAdvance == 0.0) {
-          int currentBundle = vdvBundle.currentBundle();
 
+        ParameterGUI::draw(&mComputeCache);
+        if (mAutoAdvance == 0.0) {
           ImGui::Separator();
           vis::drawControls(this->dataDisplays[vdvBundle.currentBundle()]
                                 ->mDatasetManager.mParameterSpace);
-          // auto &ps = this->dataDisplays[vdvBundle.currentBundle()]
-          //    ->mDatasetManager.mParameterSpace;
-          // for (size_t i = 0; i < ps.dimensions.size(); i++) {
-          //    gui::drawControl(ps.dimensions[i]);
-          //}
           ImGui::Separator();
         }
         ParameterGUI::drawParameterMeta(
@@ -854,15 +843,7 @@ public:
                                std::to_string(mAutoAdvanceFreq);
             ImGui::Text("%s", text.c_str());
           }
-          //          ParameterGUI::drawParameterMeta(
-          //              &this->dataDisplays[vdvBundle.currentBundle()]
-          //                   ->mCumulativeTrajectory);
-          //          ParameterGUI::drawParameterMeta(
-          //              &this->dataDisplays[vdvBundle.currentBundle()]
-          //                   ->mIndividualTrajectory);
         }
-        //          ImGui::Separator();
-        //          ParameterGUI::drawParameterMeta(&mViewMenu);
         ParameterGUI::drawTrigger(&mSaveGraphics);
         ImGui::SameLine();
         ParameterGUI::drawParameterMeta(&ResetSlicing);
@@ -908,10 +889,16 @@ public:
           ImGui::Indent(20.0);
           ParameterGUI::drawParameterMeta(
               &this->dataDisplays[vdvBundle.currentBundle()]
+                   ->atomrender.mSlicingPlaneCorner);
+          ParameterGUI::drawParameterMeta(
+              &this->dataDisplays[vdvBundle.currentBundle()]
                    ->atomrender.mSlicingPlaneNormal);
           ParameterGUI::drawParameterMeta(
               &this->dataDisplays[vdvBundle.currentBundle()]
                    ->atomrender.mSlicingPlaneThickness);
+          ParameterGUI::drawParameterMeta(
+              &this->dataDisplays[vdvBundle.currentBundle()]
+                   ->atomrender.mSlicingPlaneSize);
 
           ParameterGUI::drawParameterMeta(
               &this->dataDisplays[vdvBundle.currentBundle()]
@@ -920,7 +907,6 @@ public:
           ParameterGUI::drawParameterMeta(&mJumpLayerNeg);
           ImGui::SameLine();
           ParameterGUI::drawParameterMeta(&mJumpLayerPos);
-          //        ParameterGUI::drawParameterMeta(&CalculateSlicing);
           ImGui::SameLine();
           ParameterGUI::drawParameterMeta(&pitchAngleStep);
           ParameterGUI::drawParameterMeta(&stepPitchAngleNeg);
@@ -956,9 +942,6 @@ public:
                                         ->parallelPickable.bundle);
           ParameterGUI::drawBundle(&dataDisplays[vdvBundle.currentBundle()]
                                         ->perspectivePickable.bundle);
-          //          ParameterGUI::drawBundle(&dataDisplays[vdvBundle.currentBundle()]->slicePickable.bundle);
-          //          // Slice pickable is already exposed enough above
-
           ImGui::Unindent(20.0);
         }
         ParameterGUI::drawPresetHandler(positionPresets.get());
@@ -1060,9 +1043,9 @@ public:
     ImGui::SetNextWindowPos(ImVec2(400, 10), ImGuiCond_FirstUseEver);
     ImGui::SetNextWindowSize(ImVec2(300, 400), ImGuiCond_FirstUseEver);
     ImGui::Begin("TINC controls");
-    if (ImGui::Button("Start KMC analysis script")) {
-      percoTools.start();
-    }
+    //    if (ImGui::Button("Start KMC analysis script")) {
+    //      percoTools.start();
+    //    }
     vis::drawTincServerInfo(tincServer, true);
     for (auto *param : params) {
       if (param->getGroup() == "casm") {
@@ -1108,33 +1091,14 @@ public:
 
 // Set default values
 #ifdef AL_WINDOWS
-    font.setNoCalls("C:\\Windows\\Fonts\\arial.ttf");
+    font.setNoCalls(al::Font::defaultFont());
 #elif defined(AL_OSX)
-    font.setNoCalls(string("/Library/Fonts/arial.ttf"));
+    font.setNoCalls(al::Font::defaultFont());
 #else
     font.setNoCalls(string("/usr/share/fonts/truetype/freefont/FreeMono.ttf"));
 #endif
     pythonScriptsPath.setNoCalls(string("./python"));
     pythonBinary.setNoCalls(string("python3"));
-
-    //    std::string scriptPath = configLoader2.gets("pythonScriptsPath");
-    //    if (scriptPath.substr(0, 2) == "..") { // Make path absolute
-    //      std::string cwdString = File::currentPath();
-    //      scriptPath =
-    //          cwdString.substr(0, cwdString.rfind('/', cwdString.size() - 2))
-    //          + scriptPath.substr(2);
-    //    }
-
-    //    std::string pythonBinaryConf = configLoader2.gets("pythonBinary");
-
-    //    std::replace(scriptPath.begin(), scriptPath.end(), '\\', '/');
-    //    std::replace(pythonBinaryConf.begin(), pythonBinaryConf.end(), '\\',
-    //    '/'); pythonScriptPath.set(scriptPath);
-    //    pythonBinary.set(pythonBinaryConf);
-
-    //    std::string fontPath = configLoader2.gets("font");
-    //    std::replace(fontPath.begin(), fontPath.end(), '\\', '/');
-    //    font.set(fontPath);
 
     ///
     config.setAppName("casm_viewer");
@@ -1330,15 +1294,17 @@ public:
 
     tincServer << mDataset;
 
+    // Expose buffers from renderers to TINC
     dataDisplays[0]->mHistoryRender.trajectoryWidth.max(100);
     dataDisplays[0]->mTrajRender.trajectoryWidth.max(100);
 
     dataDisplays[0]->mHistoryRender.registerWithTincServer(tincServer);
     dataDisplays[0]->mTrajRender.registerWithTincServer(tincServer);
 
+    // Start TINC server
     tincServer.start();
 
-    percoTools.init();
+    //    percoTools.init();
   }
 
   void registerParameterCallbacks() {
@@ -1350,24 +1316,16 @@ public:
           [this, display](std::string value) {
             std::string path = value;
             path = path.substr(path.rfind('/') + 1);
-            if (display->mDatasetManager.mGlobalRoot.size() > 0) {
-              presetHandler->setRootPath(display->mDatasetManager.mGlobalRoot);
-              positionPresets->setRootPath(
-                  display->mDatasetManager.mGlobalRoot);
-              if (!File::exists(display->mDatasetManager.mGlobalRoot + value +
-                                "/presets")) {
-                Dir::make(value + "/presets");
-              }
-              if (!File::exists(display->mDatasetManager.mGlobalRoot + value +
-                                "/positionPresets")) {
-                Dir::make(value + "/positionPresets");
-              }
-              presetHandler->setSubDirectory(value + "/presets");
-              positionPresets->setSubDirectory(value + "/presets");
-              presetHandler->setCurrentPresetMap("default", true);
-              std::cout << "Preset Handler sub dir set to " << value
-                        << std::endl;
+            std::string datasetPath;
+            if (display->mDatasetManager.mGlobalRoot.size() > 0 &&
+                display->mDatasetManager.mGlobalRoot != "./") {
+              datasetPath = display->mDatasetManager.mGlobalRoot;
             }
+            datasetPath += value + "/presets";
+            presetHandler->setRootPath(datasetPath);
+            positionPresets->setRootPath(datasetPath);
+            presetHandler->setCurrentPresetMap("default", true);
+            std::cout << "Preset Handler sub dir set to " << value << std::endl;
             updateTitle();
             mAutoAdvance = 0.0; // Turn off auto advance
           });
@@ -1702,6 +1660,18 @@ public:
              d->mDatasetManager.sampleProcessorGraph.getProcessors()) {
           proc->setVerbose(value != 0.0);
         }
+      }
+    });
+
+    mComputeCache.registerChangeCallback([&](float value) {
+      if (value != 0.0) {
+        dataDisplays[vdvBundle.currentBundle()]
+            ->mDatasetManager.mParameterSpace.sweep(
+                dataDisplays[vdvBundle.currentBundle()]
+                    ->mDatasetManager.sampleProcessorGraph);
+      } else {
+        dataDisplays[vdvBundle.currentBundle()]
+            ->mDatasetManager.mParameterSpace.stopSweep();
       }
     });
   }

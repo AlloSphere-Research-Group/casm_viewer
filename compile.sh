@@ -1,6 +1,7 @@
 mkdir -p build/release
 cd build/release
 cmake -DCMAKE_BUILD_TYPE=Release -Wno-deprecated ../..
+# cmake -G Xcode -DCMAKE_BUILD_TYPE=Release -Wno-deprecated ../..
 cd ../..
 cmake --build build/release -j7
 cp res/macos/Info.plist bin/casm_viewer.app/Contents/

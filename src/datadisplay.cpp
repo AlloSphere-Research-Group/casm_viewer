@@ -1067,10 +1067,7 @@ void DataDisplay::drawPerspective(Graphics &g) {
       atomrender.applyTransformations(g);
 
       g.translate(atomrender.mSlicingPlaneCorner.get());
-      g.rotate(atomrender.mSliceRotationPitch * 360.0f / (M_2PI), 1.0f, 0.0,
-               0.0);
-      g.rotate(atomrender.mSliceRotationRoll * 360.0f / (M_2PI), 0.0, -1.0f,
-               0.0);
+      g.rotate(atomrender.mSlicingPlaneQuat);
       g.scale(atomrender.mSlicingPlaneSize, atomrender.mSlicingPlaneSize,
               atomrender.mSlicingPlaneThickness.get());
 

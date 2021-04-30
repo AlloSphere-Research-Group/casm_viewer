@@ -1195,7 +1195,7 @@ public:
     if (mScreenshotPrefix.size() > 0) { // Take screenshot
       std::vector<unsigned char> mPixels;
       mPixels.resize(width() * height() * 3);
-      unsigned char *pixs = &mPixels[0];
+      unsigned char *pixs = mPixels.data();
       // FIXME this can be done more efficiently
       glReadPixels(1, 1, width(), height(), GL_RGB, GL_UNSIGNED_BYTE, pixs);
       std::string dumpDirectory = File::conformPathToOS(
@@ -1203,11 +1203,20 @@ public:
           dataDisplays[vdvBundle.currentBundle()]
               ->mDatasetManager.mCurrentDataset.get() +
           "/graphics/");
+      if (!al::File::isDirectory(dataDisplays[vdvBundle.currentBundle()]
+                                     ->mDatasetManager.mGlobalRoot +
+                                 dataDisplays[vdvBundle.currentBundle()]
+                                     ->mDatasetManager.mCurrentDataset.get() +
+                                 "/graphics/")) {
+        al::Dir::make(dataDisplays[vdvBundle.currentBundle()]
+                          ->mDatasetManager.mGlobalRoot +
+                      dataDisplays[vdvBundle.currentBundle()]
+                          ->mDatasetManager.mCurrentDataset.get() +
+                      "/graphics/");
+      }
       std::string imagePath = dumpDirectory + mScreenshotPrefix + "_screen.png";
 
-      //      stbi_flip_vertically_on_write(1);
-      //      stbi_write_png(imagePath.c_str(), width(), height(), 3, pixs,
-      //                     width() * 3);
+      Image::saveImage(imagePath, pixs, width(), height(), true, 3);
 
       mScreenshotPrefix = "";
     }

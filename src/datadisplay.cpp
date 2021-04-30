@@ -263,6 +263,24 @@ void DataDisplay::init() {
   bundle << atomrender.mAtomMarkerSize;
 
   bundle << mShowAtoms;
+  // Colors
+
+  for (int i = 0; i < 16; i++) {
+    mColorList.emplace_back(
+        std::make_shared<ParameterColor>("atomColor" + std::to_string(i)));
+    mColorList.back()->set(colorList[i % colorList.size()]);
+    mColorList.back()->setHint("hsv", 1.0);
+    bundle << *mColorList.back();
+  }
+
+  for (int i = 0; i < DatasetManager::maxPercolationTypes; i++) {
+
+    mPercoColorList.emplace_back(
+        std::make_shared<ParameterColor>("percoColor" + std::to_string(i)));
+    mPercoColorList.back()->set(colorList[(i + 4) % colorList.size()]);
+    mPercoColorList.back()->setHint("hsv", 1.0);
+  }
+
   bundle << mDatasetManager.mPlotXAxis;
   bundle << mDatasetManager.mPlotYAxis;
   bundle << mShowPerspective;
@@ -280,23 +298,6 @@ void DataDisplay::init() {
   bundle << mSmallLabel;
   bundle << mDrawLabels;
 
-  // Colors
-
-  for (int i = 0; i < DatasetManager::maxPercolationTypes; i++) {
-
-    mPercoColorList.emplace_back(
-        std::make_shared<ParameterColor>("percoColor" + std::to_string(i)));
-    mPercoColorList.back()->set(colorList[(i + 4) % colorList.size()]);
-    mPercoColorList.back()->setHint("hsv", 1.0);
-  }
-
-  for (int i = 0; i < 16; i++) {
-    mColorList.emplace_back(
-        std::make_shared<ParameterColor>("atomColor" + std::to_string(i)));
-    mColorList.back()->set(colorList[i % colorList.size()]);
-    mColorList.back()->setHint("hsv", 1.0);
-    bundle << *mColorList.back();
-  }
   bundle << mColorTrigger;
 
   // Pickable
@@ -438,6 +439,15 @@ bool DataDisplay::initDataset() {
       mShowAtoms.setElementSelected(elementLabel);
     }
   }
+  for (size_t i = 0; i < mColorList.size(); i++) {
+    if (i < mShowAtoms.getElements().size()) {
+      mColorList[i]->setHint("hide", 0.0); // Show in GUI
+      mColorList[i]->displayName(mShowAtoms.getElements()[i]);
+    } else {
+      mColorList[i]->setHint("hide", 1.0); // hide in GUI
+    }
+  }
+
   mDatasetManager.mParameterSpace.runProcess(
       mDatasetManager.sampleProcessorGraph, {}, {});
   if (mDatasetManager.graphGenerator.getOutputFileNames().size() > 0) {

@@ -38,7 +38,6 @@ using namespace std;
 
 struct State {
   float zoom = 0.0;
-  Matrix4f transformMatrix;
 };
 
 // ---------------------------------------------------
@@ -228,6 +227,8 @@ public:
     szBuff = std::getenv("USERPROFILE");
     if (szBuff) {
       mPreviousBrowseDir = szBuff;
+    } else {
+      mPreviousBrowseDir = "~/";
     }
 
     // Initialize default view.
@@ -372,7 +373,7 @@ public:
     // fbo operations should be done outside onDraw so it does not mess with
     // omni drawing
     for (auto *display : dataDisplays) {
-      display->prepare(graphics(), state().transformMatrix);
+      display->prepare(graphics());
     }
 #ifdef AL_EXT_OPENVR
     // Update traking and controller data;
@@ -891,6 +892,9 @@ public:
           ImGui::Indent(20.0);
           ParameterGUI::drawParameterMeta(
               &this->dataDisplays[vdvBundle.currentBundle()]
+                   ->atomrender.mAlpha);
+          ParameterGUI::drawParameterMeta(
+              &this->dataDisplays[vdvBundle.currentBundle()]
                    ->atomrender.mSlicingPlaneCorner);
           ParameterGUI::drawParameterMeta(
               &this->dataDisplays[vdvBundle.currentBundle()]
@@ -944,6 +948,10 @@ public:
                                         ->parallelPickable.bundle);
           ParameterGUI::drawBundle(&dataDisplays[vdvBundle.currentBundle()]
                                         ->perspectivePickable.bundle);
+          ParameterGUI::draw(
+              &dataDisplays[vdvBundle.currentBundle()]->mShowMarkers);
+          ParameterGUI::draw(
+              &dataDisplays[vdvBundle.currentBundle()]->mShowAxes);
           ImGui::Unindent(20.0);
         }
         ParameterGUI::drawPresetHandler(positionPresets.get());

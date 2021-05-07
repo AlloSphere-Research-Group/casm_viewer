@@ -852,22 +852,10 @@ void DataDisplay::prepareParallelProjection(Graphics &g) {
 
   float scaling = atomrender.mSlicingPlaneSize;
 
-  float left =
-      /* atomrender.mDataScale.get().x * */ (
-          atomrender.mSlicingPlaneCorner.get().x) -
-      padding;
-  float right =
-      //      atomrender.mDataScale.get().x *
-      (atomrender.mSlicingPlaneCorner.get().x + atomrender.mSlicingPlaneSize) +
-      padding;
-  float top =
-      //      atomrender.mDataScale.get().y *
-      (atomrender.mSlicingPlaneCorner.get().y + atomrender.mSlicingPlaneSize) +
-      padding;
-  float bottom =
-      /*  atomrender.mDataScale.get().y **/ (
-          atomrender.mSlicingPlaneCorner.get().y) -
-      padding;
+  float left = -padding;
+  float right = atomrender.mSlicingPlaneSize + padding;
+  float top = atomrender.mSlicingPlaneSize + padding;
+  float bottom = -padding;
 
   g.projMatrix(Matrix4f::ortho(ar * left, ar * right, bottom, top,
                                mTemplateDataBoundaries.min.z - 100,
@@ -886,10 +874,14 @@ void DataDisplay::prepareParallelProjection(Graphics &g) {
     g.clear(backgroundColor);
 
     g.pushViewMatrix();
-    g.viewMatrix(getLookAt(atomrender.mSlicingPlaneCorner,
-                           atomrender.mSlicingPlaneCorner.get() -
-                               atomrender.mSlicingPlaneNormal.get(),
-                           {0.0f, 1.0f, 0.0f}));
+
+    Vec3f upVector =
+        atomrender.mSlicingPlaneQuat.rotate(al::Vec3f(0.f, 1.f, 0.f));
+    g.viewMatrix(
+        getLookAt(atomrender.mSlicingPlaneCorner,
+                  atomrender.mSlicingPlaneCorner.get() -
+                      atomrender.mSlicingPlaneNormal.get().normalized(),
+                  upVector));
 
     g.blending(false);
     g.depthTesting(true);

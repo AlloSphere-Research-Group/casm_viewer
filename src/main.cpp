@@ -228,7 +228,7 @@ public:
     if (szBuff) {
       mPreviousBrowseDir = szBuff;
     } else {
-      mPreviousBrowseDir = "~/";
+      // mPreviousBrowseDir = "~/";
     }
 
     // Initialize default view.

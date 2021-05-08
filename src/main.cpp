@@ -834,8 +834,6 @@ public:
         ParameterGUI::drawParameterMeta(
             &this->dataDisplays[vdvBundle.currentBundle()]
                  ->atomrender.mAtomMarkerSize);
-        ParameterGUI::drawParameterMeta(
-            &this->dataDisplays[vdvBundle.currentBundle()]->mPercoMarkerScale);
         if (this->dataDisplays[vdvBundle.currentBundle()]
                 ->mDatasetManager.mParameterSpace.getDimension("time")) {
           ParameterGUI::drawParameterMeta(&mAutoAdvance);
@@ -868,10 +866,14 @@ public:
         } else {
           ImGui::Text("No Shell site data found.");
         }
+
         auto percoSize = this->dataDisplays[vdvBundle.currentBundle()]
                              ->mDatasetManager.mPercolationTypes.getElements()
                              .size();
         if (percoSize > 0) {
+          ParameterGUI::drawParameterMeta(
+              &this->dataDisplays[vdvBundle.currentBundle()]
+                   ->mPercoMarkerScale);
           ParameterGUI::drawParameterMeta(
               &this->dataDisplays[vdvBundle.currentBundle()]
                    ->mDatasetManager.mPercolationTypes);
@@ -1319,6 +1321,7 @@ public:
 
     dataDisplays[0]->mHistoryRender.registerWithTincServer(tincServer);
     dataDisplays[0]->mTrajRender.registerWithTincServer(tincServer);
+    dataDisplays[0]->atomrender.registerWithTincServer(tincServer);
 
     // Start TINC server
     tincServer.start();

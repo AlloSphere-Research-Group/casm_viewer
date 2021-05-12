@@ -537,9 +537,11 @@ bool DatasetManager::initDataset() {
 
   if (isMultiId) {
     pathTemplate = "/conditions.%%" + conditionDim + "%%";
-  } else {
+  } else if (idDims.size() > 0) {
     pathTemplate +=
         "%%" + idDims.at(0) + "%%conditions.%%" + conditionDim + "%%";
+  } else {
+    pathTemplate = "/conditions.%%" + conditionDim + "%%";
   }
 
   mParameterSpace.setCurrentPathTemplate(pathTemplate);

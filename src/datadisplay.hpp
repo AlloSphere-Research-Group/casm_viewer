@@ -105,6 +105,8 @@ public:
 
   ParameterString lastError{"lastError"};
 
+  ParameterBool mShowAxes{"ShowAxes", "", 1.0};
+  ParameterBool mShowMarkers{"ShowMarkers", "", 1.0};
   ParameterColor mMarkerColor{"markerColor"};
   Parameter mMarkerScale{"markerScale", "", 1.7, 0.001, 20};
   Parameter mPercoMarkerScale{"percoMarkerScaleFactor", "", 1.5, 0.01, 8.0};
@@ -169,8 +171,8 @@ public:
   bool initDataset();
 
   // Prepare elements before draw call
-  void prepare(Graphics &g, Matrix4f &transformMatrix);
-  void prepareParallelProjection(Graphics &g, Matrix4f &transformMatrix);
+  void prepare(Graphics &g);
+  void prepareParallelProjection(Graphics &g);
 
   // Draw function
   void draw(Graphics &g);
@@ -202,14 +204,14 @@ public:
       atomrender.mSlicingPlaneThickness =
           findDistanceNormal(mAligned4fData, layerDir.get());
       std::cout << "Data Boundaries:" << std::endl;
-      std::cout << "X " << mDataBoundaries.min.x << " -> "
-                << mDataBoundaries.max.x << std::endl;
-      std::cout << "Y " << mDataBoundaries.min.y << " -> "
-                << mDataBoundaries.max.y << std::endl;
-      std::cout << "Z " << mDataBoundaries.min.z << " -> "
-                << mDataBoundaries.max.z << std::endl;
+      std::cout << "X " << mTemplateDataBoundaries.min.x << " -> "
+                << mTemplateDataBoundaries.max.x << std::endl;
+      std::cout << "Y " << mTemplateDataBoundaries.min.y << " -> "
+                << mTemplateDataBoundaries.max.y << std::endl;
+      std::cout << "Z " << mTemplateDataBoundaries.min.z << " -> "
+                << mTemplateDataBoundaries.max.z << std::endl;
       Vec3f point = atomrender.mSlicingPlaneCorner;
-      point.z = mDataBoundaries.min.z;
+      point.z = mTemplateDataBoundaries.min.z;
       atomrender.mSlicingPlaneCorner = point;
     }
   }
@@ -223,7 +225,7 @@ protected:
   void updateDisplayBuffers();
   void updatePercolationBuffers();
 
-  void drawHistory(Graphics &g);
+  void drawTrajectories(Graphics &g);
   void drawPerspective(Graphics &g);
   void drawParallelProjection(Graphics &g);
   void drawGraph(Graphics &g);
@@ -260,7 +262,7 @@ private:
   std::vector<float>
       mAlignedPercolation4fData[DatasetManager::maxPercolationTypes];
 
-  BoundingBoxData mDataBoundaries;
+  BoundingBoxData mTemplateDataBoundaries;
 };
 
 #endif // DATASETDISPLAY_HPP

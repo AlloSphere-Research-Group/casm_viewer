@@ -51,7 +51,6 @@ void DataDisplay::init() {
         if (!initDataset()) {
           lastError.set(mDatasetManager.lastError);
         }
-        resetSlicing();
       });
 
   mDatasetManager.mShellSiteTypes.registerChangeCallback([&](uint16_t value) {
@@ -263,24 +262,15 @@ void DataDisplay::init() {
   bundle << atomrender.mAtomMarkerSize;
 
   bundle << mShowAtoms;
-  bundle << mDatasetManager.mPlotXAxis;
-  bundle << mDatasetManager.mPlotYAxis;
-  bundle << mShowPerspective;
-
-  bundle << mDisplaySlicing;
-  bundle << mDisplayGraphs;
-
-  bundle << mPerspectiveRotY;
-  bundle << atomrender.mSlicingPlaneNormal;
-  bundle << atomrender.mSliceRotationPitch << atomrender.mSliceRotationRoll;
-  bundle << atomrender.mSlicingPlaneCorner << atomrender.mSlicingPlaneThickness;
-  bundle << mShowGrid << mGridType << mGridSpacing << mGridXOffset
-         << mGridYOffset;
-  bundle << mBillboarding;
-  bundle << mSmallLabel;
-  bundle << mDrawLabels;
-
   // Colors
+
+  for (int i = 0; i < 16; i++) {
+    mColorList.emplace_back(
+        std::make_shared<ParameterColor>("atomColor" + std::to_string(i)));
+    mColorList.back()->set(colorList[i % colorList.size()]);
+    mColorList.back()->setHint("hsv", 1.0);
+    bundle << *mColorList.back();
+  }
 
   for (int i = 0; i < DatasetManager::maxPercolationTypes; i++) {
 
@@ -290,13 +280,23 @@ void DataDisplay::init() {
     mPercoColorList.back()->setHint("hsv", 1.0);
   }
 
-  for (int i = 0; i < 16; i++) {
-    mColorList.emplace_back(
-        std::make_shared<ParameterColor>("atomColor" + std::to_string(i)));
-    mColorList.back()->set(colorList[i % colorList.size()]);
-    mColorList.back()->setHint("hsv", 1.0);
-    bundle << *mColorList.back();
+  bundle << mDatasetManager.mPlotXAxis;
+  bundle << mDatasetManager.mPlotYAxis;
+  bundle << mShowPerspective;
+
+  bundle << mDisplaySlicing;
+  bundle << mDisplayGraphs;
+
+  bundle << mPerspectiveRotY;
+  for (auto *p : atomrender.parameters()) {
+    bundle << p;
   }
+  bundle << mShowGrid << mGridType << mGridSpacing << mGridXOffset
+         << mGridYOffset;
+  bundle << mBillboarding;
+  bundle << mSmallLabel;
+  bundle << mDrawLabels;
+
   bundle << mColorTrigger;
 
   // Pickable
@@ -438,6 +438,15 @@ bool DataDisplay::initDataset() {
       mShowAtoms.setElementSelected(elementLabel);
     }
   }
+  for (size_t i = 0; i < mColorList.size(); i++) {
+    if (i < mShowAtoms.getElements().size()) {
+      mColorList[i]->setHint("hide", 0.0); // Show in GUI
+      mColorList[i]->displayName(mShowAtoms.getElements()[i]);
+    } else {
+      mColorList[i]->setHint("hide", 1.0); // hide in GUI
+    }
+  }
+
   mDatasetManager.mParameterSpace.runProcess(
       mDatasetManager.sampleProcessorGraph, {}, {});
   if (mDatasetManager.graphGenerator.getOutputFileNames().size() > 0) {
@@ -451,10 +460,12 @@ bool DataDisplay::initDataset() {
     mPercoColorList[count]->displayName(perc);
     count++;
   }
+
+  resetSlicing();
   return ret;
 }
 
-void DataDisplay::prepare(Graphics &g, Matrix4f &transformMatrix) {
+void DataDisplay::prepare(Graphics &g) {
 
   if (mNeedsProcessing) {
     mDatasetManager.mCurrentDataset.processChange();
@@ -500,7 +511,7 @@ void DataDisplay::prepare(Graphics &g, Matrix4f &transformMatrix) {
     updateDisplayBuffers();
   }
   updatePercolationBuffers();
-  prepareParallelProjection(g, transformMatrix);
+  prepareParallelProjection(g);
 }
 
 void DataDisplay::draw(Graphics &g) { // Load data after drawing frame to allow
@@ -623,7 +634,7 @@ void DataDisplay::updateDisplayBuffers() {
 
   auto curVisibleAtoms = mShowAtoms.getSelectedElements();
 
-  mDataBoundaries.resetInv();
+  mTemplateDataBoundaries.resetInv();
   mAligned4fData.clear();
 
   mAtomData.clear();
@@ -685,7 +696,7 @@ void DataDisplay::updateDisplayBuffers() {
         auto hue = rgb2hsv(mAtomData[atomName].color.rgb()).h;
         mAligned4fData.push_back(hue);
         Vec3f vec(templateDataIt->x, templateDataIt->y, templateDataIt->z);
-        mDataBoundaries.includePoint(vec);
+        mTemplateDataBoundaries.includePoint(vec);
       }
       if (prevOccupationPtr) {
         std::string prevAtomName =
@@ -749,14 +760,14 @@ void DataDisplay::updateDisplayBuffers() {
         mAtomData[atomName].counts++;
 
         Vec3f vec(templateDataIt->x, templateDataIt->y, templateDataIt->z);
-        mDataBoundaries.includePoint(vec);
+        mTemplateDataBoundaries.includePoint(vec);
       }
       templateDataIt++;
     }
   }
 
   if (mAligned4fData.size() > 0) {
-    auto &b = mDataBoundaries;
+    auto &b = mTemplateDataBoundaries;
     perspectivePickable.bb.set(Vec3f(b.min.x, b.min.y, b.min.z),
                                Vec3f(b.max.x, b.max.y, b.max.z));
     slicePickable.bb.set(Vec3f(b.min.x, b.min.y, b.min.z),
@@ -804,7 +815,7 @@ void DataDisplay::updatePercolationBuffers() {
   }
 }
 
-void DataDisplay::drawHistory(Graphics &g) {
+void DataDisplay::drawTrajectories(Graphics &g) {
   g.pushMatrix();
   g.meshColor();
   g.polygonFill();
@@ -823,134 +834,113 @@ void DataDisplay::drawHistory(Graphics &g) {
   g.popMatrix();
 }
 
-void DataDisplay::prepareParallelProjection(Graphics &g,
-                                            Matrix4f &transformMatrix) {
+void DataDisplay::prepareParallelProjection(Graphics &g) {
   //        std::unique_lock<std::mutex> lk(mDataLock);
   g.pushFramebuffer(fbo_iso);
   g.pushViewport(fbo_iso.width(), fbo_iso.height());
-  g.pushModelMatrix();
-  g.pushViewMatrix();
   g.pushProjMatrix();
 
-  // note that translation in z direction will mess up layer clipping
-  g.modelMatrix(transformMatrix);
   // projection matrix from clipping params
   // will only work with z axis aligned data and single viewport mode
 
   //        const float cameraZ = mDataBoundaries.maxz;
 
   float ar = float(fbo_iso.width()) / fbo_iso.height();
-  //        float rangeSizeZ = mDataBoundaries.maxz - mDataBoundaries.minz;
-  //  float centerX = (mDataBoundaries.max.x + mDataBoundaries.min.x) / 2.0f;
-  //  float centerY = (mDataBoundaries.max.y + mDataBoundaries.min.y) / 2.0f;
   float maxrange =
       std::max(atomrender.dataBoundary.dim.x, atomrender.dataBoundary.dim.y);
   float padding = maxrange * 0.05f;
 
   float scaling = atomrender.mSlicingPlaneSize;
-  //  float left = centerX - 0.5f * maxrange * scaling - padding;
-  //  float right = centerX + 0.5f * maxrange * scaling + padding;
-  //  float top = centerY + 0.5f * maxrange * scaling + padding;
-  //  float bottom = centerY - 0.5f * maxrange * scaling - padding;
 
-  float left = atomrender.mSlicingPlaneCorner.get().x;
-  float right =
-      atomrender.mSlicingPlaneCorner.get().x + atomrender.mSlicingPlaneSize;
-  float top =
-      atomrender.mSlicingPlaneCorner.get().y + atomrender.mSlicingPlaneSize;
-  float bottom = atomrender.mSlicingPlaneCorner.get().y;
+  float left = -padding;
+  float right = atomrender.mSlicingPlaneSize + padding;
+  float top = atomrender.mSlicingPlaneSize + padding;
+  float bottom = -padding;
 
   g.projMatrix(Matrix4f::ortho(ar * left, ar * right, bottom, top,
-                               mDataBoundaries.min.z - 100,
-                               mDataBoundaries.max.z + 100));
+                               mTemplateDataBoundaries.min.z - 100,
+                               mTemplateDataBoundaries.max.z + 100));
 
   // save for later
   GLboolean last_enable_scissor_test = glIsEnabled(GL_SCISSOR_TEST);
   g.scissorTest(true);
-  int w = fbo_iso.width() / 2;
-  int h = fbo_iso.height() / 2;
+  int w = fbo_iso.width();
+  int h = fbo_iso.height();
   g.polygonFill();
-  g.depthMask(true); // for axis rendering
-
-  g.pushViewport(0, 0, 2 * w, 2 * h);
-  g.scissorArea(0, 0, 2 * w, 2 * h);
-  g.clear(backgroundColor);
-
-  g.pushViewMatrix();
-  g.viewMatrix(getLookAt(atomrender.mSlicingPlaneCorner,
-                         atomrender.mSlicingPlaneCorner.get() -
-                             atomrender.mSlicingPlaneNormal.get().normalized(),
-                         {0.0f, 1.0f, 0.0f}));
-
-  g.blending(false);
-  g.depthTesting(true);
-  g.meshColor();
-  g.draw(axis);
-
-  if (mShowGrid == 1.0f) {
-    mGridMesh.reset();
-    addRect(mGridMesh, 0, -2.0, 0.1f / (scaling), 4.0f);
-    mGridMesh.update();
-    if (backgroundColor.get().luminance() > 0.5f) {
-      g.color(0.2f);
-    } else {
-      g.color(0.7f);
-    }
-    for (int i = 0; i < 40; i++) {
-      if (mGridType.getCurrent() == "square") {
-        g.pushMatrix();
-        g.translate(mGridXOffset, mGridYOffset + mGridSpacing * i, 0);
-        g.scale(scaling);
-        g.rotate(90, 0, 0, 1);
-        g.draw(mGridMesh);
-        g.popMatrix();
-        g.pushMatrix();
-        g.translate(mGridXOffset + mGridSpacing * i, mGridYOffset, 0);
-        g.scale(scaling);
-        g.draw(mGridMesh);
-        g.popMatrix();
-      } else if (mGridType.getCurrent() == "triangle") {
-        float spacing = 0.86602540378f * mGridSpacing; // sin(60)
-        g.pushMatrix();
-        g.translate(mGridXOffset, mGridYOffset + spacing * i, 0);
-        g.scale(scaling);
-        g.rotate(90, 0, 0, 1);
-        g.draw(mGridMesh);
-        g.popMatrix();
-        g.pushMatrix();
-        g.translate(mGridXOffset, mGridYOffset, 0);
-        g.rotate(30, 0, 0, 1);
-        g.translate(spacing * i, 0, 0);
-        g.scale(scaling);
-        g.draw(mGridMesh);
-        g.popMatrix();
-        g.pushMatrix();
-        g.translate(mGridXOffset, mGridYOffset, 0);
-        g.rotate(-30, 0, 0, 1);
-        g.translate(spacing * i, 0, 0);
-        g.scale(scaling);
-        g.draw(mGridMesh);
-        g.popMatrix();
-      }
-    }
-  }
-
-  g.blending(true);
-  g.blendTrans();
-  g.depthTesting(false);
-  g.pushMatrix();
 
   {
-    // ----------------------------------------
-    int cumulativeCount = 0;
-    for (auto &data : mAtomData) {
+    g.pushViewport(0, 0, w, h);
+    g.scissorArea(0, 0, w, h);
+    g.clear(backgroundColor);
 
-      int count = data.second.counts;
-      atomrender.instancingMesh.attrib_data(
-          count * 4 * sizeof(float),
-          mAligned4fData.data() + (cumulativeCount * 4), count);
-      cumulativeCount += data.second.counts;
-      // now draw data with custom shader
+    g.pushViewMatrix();
+
+    Vec3f upVector =
+        atomrender.mSlicingPlaneQuat.rotate(al::Vec3f(0.f, 1.f, 0.f));
+    g.viewMatrix(
+        getLookAt(atomrender.mSlicingPlaneCorner,
+                  atomrender.mSlicingPlaneCorner.get() -
+                      atomrender.mSlicingPlaneNormal.get().normalized(),
+                  upVector));
+
+    g.blending(false);
+    g.depthTesting(true);
+
+    if (mShowGrid == 1.0f) {
+      mGridMesh.reset();
+      addRect(mGridMesh, 0, -2.0, 0.1f / (scaling), 4.0f);
+      mGridMesh.update();
+      if (backgroundColor.get().luminance() > 0.5f) {
+        g.color(0.2f);
+      } else {
+        g.color(0.7f);
+      }
+      for (int i = 0; i < 40; i++) {
+        if (mGridType.getCurrent() == "square") {
+          g.pushMatrix();
+          g.translate(mGridXOffset, mGridYOffset + mGridSpacing * i, 0);
+          g.scale(scaling);
+          g.rotate(90, 0, 0, 1);
+          g.draw(mGridMesh);
+          g.popMatrix();
+          g.pushMatrix();
+          g.translate(mGridXOffset + mGridSpacing * i, mGridYOffset, 0);
+          g.scale(scaling);
+          g.draw(mGridMesh);
+          g.popMatrix();
+        } else if (mGridType.getCurrent() == "triangle") {
+          float spacing = 0.86602540378f * mGridSpacing; // sin(60)
+          g.pushMatrix();
+          g.translate(mGridXOffset, mGridYOffset + spacing * i, 0);
+          g.scale(scaling);
+          g.rotate(90, 0, 0, 1);
+          g.draw(mGridMesh);
+          g.popMatrix();
+          g.pushMatrix();
+          g.translate(mGridXOffset, mGridYOffset, 0);
+          g.rotate(30, 0, 0, 1);
+          g.translate(spacing * i, 0, 0);
+          g.scale(scaling);
+          g.draw(mGridMesh);
+          g.popMatrix();
+          g.pushMatrix();
+          g.translate(mGridXOffset, mGridYOffset, 0);
+          g.rotate(-30, 0, 0, 1);
+          g.translate(spacing * i, 0, 0);
+          g.scale(scaling);
+          g.draw(mGridMesh);
+          g.popMatrix();
+        }
+      }
+    }
+
+    g.blending(true);
+    g.blendTrans();
+    g.depthTesting(false);
+    {
+      g.pushMatrix();
+      // ----------------------------------------
+      int cumulativeCount = 0;
       g.shader(atomrender.instancingMesh.shader);
       g.update(); // sends modelview and projection matrices
       g.shader().uniform("dataScale", atomrender.mDataScale.get());
@@ -958,7 +948,7 @@ void DataDisplay::prepareParallelProjection(Graphics &g,
       g.shader().uniform("eye_sep", g.lens().eyeSep() * g.eye() / 2.0f);
       //      g.shader().uniform("foc_len", g.lens().focalLength());
 
-      g.shader().uniform("alpha", 1.0);
+      g.shader().uniform("alpha", atomrender.mAlpha);
       g.shader().uniform("markerScale", atomrender.mAtomMarkerSize);
 
       g.shader().uniform("plane_point", atomrender.mSlicingPlaneCorner.get());
@@ -973,21 +963,28 @@ void DataDisplay::prepareParallelProjection(Graphics &g,
       g.shader().uniform("clipped_mult", 0.0);
 
       g.shader().uniform("is_line", 0.0f);
-      atomrender.instancingMesh.draw();
-    }
 
-    g.popMatrix();
+      for (auto &data : mAtomData) {
+
+        int count = data.second.counts;
+        // now draw data with custom shader
+        atomrender.instancingMesh.attrib_data(
+            count * 4 * sizeof(float),
+            mAligned4fData.data() + (cumulativeCount * 4), count);
+        cumulativeCount += data.second.counts;
+        atomrender.instancingMesh.draw();
+      }
+
+      g.popMatrix();
+    }
     g.popViewMatrix();
     g.popViewport();
   }
 
-  // put back scissoring
-  g.scissorTest(last_enable_scissor_test);
+  g.scissorTest(last_enable_scissor_test); // put back scissoring
   g.popProjMatrix();
-  g.popViewMatrix();
-  g.popModelMatrix();
-  g.popFramebuffer();
   g.popViewport();
+  g.popFramebuffer();
 }
 
 void DataDisplay::drawPerspective(Graphics &g) {
@@ -1005,26 +1002,23 @@ void DataDisplay::drawPerspective(Graphics &g) {
 
     g.meshColor();
 
-    {
+    if (mShowAxes) {
       g.pushMatrix();
-      g.scale(20);
+      g.scale(atomrender.dataBoundary.dim.x * 0.5);
       g.draw(axis);
       g.popMatrix();
     }
 
-    drawHistory(g);
-
-    atomrender.scale.set({50, 50, 50});
+    drawTrajectories(g);
 
     {
       g.pushMatrix();
-      g.scale(perspectivePickable.scale);
       atomrender.applyTransformations(g);
       {
         g.pushMatrix();
         g.polygonLine();
         g.scale(atomrender.dataBoundary.dim);
-        g.color(0.3f, 0.3f, 0.4f, 0.6f);
+        g.color(0.3f, 0.3f, 0.9f, 0.6f);
         g.draw(boxMesh);
         g.popMatrix();
       }
@@ -1034,27 +1028,28 @@ void DataDisplay::drawPerspective(Graphics &g) {
     }
 
     {
+      g.pushMatrix();
+      atomrender.applyTransformations(g);
       // draw percolation data
-      g.blendScreen();
+      g.blendTrans();
       g.depthTesting(true);
+      //      g.meshColor();
       auto size = mDatasetManager.mPercolationTypes.getElements().size();
       auto enabledPerc = mDatasetManager.mPercolationTypes.get();
       auto previousScale = atomrender.mAtomMarkerSize.get();
 
+      // Temporarily override scale to atom render
       atomrender.mAtomMarkerSize.setNoCalls(previousScale *
                                             mPercoMarkerScale.get());
       for (size_t i = 0; i < size; i++) {
         if (enabledPerc & ((uint64_t)1 << i)) {
-          {
-            g.pushMatrix();
-            g.scale(perspectivePickable.scale);
-            atomrender.applyTransformations(g);
-            atomrender.onProcess(g);
-            g.popMatrix();
-          }
+          atomrender.draw(g, mPercolationData[i], mAlignedPercolation4fData[i]);
         }
       }
+      // Put back previous scale to atom render
       atomrender.mAtomMarkerSize.setNoCalls(previousScale);
+
+      g.popMatrix();
     }
 
     g.depthTesting(true);
@@ -1063,13 +1058,14 @@ void DataDisplay::drawPerspective(Graphics &g) {
     if (mDisplaySlicing.get() == 1.0) {
       g.pushMatrix();
 
-      g.scale(perspectivePickable.scale);
-      atomrender.applyTransformations(g);
+      //      atomrender.applyTransformations(g);
 
       g.translate(atomrender.mSlicingPlaneCorner.get());
       g.rotate(atomrender.mSlicingPlaneQuat);
       g.scale(atomrender.mSlicingPlaneSize, atomrender.mSlicingPlaneSize,
               atomrender.mSlicingPlaneThickness.get());
+
+      //      g.scale(perspectivePickable.scale);
 
       g.polygonLine();
       g.color(0.8f, 0.8f, 1.0f, 0.9f);
@@ -1078,7 +1074,7 @@ void DataDisplay::drawPerspective(Graphics &g) {
       g.popMatrix();
     }
 
-    { // Draw change markers
+    if (mShowMarkers) { // Draw change markers
       g.pushMatrix();
 
       g.depthTesting(true);
@@ -1105,23 +1101,21 @@ void DataDisplay::drawPerspective(Graphics &g) {
       }
 
       g.popMatrix();
+      { // Draw selected atom
+        g.depthTesting(true);
+        g.blending(true);
+        //  g.scale(perspectivePickable.scale);
+        g.polygonLine();
+        g.pushMatrix();
+        g.translate(selectedPosition);
+        g.color(0.2f, 1.f, 0.2f);
+        g.scale(2.8);
+        g.draw(mMarker);
+        g.popMatrix();
+      }
     }
 
-    { // Draw selected atom
-      g.pushMatrix();
-
-      g.depthTesting(true);
-      g.blending(true);
-      //  g.scale(perspectivePickable.scale);
-      g.polygonLine();
-      g.pushMatrix();
-      g.translate(selectedPosition);
-      g.color(0.2f, 1.f, 0.2f);
-      g.scale(2.8);
-      g.draw(mMarker);
-      g.popMatrix();
-    }
-
+    //    perspectivePickable.drawBB(g);
     perspectivePickable.popMatrix(g); // pickable
   }
 
@@ -1160,8 +1154,7 @@ void DataDisplay::drawPerspective(Graphics &g) {
     g.popMatrix();
   }
 
-  perspectivePickable.drawBB(g);
-  g.popMatrix();
+  //  g.popMatrix(); // pop pickable matrix
 }
 
 void DataDisplay::drawParallelProjection(Graphics &g) {

@@ -38,7 +38,6 @@ using namespace std;
 
 struct State {
   float zoom = 0.0;
-  Matrix4f transformMatrix;
 };
 
 // ---------------------------------------------------
@@ -228,6 +227,8 @@ public:
     szBuff = std::getenv("USERPROFILE");
     if (szBuff) {
       mPreviousBrowseDir = szBuff;
+    } else {
+      // mPreviousBrowseDir = "~/";
     }
 
     // Initialize default view.
@@ -372,7 +373,7 @@ public:
     // fbo operations should be done outside onDraw so it does not mess with
     // omni drawing
     for (auto *display : dataDisplays) {
-      display->prepare(graphics(), state().transformMatrix);
+      display->prepare(graphics());
     }
 #ifdef AL_EXT_OPENVR
     // Update traking and controller data;
@@ -833,8 +834,6 @@ public:
         ParameterGUI::drawParameterMeta(
             &this->dataDisplays[vdvBundle.currentBundle()]
                  ->atomrender.mAtomMarkerSize);
-        ParameterGUI::drawParameterMeta(
-            &this->dataDisplays[vdvBundle.currentBundle()]->mPercoMarkerScale);
         if (this->dataDisplays[vdvBundle.currentBundle()]
                 ->mDatasetManager.mParameterSpace.getDimension("time")) {
           ParameterGUI::drawParameterMeta(&mAutoAdvance);
@@ -867,10 +866,14 @@ public:
         } else {
           ImGui::Text("No Shell site data found.");
         }
+
         auto percoSize = this->dataDisplays[vdvBundle.currentBundle()]
                              ->mDatasetManager.mPercolationTypes.getElements()
                              .size();
         if (percoSize > 0) {
+          ParameterGUI::drawParameterMeta(
+              &this->dataDisplays[vdvBundle.currentBundle()]
+                   ->mPercoMarkerScale);
           ParameterGUI::drawParameterMeta(
               &this->dataDisplays[vdvBundle.currentBundle()]
                    ->mDatasetManager.mPercolationTypes);
@@ -889,6 +892,9 @@ public:
                     ->mDisplaySlicing.get() == 1.0 &&
             ImGui::CollapsingHeader("Slicing")) {
           ImGui::Indent(20.0);
+          ParameterGUI::drawParameterMeta(
+              &this->dataDisplays[vdvBundle.currentBundle()]
+                   ->atomrender.mAlpha);
           ParameterGUI::drawParameterMeta(
               &this->dataDisplays[vdvBundle.currentBundle()]
                    ->atomrender.mSlicingPlaneCorner);
@@ -944,6 +950,10 @@ public:
                                         ->parallelPickable.bundle);
           ParameterGUI::drawBundle(&dataDisplays[vdvBundle.currentBundle()]
                                         ->perspectivePickable.bundle);
+          ParameterGUI::draw(
+              &dataDisplays[vdvBundle.currentBundle()]->mShowMarkers);
+          ParameterGUI::draw(
+              &dataDisplays[vdvBundle.currentBundle()]->mShowAxes);
           ImGui::Unindent(20.0);
         }
         ParameterGUI::drawPresetHandler(positionPresets.get());
@@ -1195,7 +1205,7 @@ public:
     if (mScreenshotPrefix.size() > 0) { // Take screenshot
       std::vector<unsigned char> mPixels;
       mPixels.resize(width() * height() * 3);
-      unsigned char *pixs = &mPixels[0];
+      unsigned char *pixs = mPixels.data();
       // FIXME this can be done more efficiently
       glReadPixels(1, 1, width(), height(), GL_RGB, GL_UNSIGNED_BYTE, pixs);
       std::string dumpDirectory = File::conformPathToOS(
@@ -1203,11 +1213,20 @@ public:
           dataDisplays[vdvBundle.currentBundle()]
               ->mDatasetManager.mCurrentDataset.get() +
           "/graphics/");
+      if (!al::File::isDirectory(dataDisplays[vdvBundle.currentBundle()]
+                                     ->mDatasetManager.mGlobalRoot +
+                                 dataDisplays[vdvBundle.currentBundle()]
+                                     ->mDatasetManager.mCurrentDataset.get() +
+                                 "/graphics/")) {
+        al::Dir::make(dataDisplays[vdvBundle.currentBundle()]
+                          ->mDatasetManager.mGlobalRoot +
+                      dataDisplays[vdvBundle.currentBundle()]
+                          ->mDatasetManager.mCurrentDataset.get() +
+                      "/graphics/");
+      }
       std::string imagePath = dumpDirectory + mScreenshotPrefix + "_screen.png";
 
-      //      stbi_flip_vertically_on_write(1);
-      //      stbi_write_png(imagePath.c_str(), width(), height(), 3, pixs,
-      //                     width() * 3);
+      Image::saveImage(imagePath, pixs, width(), height(), true, 3);
 
       mScreenshotPrefix = "";
     }
@@ -1302,6 +1321,7 @@ public:
 
     dataDisplays[0]->mHistoryRender.registerWithTincServer(tincServer);
     dataDisplays[0]->mTrajRender.registerWithTincServer(tincServer);
+    dataDisplays[0]->atomrender.registerWithTincServer(tincServer);
 
     // Start TINC server
     tincServer.start();

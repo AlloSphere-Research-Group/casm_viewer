@@ -49,29 +49,6 @@ void DatasetManager::initializeComputation() {
                                       {"chempotB", "param_chem_pot(b)"},
                                       {"dir", "dir"}};
 
-  mParameterSpace.generateRelativeRunPath =
-      [&](std::map<std::string, size_t> indices, ParameterSpace *ps) {
-        bool isMultiId = false;
-
-        for (auto dim : mParameterSpace.getDimensions()) {
-          if (dim->getSpaceStride() > 1) {
-            isMultiId = true;
-            break;
-          }
-        }
-
-        std::string path;
-
-        if (isMultiId) {
-          path = ps->resolveFilename(
-              ps->getCommonId() + ps->getCurrentPathTemplate(), indices);
-          ;
-        } else {
-          path = ps->resolveFilename(ps->getCurrentPathTemplate(), indices);
-        }
-        return al::File::conformDirectory(al::File::conformPathToOS(path));
-      };
-
   // Parameter space callback
   mParameterSpace.onValueChange = [&](ParameterSpaceDimension *changedDimension,
                                       ParameterSpace *ps) {
@@ -165,100 +142,84 @@ void DatasetManager::initializeComputation() {
     std::string xLabel = mPlotXAxis.getCurrent();
     std::string yLabel = mPlotYAxis.getCurrent();
 
-    auto jsonText = readJsonResultsFile(mCurrentDataset, getSubDir());
-    if (jsonText.size() > 0) {
-      std::vector<double> datax, datay;
-      auto resultsJson = json::parse(jsonText);
+    std::vector<double> datax, datay;
 
-      if (resultsJson.find(yLabel) != resultsJson.end()) {
-        try {
-          datay = resultsJson[yLabel].get<std::vector<double>>();
-        } catch (std::exception &) {
-        }
-      } else {
-        std::cerr << "Results file not suitable for graphing" << std::endl;
-        return false;
+    std::string highlightValue = "0.0";
+    auto dim = mParameterSpace.getDimension(xLabel);
+    if (dim) {
+      size_t index = 0;
+      while (index < dim->size()) {
+        datax.push_back(dim->at(index));
+        index += dim->getSpaceStride();
       }
-      std::string highlightValue = "0.0";
-      if (mParameterSpace.parameterNameMap.find(xLabel) !=
-          mParameterSpace.parameterNameMap.end()) {
-        xLabel = mParameterSpace.parameterNameMap[xLabel];
-      }
-
-      if (mParameterSpace.getDimension(xLabel)) {
-        try {
-          datax.reserve(mParameterSpace.getDimension(xLabel)->size());
-          for (auto value :
-               mParameterSpace.getDimension(xLabel)->getSpaceValues<float>()) {
-            datax.push_back(value);
-          }
-          highlightValue = std::to_string(
-              int(mParameterSpace.getDimension(xLabel)->getCurrentValue()));
-        } catch (std::exception &) {
-        }
-      } else {
-        std::cerr << "Results file not suitable for graphing. Dimension "
-                  << xLabel << " not suitable." << std::endl;
-        return false;
-      }
-      if (datax.size() != datay.size()) {
-        std::cerr << "ERROR graph axis size mismatch. " << xLabel << ":"
-                  << datax.size() << " " << yLabel << ":" << datay.size()
-                  << std::endl;
-        return false;
-      }
-
-      std::string fullDatasetPath = File::conformPathToOS(
-          getGlobalRootPath() + File::conformPathToOS(mCurrentDataset.get()));
-
-      std::ofstream ofsx(fullDatasetPath + "cached_output/inx.bin",
-                         std::ofstream::out | std::ios::binary);
-      ofsx.write((char *)datax.data(), datax.size() * sizeof(double));
-      ofsx.flush();
-      ofsx.close();
-      std::ofstream ofsy(fullDatasetPath + "cached_output/iny.bin",
-                         std::ofstream::out | std::ios::binary);
-      ofsy.write((char *)datay.data(), datay.size() * sizeof(double));
-      ofsy.flush();
-      ofsy.close();
-      std::string subDir = getSubDir();
-      // Check data range for whole dataset
-      std::string str = readJsonResultsFile(datasetId, getSubDir());
-      std::pair<float, float> dataRange(FLT_MAX, FLT_MIN);
-      if (str.size() > 0) {
-        auto resultsJson = json::parse(str);
-        auto data = resultsJson[yLabel];
-        for (json::iterator v = data.begin(); v != data.end(); v++) {
-          if (v->get<float>() < dataRange.first) {
-            dataRange.first = v->get<float>();
-          } else if (v->get<float>() > dataRange.second) {
-            dataRange.second = v->get<float>();
-          }
-        }
-      }
-
-      std::string yLabelSanitized = yLabel;
-      replaceAll(yLabelSanitized, "<", "_");
-      replaceAll(yLabelSanitized, ">", "_");
-      replaceAll(yLabelSanitized, "(", "_");
-      replaceAll(yLabelSanitized, ")", "_");
-
-      graphGenerator.configuration["title"] = mTitle;
-      graphGenerator.configuration["dataset"] = datasetId;
-      graphGenerator.configuration["temp_interest"] = highlightValue;
-      graphGenerator.configuration["subdir"] = subDir;
-      graphGenerator.configuration["xLabel"] = xLabel;
-      graphGenerator.configuration["yLabel"] = yLabelSanitized;
-
-      graphGenerator.configuration["miny"] = std::to_string(dataRange.first);
-      graphGenerator.configuration["maxy"] = std::to_string(dataRange.second);
-      graphGenerator.configuration["inxFile"] =
-          std::string(fullDatasetPath + "cached_output/inx.bin");
-      graphGenerator.configuration["inyFile"] =
-          std::string(fullDatasetPath + "cached_output/iny.bin");
+      highlightValue = std::to_string(
+          mParameterSpace.getDimension(xLabel)->getCurrentValue());
     } else {
+      std::cerr << "Results file not suitable for graphing. Dimension "
+                << xLabel << " not suitable." << std::endl;
       return false;
     }
+    datay.resize(datax.size());
+    auto ysliceSize =
+        dataPool.readDataSlice(yLabel, xLabel, datay.data(), datay.size());
+
+    if (datax.size() != datay.size()) {
+      std::cerr << "ERROR graph axis size mismatch. " << xLabel << ":"
+                << datax.size() << " " << yLabel << ":" << datay.size()
+                << std::endl;
+      return false;
+    }
+
+    if (mParameterSpace.parameterNameMap.find(xLabel) !=
+        mParameterSpace.parameterNameMap.end()) {
+      xLabel = mParameterSpace.parameterNameMap[xLabel];
+    }
+
+    std::string fullDatasetPath = File::conformPathToOS(
+        getGlobalRootPath() + File::conformPathToOS(mCurrentDataset.get()));
+
+    std::ofstream ofsx(fullDatasetPath + "cached_output/inx.bin",
+                       std::ofstream::out | std::ios::binary);
+    ofsx.write((char *)datax.data(), datax.size() * sizeof(double));
+    ofsx.flush();
+    ofsx.close();
+    std::ofstream ofsy(fullDatasetPath + "cached_output/iny.bin",
+                       std::ofstream::out | std::ios::binary);
+    ofsy.write((char *)datay.data(), datay.size() * sizeof(double));
+    ofsy.flush();
+    ofsy.close();
+    std::string subDir = getSubDir();
+    // Check data range for whole dataset
+    std::string str = readJsonResultsFile(datasetId, getSubDir());
+    std::pair<float, float> dataRange(FLT_MAX, FLT_MIN);
+    if (str.size() > 0) {
+      auto resultsJson = json::parse(str);
+      auto data = resultsJson[yLabel];
+      for (json::iterator v = data.begin(); v != data.end(); v++) {
+        if (v->get<float>() < dataRange.first) {
+          dataRange.first = v->get<float>();
+        } else if (v->get<float>() > dataRange.second) {
+          dataRange.second = v->get<float>();
+        }
+      }
+    }
+
+    std::string yLabelSanitized = ProcessorScript::sanitizeName(yLabel);
+
+    graphGenerator.configuration["title"] = mTitle;
+    graphGenerator.configuration["dataset"] = datasetId;
+    graphGenerator.configuration["temp_interest"] = highlightValue;
+    graphGenerator.configuration["subdir"] = subDir;
+    graphGenerator.configuration["xLabel"] = xLabel;
+    graphGenerator.configuration["yLabel"] = yLabelSanitized;
+
+    graphGenerator.configuration["miny"] = std::to_string(dataRange.first);
+    graphGenerator.configuration["maxy"] = std::to_string(dataRange.second);
+    graphGenerator.configuration["inxFile"] =
+        std::string(fullDatasetPath + "cached_output/inx.bin");
+    graphGenerator.configuration["inyFile"] =
+        std::string(fullDatasetPath + "cached_output/iny.bin");
+
     return true;
   };
 
@@ -269,16 +230,24 @@ void DatasetManager::initializeComputation() {
   mPlotYAxis.registerChangeCallback([this](float value) {
     if (mPlotYAxis.get() != value) {
       mPlotYAxis.setNoCalls(value); // Force internal value, discard old value
-      graphGenerator.process();
-      // TODO connect to ImageDiskBuffer
+      if (graphGenerator.process()) {
+        if (graphGenerator.getOutputFileNames().size() > 0) {
+          currentGraphName.set(graphGenerator.getOutputDirectory() +
+                               graphGenerator.getOutputFileNames()[0]);
+        }
+      }
     }
   });
 
   mPlotXAxis.registerChangeCallback([this](float value) {
     if (mPlotXAxis.get() != value) {
       mPlotXAxis.setNoCalls(value); // Force internal value, discard old value
-      graphGenerator.process();
-      // TODO connect to ImageDiskBuffer
+      if (graphGenerator.process()) {
+        if (graphGenerator.getOutputFileNames().size() > 0) {
+          currentGraphName.set(graphGenerator.getOutputDirectory() +
+                               graphGenerator.getOutputFileNames()[0]);
+        }
+      }
     }
   });
 
@@ -526,17 +495,21 @@ bool DatasetManager::initDataset() {
       pathTemplate = "%%dir%%";
     }
   }
-  bool isMultiId = false;
+  std::vector<std::string> multiIdDimensions;
 
   for (auto dim : mParameterSpace.getDimensions()) {
     if (dim->getCurrentIds().size() > 1) {
-      isMultiId = true;
-      break;
+      multiIdDimensions.push_back(dim->getName());
     }
   }
 
-  if (isMultiId) {
-    pathTemplate = "/conditions.%%" + conditionDim + "%%";
+  if (multiIdDimensions.size() > 0) {
+    pathTemplate = "%%";
+    for (auto dimName : multiIdDimensions) {
+      pathTemplate += dimName + ",";
+    }
+    pathTemplate.resize(pathTemplate.size() - 1);
+    pathTemplate += "%%conditions.%%" + conditionDim + "%%";
   } else if (idDims.size() > 0) {
     pathTemplate +=
         "%%" + idDims.at(0) + "%%conditions.%%" + conditionDim + "%%";

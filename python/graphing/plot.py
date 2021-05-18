@@ -46,7 +46,7 @@ ax1.plot(datax, datay)
 
 plt.ylim((float(args['miny'])* 0.95,float(args['maxy'])* 1.05))
 
-ax1.vlines(float(args['temp_interest']), float(args['miny'])* 0.95, float(args['maxy'])* 1.05)
+ax1.vlines(float(args['temp_interest']), float(args['miny'])* 0.95, float(args['maxy'])* 1.05, 'r')
 
 fig.tight_layout()  # otherwise the right y-label is slightly clipped
 

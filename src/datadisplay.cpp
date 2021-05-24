@@ -1012,11 +1012,13 @@ void DataDisplay::drawPerspective(Graphics &g) {
     drawTrajectories(g);
 
     {
+      // Draw data boundary
       g.pushMatrix();
       atomrender.applyTransformations(g);
       {
         g.pushMatrix();
         g.polygonLine();
+        g.translate(atomrender.dataBoundary.min);
         g.scale(atomrender.dataBoundary.dim);
         g.color(0.3f, 0.3f, 0.9f, 0.6f);
         g.draw(boxMesh);

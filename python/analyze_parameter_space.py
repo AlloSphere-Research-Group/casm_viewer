@@ -393,7 +393,8 @@ if __name__ == '__main__':
         for dir_param_name, dir_param_values in dir_params.items():
             dataset_param_meta["mapped_params"][dir_param_name] = {"value": [i[1] for i in dir_param_values], "dir" : [i[0] for i in dir_param_values] }
     dataset_param_meta["index_params"] = consistent_params_data
-    dataset_param_meta["internal_params"] = {"time": []}
+    
+    dataset_param_meta["internal_params"] = {}
 
     #if len(dataset_dirs) == 1:
     #    dataset_param_meta['mapped_params']['dir'] = {}

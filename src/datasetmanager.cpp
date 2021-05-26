@@ -137,6 +137,9 @@ void DatasetManager::initializeComputation() {
   graphGenerator.setOutputFileNames({"graph.png"});
   graphGenerator.ignoreFail = true; // It doesn't matter if graph fails.
 
+  graphGenerator.registerDependency(mPlotYAxis);
+  graphGenerator.registerDependency(mPlotXAxis);
+
   graphGenerator.prepareFunction = [&]() {
     std::string datasetId = mCurrentDataset.get();
     std::string xLabel = mPlotXAxis.getCurrent();

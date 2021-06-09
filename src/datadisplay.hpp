@@ -201,8 +201,8 @@ public:
 
   void computeSlicing() {
     if (mDatasetManager.mRunProcessors) {
-      atomrender.mSlicingPlaneThickness =
-          findDistanceNormal(mAligned4fData, layerDir.get());
+      atomrender.mSlicingPlaneThickness = findDistanceNormal(
+          atomrender.getData()->getVector<float>(), layerDir.get());
       std::cout << "Data Boundaries:" << std::endl;
       std::cout << "X " << mTemplateDataBoundaries.min.x << " -> "
                 << mTemplateDataBoundaries.max.x << std::endl;
@@ -255,7 +255,6 @@ private:
   std::vector<DatasetManager::position_t> atomRemoved;
 
   std::map<std::string, AtomData> mAtomData;
-  std::vector<float> mAligned4fData;
 
   std::map<std::string, AtomData>
       mPercolationData[DatasetManager::maxPercolationTypes];

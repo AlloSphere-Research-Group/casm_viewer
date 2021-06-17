@@ -124,7 +124,6 @@ public:
   Parameter rollAngleStep{"RollAngleStep", "AngleControl", 15, 0.0, 60.0};
   Trigger stepRollAnglePos{"stepRollAnglePos", "AngleControl"};
   Trigger stepRollAngleNeg{"stepRollAngleNeg", "AngleControl"};
-  //  Trigger CalculateSlicing{"CalculateSlicing"};
   Trigger ResetSlicing{"ResetSlicing"};
   Trigger mSaveGraphics{"SaveScreenshot"};
   Trigger mAlignTemperatures{"AlignTemperatures"};
@@ -137,7 +136,6 @@ public:
   Parameter mAutoAdvanceFreq{"autoAdvanceFreq", "", 5, 0.25, 10.0};
 
   // File selection
-  //  ParameterMenu mDataRootPath{"datarootPath"};
   ParameterString mDataset{"dataset"};
   ParameterMenu mRecentDatasets{"recentDatasets"};
   ParameterString mWindowTitle{"windowTitle"};
@@ -214,8 +212,6 @@ public:
 
     for (int i = 0; i < numDisplays; i++) {
       dataDisplays.emplace_back(new DataDisplay);
-      //      dataDisplays.back()->mDatasetManager.mParameterSpace.setId(
-      //          "casm_space_" + std::to_string(i));
       dataDisplays.back()->init();
       dataDisplays.back()->mDatasetManager.mRunProcessors = rank == 0;
       if (dataRoot.size() > 0) {
@@ -239,9 +235,6 @@ public:
     dataDisplays[0]->perspectivePickable.pose.setPos(Vec3d(0.55, 0.35, -0.7));
     dataDisplays[0]->perspectivePickable.scale = 0.02f;
 
-    //    dataDisplays[0]->mShowGraph = true;
-    //    dataDisplays[0]->mShowParallel = true;
-    //                dataDisplays[0]->mShowSurface = false;
     dataDisplays[0]->mShowPerspective = true;
     dataDisplays[0]->mBillboarding = false;
     dataDisplays[0]->mSmallLabel = true;
@@ -341,10 +334,6 @@ public:
         cursorHide(false);
       }
     }
-
-    //    std::string cwdString = File::currentPath();
-    //    mDatasetSelector = new FileSelector(dataRoot, File::isDirectory);
-    //    mDatasetSelector->start(cwdString);
 
 #ifdef AL_EXT_OPENVR
     openVRDomain = OpenVRDomain::enableVR(this);
@@ -535,8 +524,6 @@ public:
   }
 
   virtual void onMessage(osc::Message &m) override {
-    //      std::cout << name();
-    //      m.print();
     if ("/point" == m.addressPattern()) {
       float ox, oy, oz, dx, dy, dz;
       int id;
@@ -1036,6 +1023,11 @@ public:
       if (ImGui::InputText("Python executable", buf, 512)) {
         pythonBinary.set(std::string(buf));
       }
+      auto currentScriptsPath = pythonScriptsPath.get();
+      strncpy(buf, currentScriptsPath.c_str(), currentScriptsPath.size() + 1);
+      if (ImGui::InputText("Python Scripts Path", buf, 512)) {
+        pythonScriptsPath.set(std::string(buf));
+      }
 #ifdef AL_WINDOWS
       if (ImGui::Button("Use anaconda")) {
         pythonBinary.set(
@@ -1191,8 +1183,6 @@ public:
         for (auto *display : dataDisplays) {
           display->elementData[atomName] = {radius, Color(r, g, b)};
         }
-        //            std::cout << atomName << ":" << radius << " " << r << "  "
-        //            << g << " " << b << std::endl;
       }
     } else {
       std::cout << name() << "Could not open elements.ini - Using defaults."
@@ -1471,10 +1461,6 @@ public:
         }
       });
 
-      //      CalculateSlicing.registerChangeCallback([this](float value) {
-      //        this->dataDisplays[vdvBundle.currentBundle()]->computeSlicing();
-      //      });
-
       ResetSlicing.registerChangeCallback([this](float value) {
         this->dataDisplays[vdvBundle.currentBundle()]->resetSlicing();
       });
@@ -1708,14 +1694,10 @@ public:
     return ray;
   }
 
-  //  const char *flowAddress() override { return "interface"; }
-
   void updateTitle() {
     std::string newTitle = "CASM Viewer ";
     for (auto *display : dataDisplays) {
       if (display->mVisible == 1.0f) {
-        //          newTitle += display->mDatasetManager.mRootPath.get() + " :
-        //          ";
         newTitle += display->mDatasetManager.mCurrentDataset;
         newTitle += " -- ";
       }

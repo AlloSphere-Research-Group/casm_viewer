@@ -208,7 +208,7 @@ public:
     presetServer = std::make_unique<PresetServer>();
 
     // Create and configure displays
-    int numDisplays = 1;
+    int numDisplays = 2;
 
     for (int i = 0; i < numDisplays; i++) {
       dataDisplays.emplace_back(new DataDisplay);
@@ -228,17 +228,23 @@ public:
     }
 
     // Initialize default view.
-    dataDisplays[0]->graphPickable.pose.setPos(Vec3d(-2.0, 0.8, -.75));
-    dataDisplays[0]->graphPickable.scale = 0.2f;
-    dataDisplays[0]->parallelPickable.pose.setPos(Vec3d(-0.68, 1.1, -1.5));
-    dataDisplays[0]->parallelPickable.scale = 0.4f;
-    dataDisplays[0]->perspectivePickable.pose.setPos(Vec3d(0.55, 0.35, -0.7));
-    dataDisplays[0]->perspectivePickable.scale = 0.02f;
+    int counter = 0;
+    for (auto *disp : dataDisplays) {
+      disp->graphPickable.pose.setPos(Vec3d(-2.0 + (counter * 0.5), 0.8, -.75));
+      disp->graphPickable.scale = 0.2f;
+      disp->parallelPickable.pose.setPos(
+          Vec3d(-0.68 + (counter * 0.5), 1.1, -1.5));
+      disp->parallelPickable.scale = 0.4f;
+      disp->perspectivePickable.pose.setPos(
+          Vec3d(0.55 + (counter * 0.5), 0.35, -0.7));
+      disp->perspectivePickable.scale = 0.02f;
 
-    dataDisplays[0]->mShowPerspective = true;
-    dataDisplays[0]->mBillboarding = false;
-    dataDisplays[0]->mSmallLabel = true;
-    dataDisplays[0]->mVisible = true;
+      disp->mShowPerspective = true;
+      disp->mBillboarding = false;
+      disp->mSmallLabel = true;
+      disp->mVisible = true;
+    }
+
     for (size_t i = 1; i < dataDisplays.size(); i++) {
       dataDisplays[i]->mVisible = false;
     }

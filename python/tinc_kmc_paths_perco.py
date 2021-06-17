@@ -306,7 +306,7 @@ clear_traj=tclient.create_parameter(Trigger,"clear_trajectories","casm")
 clear_traj.register_callback(clear_traj_buffer)
 
 selector_slider=tclient.create_parameter(ParameterInt,"moving_atoms","casm")
-selector_slider.set_space_type("INDEX")
+selector_slider.set_space_representation_type("INDEX")
 tclient.get_parameter("moving_atoms").register_callback(sel_atom)
 
 reset_button=tclient.create_parameter(Trigger,"reset_moving_atoms","casm")

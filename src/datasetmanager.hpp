@@ -29,8 +29,6 @@ public:
   VASPReader reader;
   std::mutex mDataLock;
 
-  bool mRunComputation{true};
-
   // Dataset metadata
   std::vector<std::string>
       mAvailableAtomsJson; // Atoms in result.json <comp(XX)> field

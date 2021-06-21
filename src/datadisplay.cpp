@@ -162,7 +162,7 @@ void DataDisplay::init() {
   });
 
   mShowAtoms.registerChangeCallback([this](uint16_t value) {
-    if (mShowAtoms.get() != value) {
+    if (mShowAtoms.get() != value && mDatasetManager.mRunProcessors) {
       // New values must be available for computeNewSample, throws away previous
       // value
       mShowAtoms.setNoCalls(value);
@@ -172,16 +172,23 @@ void DataDisplay::init() {
     }
   });
 
-  atomrender.mSlicingPlaneThickness.registerChangeCallback([this](float v) {
-    auto m = slicePickable.bb.max;
-    m.z = perspectivePickable.bb.min.z + v;
-    slicePickable.bb.set(slicePickable.bb.min, m);
-  });
+  if (mDatasetManager.mRunProcessors) {
+    atomrender.mSlicingPlaneThickness.registerChangeCallback([this](float v) {
+      auto m = slicePickable.bb.max;
+      m.z = perspectivePickable.bb.min.z + v;
+      slicePickable.bb.set(slicePickable.bb.min, m);
+    });
 
-  atomrender.mSlicingPlaneCorner.registerChangeCallback([this](Vec3f v) {
-    auto p = Pose(v - slicePickable.bb.min, slicePickable.pose.get().quat());
-    slicePickable.pose.setNoCalls(p);
-  });
+    atomrender.mSlicingPlaneCorner.registerChangeCallback([this](Vec3f v) {
+      auto p = Pose(v - slicePickable.bb.min, slicePickable.pose.get().quat());
+      slicePickable.pose.setNoCalls(p);
+    });
+
+    slicePickable.pose.registerChangeCallback([this](Pose pose) {
+      auto p = pose.pos() + slicePickable.bb.min;
+      atomrender.mSlicingPlaneCorner.setNoCalls(p);
+    });
+  }
 
   atomrender.mSlicingPlaneNormal.setHint("hide", 0.0);
 
@@ -193,15 +200,16 @@ void DataDisplay::init() {
   });
 
   currentSelection.registerChangeCallback([this](int32_t value) {
-    auto pos = mDatasetManager.templateData[value];
-    selectedPosition.x = pos.x;
-    selectedPosition.y = pos.y;
-    selectedPosition.z = pos.z;
-  });
-
-  slicePickable.pose.registerChangeCallback([this](Pose pose) {
-    auto p = pose.pos() + slicePickable.bb.min;
-    atomrender.mSlicingPlaneCorner.setNoCalls(p);
+    if (mDatasetManager.templateData.size() > value) {
+      auto pos = mDatasetManager.templateData[value];
+      selectedPosition.x = pos.x;
+      selectedPosition.y = pos.y;
+      selectedPosition.z = pos.z;
+    } else {
+      std::cerr << __FILE__ << ":" << __LINE__
+                << " ERROR: current selection not available in template"
+                << std::endl;
+    }
   });
 
   backgroundColor.setHint("showAlpha", 1.0);
@@ -221,37 +229,6 @@ void DataDisplay::init() {
     }
   });
   mShowGrid = false;
-
-  mDatasetManager.currentGraphName.setSynchronousCallbacks();
-  mDatasetManager.currentGraphName.registerChangeCallback(
-      [this](std::string value) {
-        std::string fullDatasetPath = File::conformPathToOS(
-            mDatasetManager.getGlobalRootPath() +
-            File::conformPathToOS(mDatasetManager.mCurrentDataset.get()));
-
-        std::cout << "loading graph " << value << " at " << fullDatasetPath
-                  << std::endl;
-        // New image module puts origin on top right
-        //        if (mGraphTextureLock.try_lock()) {
-        //            if (mGraphFilePathToLoad.size() > 0) {
-        imageDiskBuffer.loadData(value);
-      });
-
-  for (size_t i = 0; i < graphCount; i++) {
-    currentGraphNames[i]->setSynchronousCallbacks();
-    currentGraphNames[i]->registerChangeCallback([&](std::string value) {
-      std::string fullDatasetPath = File::conformPathToOS(
-          mDatasetManager.getGlobalRootPath() +
-          File::conformPathToOS(mDatasetManager.mCurrentDataset.get()));
-
-      std::cout << "loading graph [" << i << "] " << value << " at "
-                << fullDatasetPath << std::endl;
-      // New image module puts origin on top right
-      //        if (mGraphTextureLock.try_lock()) {
-      //            if (mGraphFilePathToLoad.size() > 0) {
-      imageDiskBuffers[i]->loadData(value);
-    });
-  }
 
   mLabelFont.alignLeft();
 
@@ -620,13 +597,15 @@ void DataDisplay::nextLayer() { atomrender.nextLayer(); }
 void DataDisplay::previousLayer() { atomrender.previousLayer(); }
 
 void DataDisplay::resetSlicing() {
-  atomrender.mSlicingPlaneCorner.set(slicePickable.bb.min);
+  if (mDatasetManager.mRunProcessors) {
+    atomrender.mSlicingPlaneCorner.set(slicePickable.bb.min);
 
-  atomrender.mSlicingPlaneThickness = atomrender.dataBoundary.dim.z;
-  atomrender.mSlicingPlaneSize =
-      std::max(atomrender.dataBoundary.dim.x, atomrender.dataBoundary.dim.y);
-  atomrender.mSliceRotationRoll.set(0);
-  atomrender.mSliceRotationPitch.set(0);
+    atomrender.mSlicingPlaneThickness = atomrender.dataBoundary.dim.z;
+    atomrender.mSlicingPlaneSize =
+        std::max(atomrender.dataBoundary.dim.x, atomrender.dataBoundary.dim.y);
+    atomrender.mSliceRotationRoll.set(0);
+    atomrender.mSliceRotationPitch.set(0);
+  }
 }
 
 void DataDisplay::updateDisplayBuffers() {

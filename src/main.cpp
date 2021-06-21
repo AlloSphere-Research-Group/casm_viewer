@@ -21,6 +21,7 @@
 
 #include "tinc/DeferredComputation.hpp"
 #include "tinc/PeriodicTask.hpp"
+#include "tinc/TincClient.hpp"
 #include "tinc/TincServer.hpp"
 #include "tinc/vis/GUI.hpp"
 
@@ -184,6 +185,8 @@ public:
   //  ScriptRunner percoTools;
 
   TincServer tincServer;
+  TincClient tincClient;
+  TincProtocol *tinc;
 
   // --------
   std::vector<DataDisplay *> dataDisplays;
@@ -205,15 +208,17 @@ public:
     positionPresets = std::make_unique<PresetHandler>();
     sequencer = std::make_unique<PresetSequencer>();
     recorder = std::make_unique<SequenceRecorder>();
-    presetServer = std::make_unique<PresetServer>();
+    if (isPrimary()) {
+      presetServer = std::make_unique<PresetServer>();
+    }
 
     // Create and configure displays
     int numDisplays = 2;
 
     for (int i = 0; i < numDisplays; i++) {
       dataDisplays.emplace_back(new DataDisplay);
-      dataDisplays.back()->init();
       dataDisplays.back()->mDatasetManager.mRunProcessors = rank == 0;
+      dataDisplays.back()->init();
       if (dataRoot.size() > 0) {
         dataDisplays.back()->mDatasetManager.mGlobalRoot = dataRoot;
       }
@@ -256,26 +261,25 @@ public:
 
     setupParameterServer();
     readElementsIni();
+    for (auto *display : dataDisplays) {
+      *presetHandler << display->bundle;
+      *presetHandler << display->graphPickable.bundle
+                     << display->parallelPickable.bundle
+                     << display->perspectivePickable.bundle;
 
-    if (isPrimary()) {
-      for (auto *display : dataDisplays) {
-        *presetHandler << display->bundle;
-        *presetHandler << display->graphPickable.bundle
+      *positionPresets << display->graphPickable.bundle;
+      *positionPresets << display->graphPickable.bundle
                        << display->parallelPickable.bundle
                        << display->perspectivePickable.bundle;
-
-        *positionPresets << display->graphPickable.bundle;
-        *positionPresets << display->graphPickable.bundle
-                         << display->parallelPickable.bundle
-                         << display->perspectivePickable.bundle;
-        for (auto &graph : display->graphPickables) {
-          *positionPresets << graph->bundle;
-        }
-        vdvBundle << display->bundle;
+      for (auto &graph : display->graphPickables) {
+        *positionPresets << graph->bundle;
       }
-      // Add parameters that are not part of the bundle
-      *presetHandler << Z << X; //
+      vdvBundle << display->bundle;
+    }
+    // Add parameters that are not part of the bundle
+    *presetHandler << Z << X; //
 
+    if (isPrimary()) {
       if (presetServer) {
         *presetServer << *presetHandler;
       }
@@ -530,6 +534,7 @@ public:
   }
 
   virtual void onMessage(osc::Message &m) override {
+    m.print();
     if ("/point" == m.addressPattern()) {
       float ox, oy, oz, dx, dy, dz;
       int id;
@@ -681,8 +686,10 @@ public:
   virtual void onExit() override {
     if (isPrimary()) {
       storeConfiguration();
+      tincServer.stop();
+    } else {
+      tincClient.stop();
     }
-    tincServer.stop();
     imguiShutdown();
     //#ifdef AL_EXT_OPENVR
     //    mOpenVR.close();
@@ -1049,14 +1056,16 @@ public:
     ParameterGUI::endPanel();
     ImGui::PopID();
 
-    auto params = tincServer.dimensions();
+    auto params = tinc->dimensions();
     ImGui::SetNextWindowPos(ImVec2(400, 10), ImGuiCond_FirstUseEver);
     ImGui::SetNextWindowSize(ImVec2(300, 400), ImGuiCond_FirstUseEver);
     ImGui::Begin("TINC controls");
     //    if (ImGui::Button("Start KMC analysis script")) {
     //      percoTools.start();
     //    }
-    vis::drawTincServerInfo(tincServer, true);
+    if (isPrimary()) {
+      vis::drawTincServerInfo(tincServer, true);
+    }
     for (auto *param : params) {
       if (param->getGroup() == "casm") {
         vis::drawControl(param);
@@ -1069,13 +1078,18 @@ public:
 
   void setupParameterServer() {
     // Register parameters with parameter server
-    for (auto *display : dataDisplays) {
-      parameterServer() << display->bundle;
-      parameterServer() << display->graphPickable.bundle;
-      parameterServer() << display->parallelPickable.bundle;
-      parameterServer() << display->perspectivePickable.bundle;
-      parameterServer() << display->slicePickable.bundle;
+    //    for (auto *display : dataDisplays) {
+    //    }
+    // TODO Allow control of multiple displays remotely
+    parameterServer() << dataDisplays[0]->bundle;
+    parameterServer() << dataDisplays[0]->graphPickable.bundle;
+    for (auto &gp : dataDisplays[0]->graphPickables) {
+      parameterServer() << gp->bundle;
     }
+
+    parameterServer() << dataDisplays[0]->parallelPickable.bundle;
+    parameterServer() << dataDisplays[0]->perspectivePickable.bundle;
+    parameterServer() << dataDisplays[0]->slicePickable.bundle;
     parameterServer() << resetView << stepXpos << stepXneg << stepYpos
                       << stepYneg << stepZpos << stepZneg;
     parameterServer() /*<< CalculateSlicing*/ << ResetSlicing;
@@ -1086,7 +1100,7 @@ public:
                       << stepChempotNeg << stepChempot2Pos << stepChempot2Neg
                       << mJumpLayerNeg << mJumpLayerPos;
 
-    parameterServer().verbose(false);
+    parameterServer().verbose(true);
   }
 
   // File IO/ Persistence
@@ -1287,41 +1301,48 @@ public:
     initRootProcessorGraph << parameterSpaceProcessor << shellSiteFileAnalyzer
                            << transfmatExtractor << templateGen;
 
-    // Configure TINC server
-    tincServer.setVerbose(true);
-    tincServer << initRootProcessorGraph;
+    if (isPrimary()) {
+      tinc = &tincServer;
+    } else {
+      tinc = &tincClient;
+    }
+    *tinc << initRootProcessorGraph;
 
-    tincServer << dataDisplays[0]->mDatasetManager.sampleProcessorGraph;
-    tincServer << dataDisplays[0]->mDatasetManager.mParameterSpace;
-    tincServer << dataDisplays[0]->mDatasetManager.mShellSiteTypes;
-    tincServer << dataDisplays[0]->mDatasetManager.mPercolationTypes;
-    tincServer << dataDisplays[0]->mDatasetManager.dataPool;
-    tincServer << dataDisplays[0]->mDatasetManager.trajectoriesPool;
-    tincServer << dataDisplays[0]->mDatasetManager.neighborhoodPool;
+    *tinc << dataDisplays[0]->mDatasetManager.sampleProcessorGraph;
+    *tinc << dataDisplays[0]->mDatasetManager.mParameterSpace;
+    *tinc << dataDisplays[0]->mDatasetManager.mShellSiteTypes;
+    *tinc << dataDisplays[0]->mDatasetManager.mPercolationTypes;
+    *tinc << dataDisplays[0]->mDatasetManager.dataPool;
+    *tinc << dataDisplays[0]->mDatasetManager.trajectoriesPool;
+    *tinc << dataDisplays[0]->mDatasetManager.neighborhoodPool;
 
-    tincServer << dataDisplays[0]->imageDiskBuffer;
+    *tinc << dataDisplays[0]->imageDiskBuffer;
     for (auto &db : dataDisplays[0]->imageDiskBuffers) {
-      tincServer << *db;
+      *tinc << *db;
     }
 
-    tincServer << dataDisplays[0]->mMarkerColor << dataDisplays[0]->mMarkerScale
-               << dataDisplays[0]->mPercoMarkerScale
-               << dataDisplays[0]->currentSelection
-               << dataDisplays[0]->previousSelection;
+    *tinc << dataDisplays[0]->mMarkerColor << dataDisplays[0]->mMarkerScale
+          << dataDisplays[0]->mPercoMarkerScale
+          << dataDisplays[0]->currentSelection
+          << dataDisplays[0]->previousSelection;
 
-    tincServer << mDataset;
+    *tinc << mDataset;
 
     // Expose buffers from renderers to TINC
     dataDisplays[0]->mHistoryRender.trajectoryWidth.max(100);
     dataDisplays[0]->mTrajRender.trajectoryWidth.max(100);
 
-    dataDisplays[0]->mHistoryRender.registerWithTincServer(tincServer);
-    dataDisplays[0]->mTrajRender.registerWithTincServer(tincServer);
-    dataDisplays[0]->atomrender.registerWithTincServer(tincServer);
-
-    // Start TINC server
-    tincServer.start();
-
+    dataDisplays[0]->mHistoryRender.registerWithTinc(*tinc);
+    dataDisplays[0]->mTrajRender.registerWithTinc(*tinc);
+    dataDisplays[0]->atomrender.registerWithTinc(*tinc);
+    if (isPrimary()) {
+      // Configure TINC server
+      tincServer.setVerbose(true);
+      tincServer.start();
+    } else {
+      tincClient.start();
+      tincClient.setVerbose(true);
+    }
     //    percoTools.init();
   }
 
@@ -1347,6 +1368,38 @@ public:
             updateTitle();
             mAutoAdvance = 0.0; // Turn off auto advance
           });
+      display->mDatasetManager.currentGraphName.setSynchronousCallbacks();
+      display->mDatasetManager.currentGraphName.registerChangeCallback(
+          [this, display](std::string value) {
+            std::string fullDatasetPath = File::conformPathToOS(
+                display->mDatasetManager.getGlobalRootPath() +
+                File::conformPathToOS(
+                    display->mDatasetManager.mCurrentDataset.get()));
+
+            std::cout << "loading graph " << value << " at " << fullDatasetPath
+                      << std::endl;
+            // New image module puts origin on top right
+            //        if (mGraphTextureLock.try_lock()) {
+            //            if (mGraphFilePathToLoad.size() > 0) {
+            display->imageDiskBuffer.loadData(value, isPrimary());
+          });
+      for (size_t i = 0; i < display->graphCount; i++) {
+        display->currentGraphNames[i]->setSynchronousCallbacks();
+        display->currentGraphNames[i]->registerChangeCallback(
+            [&](std::string value) {
+              std::string fullDatasetPath = File::conformPathToOS(
+                  display->mDatasetManager.getGlobalRootPath() +
+                  File::conformPathToOS(
+                      display->mDatasetManager.mCurrentDataset.get()));
+
+              std::cout << "loading graph [" << i << "] " << value << " at "
+                        << fullDatasetPath << std::endl;
+              // New image module puts origin on top right
+              //        if (mGraphTextureLock.try_lock()) {
+              //            if (mGraphFilePathToLoad.size() > 0) {
+              display->imageDiskBuffers[i]->loadData(value, isPrimary());
+            });
+      }
     }
 
     // Triggers and callbacks that should only be handled by rank 0
@@ -1510,74 +1563,76 @@ public:
         mScreenshotPrefix = str;
         mScreenshotMutex.unlock();
       });
+      if (isPrimary()) {
+        // Only connect on primary to avoid feedback
+        stepPitchAngleNeg.registerChangeCallback([this](float value) {
+          if (vdvBundle.bundleGlobal()) {
+            float newAngle = dataDisplays[vdvBundle.currentBundle()]
+                                 ->atomrender.mSliceRotationPitch;
+            newAngle -= pitchAngleStep * M_2PI / 360.0;
+            for (auto *display : dataDisplays) {
+              display->atomrender.mSliceRotationPitch = newAngle;
+            }
 
-      stepPitchAngleNeg.registerChangeCallback([this](float value) {
-        if (vdvBundle.bundleGlobal()) {
-          float newAngle = dataDisplays[vdvBundle.currentBundle()]
-                               ->atomrender.mSliceRotationPitch;
-          newAngle -= pitchAngleStep * M_2PI / 360.0;
-          for (auto *display : dataDisplays) {
-            display->atomrender.mSliceRotationPitch = newAngle;
+          } else {
+            float newAngle = dataDisplays[vdvBundle.currentBundle()]
+                                 ->atomrender.mSliceRotationPitch;
+            newAngle -= pitchAngleStep * M_2PI / 360.0;
+            dataDisplays[vdvBundle.currentBundle()]
+                ->atomrender.mSliceRotationPitch = newAngle;
           }
+        });
+        stepPitchAnglePos.registerChangeCallback([this](float value) {
+          if (vdvBundle.bundleGlobal()) {
+            float newAngle = dataDisplays[vdvBundle.currentBundle()]
+                                 ->atomrender.mSliceRotationPitch;
+            newAngle += pitchAngleStep * M_2PI / 360.0;
+            newAngle -= pitchAngleStep * M_2PI / 360.0;
+            for (auto *display : dataDisplays) {
+              display->atomrender.mSliceRotationPitch = newAngle;
+            }
 
-        } else {
-          float newAngle = dataDisplays[vdvBundle.currentBundle()]
-                               ->atomrender.mSliceRotationPitch;
-          newAngle -= pitchAngleStep * M_2PI / 360.0;
-          dataDisplays[vdvBundle.currentBundle()]
-              ->atomrender.mSliceRotationPitch = newAngle;
-        }
-      });
-      stepPitchAnglePos.registerChangeCallback([this](float value) {
-        if (vdvBundle.bundleGlobal()) {
-          float newAngle = dataDisplays[vdvBundle.currentBundle()]
-                               ->atomrender.mSliceRotationPitch;
-          newAngle += pitchAngleStep * M_2PI / 360.0;
-          newAngle -= pitchAngleStep * M_2PI / 360.0;
-          for (auto *display : dataDisplays) {
-            display->atomrender.mSliceRotationPitch = newAngle;
+          } else {
+            float newAngle = dataDisplays[vdvBundle.currentBundle()]
+                                 ->atomrender.mSliceRotationPitch;
+            newAngle += pitchAngleStep * M_2PI / 360.0;
+            dataDisplays[vdvBundle.currentBundle()]
+                ->atomrender.mSliceRotationPitch = newAngle;
           }
-
-        } else {
-          float newAngle = dataDisplays[vdvBundle.currentBundle()]
-                               ->atomrender.mSliceRotationPitch;
-          newAngle += pitchAngleStep * M_2PI / 360.0;
-          dataDisplays[vdvBundle.currentBundle()]
-              ->atomrender.mSliceRotationPitch = newAngle;
-        }
-      });
-      stepRollAngleNeg.registerChangeCallback([this](float value) {
-        if (vdvBundle.bundleGlobal()) {
-          float newAngle = dataDisplays[vdvBundle.currentBundle()]
-                               ->atomrender.mSliceRotationRoll;
-          newAngle -= rollAngleStep * M_2PI / 360.0;
-          for (auto *display : dataDisplays) {
-            display->atomrender.mSliceRotationRoll = newAngle;
+        });
+        stepRollAngleNeg.registerChangeCallback([this](float value) {
+          if (vdvBundle.bundleGlobal()) {
+            float newAngle = dataDisplays[vdvBundle.currentBundle()]
+                                 ->atomrender.mSliceRotationRoll;
+            newAngle -= rollAngleStep * M_2PI / 360.0;
+            for (auto *display : dataDisplays) {
+              display->atomrender.mSliceRotationRoll = newAngle;
+            }
+          } else {
+            float newAngle = dataDisplays[vdvBundle.currentBundle()]
+                                 ->atomrender.mSliceRotationRoll;
+            newAngle -= rollAngleStep * M_2PI / 360.0;
+            dataDisplays[vdvBundle.currentBundle()]
+                ->atomrender.mSliceRotationRoll = newAngle;
           }
-        } else {
-          float newAngle = dataDisplays[vdvBundle.currentBundle()]
-                               ->atomrender.mSliceRotationRoll;
-          newAngle -= rollAngleStep * M_2PI / 360.0;
-          dataDisplays[vdvBundle.currentBundle()]
-              ->atomrender.mSliceRotationRoll = newAngle;
-        }
-      });
-      stepRollAnglePos.registerChangeCallback([this](float value) {
-        if (vdvBundle.bundleGlobal()) {
-          float newAngle = dataDisplays[vdvBundle.currentBundle()]
-                               ->atomrender.mSliceRotationRoll;
-          newAngle += rollAngleStep * M_2PI / 360.0;
-          for (auto *display : dataDisplays) {
-            display->atomrender.mSliceRotationRoll = newAngle;
+        });
+        stepRollAnglePos.registerChangeCallback([this](float value) {
+          if (vdvBundle.bundleGlobal()) {
+            float newAngle = dataDisplays[vdvBundle.currentBundle()]
+                                 ->atomrender.mSliceRotationRoll;
+            newAngle += rollAngleStep * M_2PI / 360.0;
+            for (auto *display : dataDisplays) {
+              display->atomrender.mSliceRotationRoll = newAngle;
+            }
+          } else {
+            float newAngle = dataDisplays[vdvBundle.currentBundle()]
+                                 ->atomrender.mSliceRotationRoll;
+            newAngle += rollAngleStep * M_2PI / 360.0;
+            dataDisplays[vdvBundle.currentBundle()]
+                ->atomrender.mSliceRotationRoll = newAngle;
           }
-        } else {
-          float newAngle = dataDisplays[vdvBundle.currentBundle()]
-                               ->atomrender.mSliceRotationRoll;
-          newAngle += rollAngleStep * M_2PI / 360.0;
-          dataDisplays[vdvBundle.currentBundle()]
-              ->atomrender.mSliceRotationRoll = newAngle;
-        }
-      });
+        });
+      }
 
       mAutoAdvance.registerChangeCallback([this](float value) {
         if (value == 0.0f) {

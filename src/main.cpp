@@ -1335,18 +1335,22 @@ public:
     dataDisplays[0]->mHistoryRender.registerWithTinc(*tinc);
     dataDisplays[0]->mTrajRender.registerWithTinc(*tinc);
     dataDisplays[0]->atomrender.registerWithTinc(*tinc);
+    auto primaryHost = getPrimaryHost();
     if (isPrimary()) {
       // Configure TINC server
       tincServer.setVerbose(true);
-      tincServer.start();
+      if (primaryHost.size() > 0) {
+        tincServer.start(34450, primaryHost.c_str());
+      } else {
+        tincServer.start();
+      }
     } else {
-      auto primaryHost = getPrimaryHost();
+      tincClient.setVerbose(true);
       if (primaryHost.size() > 0) {
         tincClient.start(34450, primaryHost.c_str());
       } else {
         tincClient.start();
       }
-      tincClient.setVerbose(true);
     }
     //    percoTools.init();
   }

@@ -1340,7 +1340,12 @@ public:
       tincServer.setVerbose(true);
       tincServer.start();
     } else {
-      tincClient.start();
+      auto primaryHost = getPrimaryHost();
+      if (primaryHost.size() > 0) {
+        tincClient.start(34450, primaryHost.c_str());
+      } else {
+        tincClient.start();
+      }
       tincClient.setVerbose(true);
     }
     //    percoTools.init();

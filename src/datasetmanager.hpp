@@ -12,9 +12,8 @@
 #include "tinc/ProcessorGraph.hpp"
 #include "tinc/VASPReader.hpp"
 
+#include "al/math/al_Vec.hpp"
 #include "al/ui/al_Parameter.hpp"
-
-#include "slice.hpp"
 
 #include "nlohmann/json.hpp"
 
@@ -50,7 +49,7 @@ public:
   std::string metaText;
   std::string lastError;
 
-  std::vector<std::pair<Vec3f, Vec3f>>
+  std::vector<std::pair<al::Vec3f, al::Vec3f>>
       mHistory; // From ->to (first, second) of pair
 
   // TINC Computation
@@ -99,20 +98,20 @@ public:
   // These are internal parameters to propagate data and triggering
   // computation, not for direct user control
   //  ParameterString mRootPath{"rootPath"};
-  ParameterString mCurrentDataset{"currentDataset"}; // sub directory
-  ParameterString currentGraphName{"currentGraphName", "internal", ""};
-  ParameterString currentPoscarName{"currentPoscarName", "internal", ""};
-  ParameterBool processing{"processing", "internal", false};
+  al::ParameterString mCurrentDataset{"currentDataset"}; // sub directory
+  al::ParameterString currentGraphName{"currentGraphName", "internal", ""};
+  al::ParameterString currentPoscarName{"currentPoscarName", "internal", ""};
+  al::ParameterBool processing{"processing", "internal", false};
 
   ParameterSpace mParameterSpace{"casmParameters"};
 
   // Plot axes
-  ParameterMenu mPlotYAxis{"PlotYAxis"};
-  ParameterMenu mPlotXAxis{"PlotXAxis"};
+  al::ParameterMenu mPlotYAxis{"PlotYAxis"};
+  al::ParameterMenu mPlotXAxis{"PlotXAxis"};
 
-  ParameterMenu mAtomOfInterest{"AtomOfInterest", "", 0};
-  ParameterChoice mShellSiteTypes{"ShellSiteTypes"};
-  ParameterChoice mPercolationTypes{"PercolationTypes"};
+  al::ParameterMenu mAtomOfInterest{"AtomOfInterest", "", 0};
+  al::ParameterChoice mShellSiteTypes{"ShellSiteTypes"};
+  al::ParameterChoice mPercolationTypes{"PercolationTypes"};
 
   // Functions --------------
   DatasetManager();
@@ -155,16 +154,6 @@ public:
 
   std::vector<std::pair<std::string, float>> getCurrentCompositions();
   std::vector<int8_t> getShellSiteTypes(size_t timeIndex);
-
-  // Processing functions ----------------------------------------------
-
-  al::Vec3f findSlicingDir(std::vector<al::Vec3f> &elem_pos_as_vec3,
-                           float sampleRadius) {
-    al::Vec3f layerDir = find_slicing_dir(
-        elem_pos_as_vec3, elem_pos_as_vec3.size() / 5, sampleRadius, 8);
-    //        std::cout << "Layer Direction " << layerDir.get()<< std::endl;
-    return layerDir;
-  }
 
   void readParameterSpace();
 

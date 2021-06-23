@@ -37,7 +37,6 @@
 #include "tinc/vis/TrajectoryRender.hpp"
 
 #include "datasetmanager.hpp"
-#include "slice.hpp"
 
 #undef far
 #undef near
@@ -196,25 +195,6 @@ public:
 
   void nextLayer();
   void previousLayer();
-
-  //  void dumpImages(std::string dumpPrefix);
-
-  void computeSlicing() {
-    if (mDatasetManager.mRunProcessors) {
-      atomrender.mSlicingPlaneThickness = findDistanceNormal(
-          atomrender.getData()->getVector<float>(), layerDir.get());
-      std::cout << "Data Boundaries:" << std::endl;
-      std::cout << "X " << mTemplateDataBoundaries.min.x << " -> "
-                << mTemplateDataBoundaries.max.x << std::endl;
-      std::cout << "Y " << mTemplateDataBoundaries.min.y << " -> "
-                << mTemplateDataBoundaries.max.y << std::endl;
-      std::cout << "Z " << mTemplateDataBoundaries.min.z << " -> "
-                << mTemplateDataBoundaries.max.z << std::endl;
-      Vec3f point = atomrender.mSlicingPlaneCorner;
-      point.z = mTemplateDataBoundaries.min.z;
-      atomrender.mSlicingPlaneCorner = point;
-    }
-  }
 
   void resetSlicing();
 

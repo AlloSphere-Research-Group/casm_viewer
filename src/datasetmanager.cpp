@@ -109,18 +109,19 @@ void DatasetManager::initializeComputation() {
 
       mShellSiteTypes.set(shellSiteTypes);
     } else {
-
-      labelProcessor.setInputDirectory(
-          mParameterSpace.getRootPath() +
-          mParameterSpace.getCurrentRelativeRunPath());
-      mParameterSpace.runProcess(sampleProcessorGraph, {}, {});
-      //      sampleProcessorGraph.process();
-      if (graphGenerator.getOutputFileNames().size() > 0) {
-        currentGraphName.set(graphGenerator.getOutputDirectory() +
-                             graphGenerator.getOutputFileNames()[0]);
+      if (mRunProcessors) {
+        labelProcessor.setInputDirectory(
+            mParameterSpace.getRootPath() +
+            mParameterSpace.getCurrentRelativeRunPath());
+        mParameterSpace.runProcess(sampleProcessorGraph, {}, {});
+        //      sampleProcessorGraph.process();
+        if (graphGenerator.getOutputFileNames().size() > 0) {
+          currentGraphName.set(graphGenerator.getOutputDirectory() +
+                               graphGenerator.getOutputFileNames()[0]);
+        }
+        currentPoscarName.set(labelProcessor.getOutputDirectory() +
+                              labelProcessor.getOutputFileNames()[0]);
       }
-      currentPoscarName.set(labelProcessor.getOutputDirectory() +
-                            labelProcessor.getOutputFileNames()[0]);
     }
 
     updateText();

@@ -162,7 +162,7 @@ void DataDisplay::init() {
   });
 
   mShowAtoms.registerChangeCallback([this](uint16_t value) {
-    if (mShowAtoms.get() != value) {
+    if (mShowAtoms.get() != value && mDatasetManager.mRunProcessors) {
       // New values must be available for computeNewSample, throws away previous
       // value
       mShowAtoms.setNoCalls(value);
@@ -172,16 +172,23 @@ void DataDisplay::init() {
     }
   });
 
-  atomrender.mSlicingPlaneThickness.registerChangeCallback([this](float v) {
-    auto m = slicePickable.bb.max;
-    m.z = perspectivePickable.bb.min.z + v;
-    slicePickable.bb.set(slicePickable.bb.min, m);
-  });
+  if (mDatasetManager.mRunProcessors) {
+    atomrender.mSlicingPlaneThickness.registerChangeCallback([this](float v) {
+      auto m = slicePickable.bb.max;
+      m.z = perspectivePickable.bb.min.z + v;
+      slicePickable.bb.set(slicePickable.bb.min, m);
+    });
 
-  atomrender.mSlicingPlaneCorner.registerChangeCallback([this](Vec3f v) {
-    auto p = Pose(v - slicePickable.bb.min, slicePickable.pose.get().quat());
-    slicePickable.pose.setNoCalls(p);
-  });
+    atomrender.mSlicingPlaneCorner.registerChangeCallback([this](Vec3f v) {
+      auto p = Pose(v - slicePickable.bb.min, slicePickable.pose.get().quat());
+      slicePickable.pose.setNoCalls(p);
+    });
+
+    slicePickable.pose.registerChangeCallback([this](Pose pose) {
+      auto p = pose.pos() + slicePickable.bb.min;
+      atomrender.mSlicingPlaneCorner.setNoCalls(p);
+    });
+  }
 
   atomrender.mSlicingPlaneNormal.setHint("hide", 0.0);
 
@@ -193,15 +200,16 @@ void DataDisplay::init() {
   });
 
   currentSelection.registerChangeCallback([this](int32_t value) {
-    auto pos = mDatasetManager.templateData[value];
-    selectedPosition.x = pos.x;
-    selectedPosition.y = pos.y;
-    selectedPosition.z = pos.z;
-  });
-
-  slicePickable.pose.registerChangeCallback([this](Pose pose) {
-    auto p = pose.pos() + slicePickable.bb.min;
-    atomrender.mSlicingPlaneCorner.setNoCalls(p);
+    if (mDatasetManager.templateData.size() > value) {
+      auto pos = mDatasetManager.templateData[value];
+      selectedPosition.x = pos.x;
+      selectedPosition.y = pos.y;
+      selectedPosition.z = pos.z;
+    } else {
+      std::cerr << __FILE__ << ":" << __LINE__
+                << " ERROR: current selection not available in template"
+                << std::endl;
+    }
   });
 
   backgroundColor.setHint("showAlpha", 1.0);
@@ -221,37 +229,6 @@ void DataDisplay::init() {
     }
   });
   mShowGrid = false;
-
-  mDatasetManager.currentGraphName.setSynchronousCallbacks();
-  mDatasetManager.currentGraphName.registerChangeCallback(
-      [this](std::string value) {
-        std::string fullDatasetPath = File::conformPathToOS(
-            mDatasetManager.getGlobalRootPath() +
-            File::conformPathToOS(mDatasetManager.mCurrentDataset.get()));
-
-        std::cout << "loading graph " << value << " at " << fullDatasetPath
-                  << std::endl;
-        // New image module puts origin on top right
-        //        if (mGraphTextureLock.try_lock()) {
-        //            if (mGraphFilePathToLoad.size() > 0) {
-        imageDiskBuffer.loadData(value);
-      });
-
-  for (size_t i = 0; i < graphCount; i++) {
-    currentGraphNames[i]->setSynchronousCallbacks();
-    currentGraphNames[i]->registerChangeCallback([&](std::string value) {
-      std::string fullDatasetPath = File::conformPathToOS(
-          mDatasetManager.getGlobalRootPath() +
-          File::conformPathToOS(mDatasetManager.mCurrentDataset.get()));
-
-      std::cout << "loading graph [" << i << "] " << value << " at "
-                << fullDatasetPath << std::endl;
-      // New image module puts origin on top right
-      //        if (mGraphTextureLock.try_lock()) {
-      //            if (mGraphFilePathToLoad.size() > 0) {
-      imageDiskBuffers[i]->loadData(value);
-    });
-  }
 
   mLabelFont.alignLeft();
 
@@ -620,13 +597,15 @@ void DataDisplay::nextLayer() { atomrender.nextLayer(); }
 void DataDisplay::previousLayer() { atomrender.previousLayer(); }
 
 void DataDisplay::resetSlicing() {
-  atomrender.mSlicingPlaneCorner.set(slicePickable.bb.min);
+  if (mDatasetManager.mRunProcessors) {
+    atomrender.mSlicingPlaneCorner.set(slicePickable.bb.min);
 
-  atomrender.mSlicingPlaneThickness = atomrender.dataBoundary.dim.z;
-  atomrender.mSlicingPlaneSize =
-      std::max(atomrender.dataBoundary.dim.x, atomrender.dataBoundary.dim.y);
-  atomrender.mSliceRotationRoll.set(0);
-  atomrender.mSliceRotationPitch.set(0);
+    atomrender.mSlicingPlaneThickness = atomrender.dataBoundary.dim.z;
+    atomrender.mSlicingPlaneSize =
+        std::max(atomrender.dataBoundary.dim.x, atomrender.dataBoundary.dim.y);
+    atomrender.mSliceRotationRoll.set(0);
+    atomrender.mSliceRotationPitch.set(0);
+  }
 }
 
 void DataDisplay::updateDisplayBuffers() {
@@ -635,7 +614,8 @@ void DataDisplay::updateDisplayBuffers() {
   auto curVisibleAtoms = mShowAtoms.getSelectedElements();
 
   mTemplateDataBoundaries.resetInv();
-  mAligned4fData.clear();
+
+  std::vector<float> data4f;
 
   mAtomData.clear();
 
@@ -688,13 +668,13 @@ void DataDisplay::updateDisplayBuffers() {
               .mCurrentBasis[basis_index]["occupant_dof"][*occupationPtr];
       if (std::find(curVisibleAtoms.begin(), curVisibleAtoms.end(), atomName) !=
           curVisibleAtoms.end()) {
-        mAligned4fData.push_back(templateDataIt->x);
-        mAligned4fData.push_back(templateDataIt->y);
-        mAligned4fData.push_back(templateDataIt->z);
+        data4f.push_back(templateDataIt->x);
+        data4f.push_back(templateDataIt->y);
+        data4f.push_back(templateDataIt->z);
         mAtomData[atomName].counts++;
 
         auto hue = rgb2hsv(mAtomData[atomName].color.rgb()).h;
-        mAligned4fData.push_back(hue);
+        data4f.push_back(hue);
         Vec3f vec(templateDataIt->x, templateDataIt->y, templateDataIt->z);
         mTemplateDataBoundaries.includePoint(vec);
       }
@@ -751,12 +731,12 @@ void DataDisplay::updateDisplayBuffers() {
                                        [atom.occupancy_dof];
       if (std::find(curVisibleAtoms.begin(), curVisibleAtoms.end(), atomName) !=
           curVisibleAtoms.end()) {
-        mAligned4fData.push_back(templateDataIt->x);
-        mAligned4fData.push_back(templateDataIt->y);
-        mAligned4fData.push_back(templateDataIt->z);
+        data4f.push_back(templateDataIt->x);
+        data4f.push_back(templateDataIt->y);
+        data4f.push_back(templateDataIt->z);
 
         auto hue = rgb2hsv(mAtomData[atomName].color.rgb()).h;
-        mAligned4fData.push_back(hue);
+        data4f.push_back(hue);
         mAtomData[atomName].counts++;
 
         Vec3f vec(templateDataIt->x, templateDataIt->y, templateDataIt->z);
@@ -766,7 +746,7 @@ void DataDisplay::updateDisplayBuffers() {
     }
   }
 
-  if (mAligned4fData.size() > 0) {
+  if (data4f.size() > 0) {
     auto &b = mTemplateDataBoundaries;
     perspectivePickable.bb.set(Vec3f(b.min.x, b.min.y, b.min.z),
                                Vec3f(b.max.x, b.max.y, b.max.z));
@@ -774,7 +754,7 @@ void DataDisplay::updateDisplayBuffers() {
                          Vec3f(b.max.x, b.max.y, (b.max.z - b.min.z) * 0.25f));
     // rh.pose.pos().set(perspectivePickable.bb.cen);
     atomrender.setDataBoundaries(b);
-    atomrender.setPositions(mAligned4fData.data(), mAligned4fData.size());
+    atomrender.setPositions(data4f.data(), data4f.size());
   }
 }
 
@@ -970,7 +950,9 @@ void DataDisplay::prepareParallelProjection(Graphics &g) {
         // now draw data with custom shader
         atomrender.instancingMesh.attrib_data(
             count * 4 * sizeof(float),
-            mAligned4fData.data() + (cumulativeCount * 4), count);
+            atomrender.getData()->getVector<float>().data() +
+                (cumulativeCount * 4),
+            count);
         cumulativeCount += data.second.counts;
         atomrender.instancingMesh.draw();
       }
@@ -988,7 +970,7 @@ void DataDisplay::prepareParallelProjection(Graphics &g) {
 }
 
 void DataDisplay::drawPerspective(Graphics &g) {
-  if (mAligned4fData.size() == 0) {
+  if (atomrender.getData()->getVector<float>().size() == 0) {
     return; // No data has been loaded
   }
 

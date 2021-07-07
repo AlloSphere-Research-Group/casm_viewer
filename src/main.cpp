@@ -437,7 +437,7 @@ public:
         } else if (r.triggerRelease() || r.gripRelease()) {
           display->mPickableManager.event(PickEvent(Unpick, ray));
         } else {
-          display->mPickableManager.event(PickEvent(Point, ray));
+          display->mPickableManager.event(PickEvent(al::Point, ray));
         }
       }
     }
@@ -543,7 +543,7 @@ public:
       // r = rayTransformAllosphere(r);
       for (auto *display : dataDisplays) {
         if (display->mVisible != 0.0f) {
-          display->mPickableManager.event(PickEvent(Point, r));
+          display->mPickableManager.event(PickEvent(al::Point, r));
         }
       }
     } else if ("/pick" == m.addressPattern()) {

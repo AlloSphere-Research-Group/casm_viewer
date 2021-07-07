@@ -428,7 +428,6 @@ bool DataDisplay::initDataset() {
       mDatasetManager.sampleProcessorGraph, {}, {});
   if (mDatasetManager.graphGenerator.getOutputFileNames().size() > 0) {
     mDatasetManager.currentGraphName.set(
-        mDatasetManager.graphGenerator.getOutputDirectory() +
         mDatasetManager.graphGenerator.getOutputFileNames()[0]);
   }
   size_t count = 0;

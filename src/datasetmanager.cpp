@@ -116,8 +116,7 @@ void DatasetManager::initializeComputation() {
         mParameterSpace.runProcess(sampleProcessorGraph, {}, {});
         //      sampleProcessorGraph.process();
         if (graphGenerator.getOutputFileNames().size() > 0) {
-          currentGraphName.set(graphGenerator.getOutputDirectory() +
-                               graphGenerator.getOutputFileNames()[0]);
+          currentGraphName.set(graphGenerator.getOutputFileNames()[0]);
         }
         currentPoscarName.set(labelProcessor.getOutputDirectory() +
                               labelProcessor.getOutputFileNames()[0]);
@@ -236,8 +235,7 @@ void DatasetManager::initializeComputation() {
       mPlotYAxis.setNoCalls(value); // Force internal value, discard old value
       if (graphGenerator.process()) {
         if (graphGenerator.getOutputFileNames().size() > 0) {
-          currentGraphName.set(graphGenerator.getOutputDirectory() +
-                               graphGenerator.getOutputFileNames()[0]);
+          currentGraphName.set(graphGenerator.getOutputFileNames()[0]);
         }
       }
     }
@@ -248,8 +246,7 @@ void DatasetManager::initializeComputation() {
       mPlotXAxis.setNoCalls(value); // Force internal value, discard old value
       if (graphGenerator.process()) {
         if (graphGenerator.getOutputFileNames().size() > 0) {
-          currentGraphName.set(graphGenerator.getOutputDirectory() +
-                               graphGenerator.getOutputFileNames()[0]);
+          currentGraphName.set(graphGenerator.getOutputFileNames()[0]);
         }
       }
     }

@@ -74,8 +74,7 @@ public:
   BufferManager<std::vector<occupation_t>> occupationData{8};
 
   static const size_t maxPercolationTypes = 10;
-  BufferManager<std::vector<uint16_t>> percolationData[maxPercolationTypes] = {
-      {4}, {4}, {4}, {4}, {4}, {4}, {4}, {4}, {4}, {4}};
+  BufferManager<std::vector<uint16_t>> percolationData[maxPercolationTypes];
 
   struct position_t {
     float x, y, z;

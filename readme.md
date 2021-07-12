@@ -40,6 +40,13 @@ To get all the needed submodules.
 
 You can then use the ```run.sh``` script inside a bash shell (on Windows, Linux or macOS) or open the CMakeLists.txt file in an IDE that supports cmake.
 
+TINC requires MetCDF4 to build. We provide the build_deps.sh script in 
+external/tinc for building on Linux and OS X. This script requires the 
+libcurl-dev pacakge on Linux.
+On Windows, the installation of 
+NetCDF from the official installers will be detected if it was installed in the
+default location.
+
 # Running
 
 You will need python3, numpy and netcdf4 installed and accessible. You can set the python 

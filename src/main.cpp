@@ -1390,7 +1390,7 @@ public:
             // New image module puts origin on top right
             //        if (mGraphTextureLock.try_lock()) {
             //            if (mGraphFilePathToLoad.size() > 0) {
-            display->imageDiskBuffer.setPath(
+            display->imageDiskBuffer.setRelativePath(
                 display->mDatasetManager.graphGenerator.getOutputDirectory());
             display->imageDiskBuffer.loadData(value, isPrimary());
           });

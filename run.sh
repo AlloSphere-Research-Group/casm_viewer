@@ -46,6 +46,10 @@ set -x
 set +x
 
 if [ $? == 0 ]; then
+    if [[ -z "$LD_LIBRARY_PATH" ]]; then
+      export LD_LIBRARY_PATH=`pwd`"/../../external/tinc/external/usr/lib"
+      echo  "Setting LD_LIBRARY_PATH to $LD_LIBRARY_PATH"
+    fi
     cd ../../bin
     ./casm_viewer
 fi

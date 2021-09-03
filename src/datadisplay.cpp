@@ -921,7 +921,6 @@ void DataDisplay::prepareParallelProjection(Graphics &g) {
       // ----------------------------------------
       int cumulativeCount = 0;
       g.shader(atomrender.instancingMesh.shader);
-      g.update(); // sends modelview and projection matrices
       g.shader().uniform("dataScale", atomrender.mDataScale.get());
       g.shader().uniform("is_omni", 0.0f);
       g.shader().uniform("eye_sep", g.lens().eyeSep() * g.eye() / 2.0f);
@@ -943,18 +942,17 @@ void DataDisplay::prepareParallelProjection(Graphics &g) {
 
       g.shader().uniform("is_line", 0.0f);
 
-      for (auto &data : mAtomData) {
+      //      for (auto &data : mAtomData) {
 
-        int count = data.second.counts;
-        // now draw data with custom shader
-        atomrender.instancingMesh.attrib_data(
-            count * 4 * sizeof(float),
-            atomrender.getData()->getVector<float>().data() +
-                (cumulativeCount * 4),
-            count);
-        cumulativeCount += data.second.counts;
-        atomrender.instancingMesh.draw();
-      }
+      //        int count = data.second.counts;
+      //        // now draw data with custom shader
+      //        cumulativeCount += data.second.counts;
+      //        atomrender.instancingMesh.draw();
+      //      }
+      g.update(); // sends modelview and projection matrices
+      auto &dataVector = atomrender.getData()->getVector<float>();
+
+      atomrender.renderInstances(g, dataVector.data(), dataVector.size() / 4);
 
       g.popMatrix();
     }
@@ -1136,8 +1134,6 @@ void DataDisplay::drawPerspective(Graphics &g) {
 
     g.popMatrix();
   }
-
-  //  g.popMatrix(); // pop pickable matrix
 }
 
 void DataDisplay::drawParallelProjection(Graphics &g) {

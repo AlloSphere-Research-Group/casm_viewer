@@ -108,6 +108,7 @@ public:
   al::ParameterMenu mPlotYAxis{"PlotYAxis"};
   al::ParameterMenu mPlotXAxis{"PlotXAxis"};
 
+  //
   al::ParameterMenu mAtomOfInterest{"AtomOfInterest", "", 0};
   al::ParameterChoice mShellSiteTypes{"ShellSiteTypes"};
   al::ParameterChoice mPercolationTypes{"PercolationTypes"};

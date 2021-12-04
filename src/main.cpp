@@ -275,7 +275,10 @@ public:
         *positionPresets << graph->bundle;
       }
       vdvBundle << display->bundle;
+      presetHandler->skipParameter(
+          display->mDatasetManager.mCurrentDataset.getFullAddress());
     }
+
     // Add parameters that are not part of the bundle
     *presetHandler << Z << X; //
 

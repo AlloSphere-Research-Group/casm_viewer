@@ -608,7 +608,6 @@ void DataDisplay::resetSlicing() {
 }
 
 void DataDisplay::updateDisplayBuffers() {
-  //  std::map<string, int> elementCounts;
 
   auto curVisibleAtoms = mShowAtoms.getSelectedElements();
 
@@ -942,13 +941,6 @@ void DataDisplay::prepareParallelProjection(Graphics &g) {
 
       g.shader().uniform("is_line", 0.0f);
 
-      //      for (auto &data : mAtomData) {
-
-      //        int count = data.second.counts;
-      //        // now draw data with custom shader
-      //        cumulativeCount += data.second.counts;
-      //        atomrender.instancingMesh.draw();
-      //      }
       g.update(); // sends modelview and projection matrices
       auto &dataVector = atomrender.getData()->getVector<float>();
 

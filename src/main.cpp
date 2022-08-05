@@ -813,9 +813,18 @@ public:
       }
 
     } else {
+      static bool loaded = false;
       if (ImGui::Button("Load dataset")) {
         mDatasetSelector = new FileSelector(dataRoot, File::isDirectory);
         mDatasetSelector->start(mPreviousBrowseDir);
+        if (this->dataDisplays[vdvBundle.currentBundle()]
+                ->mDatasetManager.mParameterSpace.getDimensions()
+                .size() > 0) {
+          loaded = true;
+        }
+      }
+      if (!loaded && ImGui::Button("Cancel")) {
+        loaded = true;
       }
       if (this->dataDisplays[vdvBundle.currentBundle()]->lastError.get() !=
           "") {
@@ -823,10 +832,7 @@ public:
                               ->lastError.get()
                               .c_str());
       }
-      if (this->dataDisplays[vdvBundle.currentBundle()]
-              ->mDatasetManager.mParameterSpace.getDimensions()
-              .size() > 0) {
-
+      if (loaded) {
         ParameterGUI::draw(&mComputeCache);
         if (mAutoAdvance == 0.0) {
           ImGui::Separator();

@@ -240,8 +240,6 @@ private:
       mPercolationData[DatasetManager::maxPercolationTypes];
   std::vector<float>
       mAlignedPercolation4fData[DatasetManager::maxPercolationTypes];
-
-  BoundingBoxData mTemplateDataBoundaries;
 };
 
 #endif // DATASETDISPLAY_HPP

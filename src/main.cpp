@@ -222,6 +222,17 @@ public:
       if (dataRoot.size() > 0) {
         dataDisplays.back()->mDatasetManager.mGlobalRoot = dataRoot;
       }
+
+      DataDisplay *newDisplay = dataDisplays.back();
+      newDisplay->atomrender.registerUpdateCallback([newDisplay](bool ok) {
+        auto b = newDisplay->atomrender.getDataBoundaries();
+        newDisplay->perspectivePickable.bb.set(
+            Vec3f(b.min.x, b.min.y, b.min.z), Vec3f(b.max.x, b.max.y, b.max.z));
+        newDisplay->slicePickable.bb.set(
+            Vec3f(b.min.x, b.min.y, b.min.z),
+            Vec3f(b.max.x, b.max.y, (b.max.z - b.min.z) * 0.25f));
+        newDisplay->resetSlicing();
+      });
     }
 
     char *szBuff;

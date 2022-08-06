@@ -486,6 +486,7 @@ void DataDisplay::prepare(Graphics &g) {
     mColorTrigger.set(false);
     updateDisplayBuffers();
   }
+
   updatePercolationBuffers();
   prepareParallelProjection(g);
 }
@@ -596,22 +597,18 @@ void DataDisplay::nextLayer() { atomrender.nextLayer(); }
 void DataDisplay::previousLayer() { atomrender.previousLayer(); }
 
 void DataDisplay::resetSlicing() {
-  if (mDatasetManager.mRunProcessors) {
-    atomrender.mSlicingPlaneCorner.set(slicePickable.bb.min);
+  atomrender.mSlicingPlaneCorner.set(slicePickable.bb.min);
 
-    atomrender.mSlicingPlaneThickness = atomrender.dataBoundary.dim.z;
-    atomrender.mSlicingPlaneSize =
-        std::max(atomrender.dataBoundary.dim.x, atomrender.dataBoundary.dim.y);
-    atomrender.mSliceRotationRoll.set(0);
-    atomrender.mSliceRotationPitch.set(0);
-  }
+  atomrender.mSlicingPlaneThickness = atomrender.dataBoundary.dim.z;
+  atomrender.mSlicingPlaneSize =
+      std::max(atomrender.dataBoundary.dim.x, atomrender.dataBoundary.dim.y);
+  atomrender.mSliceRotationRoll.set(0);
+  atomrender.mSliceRotationPitch.set(0);
 }
 
 void DataDisplay::updateDisplayBuffers() {
 
   auto curVisibleAtoms = mShowAtoms.getSelectedElements();
-
-  mTemplateDataBoundaries.resetInv();
 
   std::vector<float> data4f;
 
@@ -674,7 +671,6 @@ void DataDisplay::updateDisplayBuffers() {
         auto hue = rgb2hsv(mAtomData[atomName].color.rgb()).h;
         data4f.push_back(hue);
         Vec3f vec(templateDataIt->x, templateDataIt->y, templateDataIt->z);
-        mTemplateDataBoundaries.includePoint(vec);
       }
       if (prevOccupationPtr) {
         std::string prevAtomName =
@@ -736,23 +732,14 @@ void DataDisplay::updateDisplayBuffers() {
         auto hue = rgb2hsv(mAtomData[atomName].color.rgb()).h;
         data4f.push_back(hue);
         mAtomData[atomName].counts++;
-
-        Vec3f vec(templateDataIt->x, templateDataIt->y, templateDataIt->z);
-        mTemplateDataBoundaries.includePoint(vec);
       }
       templateDataIt++;
     }
   }
 
   if (data4f.size() > 0) {
-    auto &b = mTemplateDataBoundaries;
-    perspectivePickable.bb.set(Vec3f(b.min.x, b.min.y, b.min.z),
-                               Vec3f(b.max.x, b.max.y, b.max.z));
-    slicePickable.bb.set(Vec3f(b.min.x, b.min.y, b.min.z),
-                         Vec3f(b.max.x, b.max.y, (b.max.z - b.min.z) * 0.25f));
-    // rh.pose.pos().set(perspectivePickable.bb.cen);
-    atomrender.setDataBoundaries(b);
     atomrender.setPositions(data4f.data(), data4f.size());
+    // rh.pose.pos().set(perspectivePickable.bb.cen);
   }
 }
 
@@ -835,9 +822,10 @@ void DataDisplay::prepareParallelProjection(Graphics &g) {
   float top = atomrender.mSlicingPlaneSize + padding;
   float bottom = -padding;
 
+  auto dataBoundary = atomrender.getDataBoundaries();
   g.projMatrix(Matrix4f::ortho(ar * left, ar * right, bottom, top,
-                               mTemplateDataBoundaries.min.z - 100,
-                               mTemplateDataBoundaries.max.z + 100));
+                               dataBoundary.min.z - 100,
+                               dataBoundary.max.z + 100));
 
   // save for later
   GLboolean last_enable_scissor_test = glIsEnabled(GL_SCISSOR_TEST);

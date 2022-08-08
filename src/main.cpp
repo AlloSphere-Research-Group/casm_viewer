@@ -1359,15 +1359,15 @@ public:
     if (isPrimary()) {
       // Configure TINC server
       tincServer.setVerbose(true);
-      if (primaryHost.size() > 0) {
-        tincServer.start(34450, primaryHost.c_str());
+      if (sphere::isSimulatorMachine()) {
+        tincServer.start(34450, "192.168.0.151");
       } else {
         tincServer.start();
       }
     } else {
       tincClient.setVerbose(true);
-      if (primaryHost.size() > 0) {
-        tincClient.start(34450, primaryHost.c_str());
+      if (sphere::isRendererMachine()) {
+        tincClient.start(34450, "192.168.0.151");
       } else {
         tincClient.start();
       }

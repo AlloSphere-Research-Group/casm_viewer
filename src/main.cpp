@@ -1369,7 +1369,8 @@ public:
     } else {
       tincClient.setVerbose(true);
       if (sphere::isRendererMachine()) {
-        tincClient.start(34450, "192.168.0.151");
+        std::cout << "Client on renderer" << std::endl;
+        tincClient.start(34450, primaryHost.c_str());
       } else {
         tincClient.start();
       }

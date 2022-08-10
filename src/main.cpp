@@ -1355,6 +1355,8 @@ public:
     dataDisplays[0]->mHistoryRender.registerWithTinc(*tinc);
     dataDisplays[0]->mTrajRender.registerWithTinc(*tinc);
     dataDisplays[0]->atomrender.registerWithTinc(*tinc);
+    dataDisplays[0]->mTriRender.registerWithTinc(*tinc);
+
     auto primaryHost = getPrimaryHost();
     if (isPrimary()) {
       // Configure TINC server

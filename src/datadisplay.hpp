@@ -35,6 +35,7 @@
 #include "tinc/VASPReader.hpp"
 #include "tinc/vis/AtomRenderer.hpp"
 #include "tinc/vis/TrajectoryRender.hpp"
+#include "tinc/vis/TriangleRender.hpp"
 
 #include "datasetmanager.hpp"
 
@@ -143,6 +144,7 @@ public:
 
   TrajectoryRender mHistoryRender{"history", "history.nc", "", "", 4};
   TrajectoryRender mTrajRender{"trajectory", "trajectory.nc", "", "", 4};
+  TriangleRender mTriRender{"triangles", "triangles.nc"};
 
   std::string mParamText;
 

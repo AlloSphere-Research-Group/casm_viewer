@@ -792,9 +792,11 @@ void DataDisplay::drawTrajectories(Graphics &g) {
 
   mHistoryRender.update(0);
   mTrajRender.update(0);
+  mTriRender.update(0);
 
   mHistoryRender.onProcess(g);
   mTrajRender.onProcess(g);
+  mTriRender.onProcess(g);
 
   g.popMatrix();
 }

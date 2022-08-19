@@ -1362,25 +1362,29 @@ public:
 
     if (sphere::isSphereMachine()) {
       if (isPrimary()) {
+        al::Dir::make("/alloshare/tmp");
         dataDisplays[0]->mHistoryRender.setRootPath("/alloshare/tmp");
         dataDisplays[0]->mTrajRender.setRootPath("/alloshare/tmp");
         dataDisplays[0]->atomrender.setRootPath("/alloshare/tmp");
         dataDisplays[0]->mTriRender.setRootPath("/alloshare/tmp");
 
-        dataDisplays[0]->imageDiskBuffer.setRootPath("/alloshare/tmp");
+        dataDisplays[0]->imageDiskBuffer.setRootPath("/alloshare/tmp/");
         for (const auto &b : dataDisplays[0]->imageDiskBuffers) {
-          b->setRootPath("/alloshare/tmp");
+          b->setRootPath("/alloshare/tmp/");
         }
+        al::Dir::make("/alloshare/tmp/cachedGraph");
       } else {
+        al::Dir::make("/alloshare/tmp");
         dataDisplays[0]->mHistoryRender.setRootPath("/alloshare/tmp");
         dataDisplays[0]->mTrajRender.setRootPath("/alloshare/tmp");
         dataDisplays[0]->atomrender.setRootPath("/alloshare/tmp");
         dataDisplays[0]->mTriRender.setRootPath("/alloshare/tmp");
 
-        dataDisplays[0]->imageDiskBuffer.setRootPath("/alloshare/tmp");
+        dataDisplays[0]->imageDiskBuffer.setRootPath("/alloshare/tmp/");
         for (const auto &b : dataDisplays[0]->imageDiskBuffers) {
-          b->setRootPath("/alloshare/tmp");
+          b->setRootPath("/alloshare/tmp/");
         }
+        al::Dir::make("/alloshare/tmp/cachedGraph");
       }
     }
 
@@ -1398,7 +1402,7 @@ public:
       tincClient.setVerbose(true);
       if (sphere::isRendererMachine()) {
         std::cout << "Client on renderer" << std::endl;
-        tincClient.start(34450, "ar01.1g");
+        tincClient.start(34450, "ar01");
       } else {
         tincClient.start();
       }

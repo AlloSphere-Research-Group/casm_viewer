@@ -1362,15 +1362,15 @@ public:
 
     if (sphere::isSphereMachine()) {
       if (isPrimary()) {
-        dataDisplays[0]->mHistoryRender.setRootPath("/Volumes/Data/tmp");
-        dataDisplays[0]->mTrajRender.setRootPath("/Volumes/Data/tmp");
-        dataDisplays[0]->atomrender.setRootPath("/Volumes/Data/tmp");
-        dataDisplays[0]->mTriRender.setRootPath("/Volumes/Data/tmp");
+        dataDisplays[0]->mHistoryRender.setRootPath("/alloshare/tmp");
+        dataDisplays[0]->mTrajRender.setRootPath("/alloshare/tmp");
+        dataDisplays[0]->atomrender.setRootPath("/alloshare/tmp");
+        dataDisplays[0]->mTriRender.setRootPath("/alloshare/tmp");
       } else {
-        dataDisplays[0]->mHistoryRender.setRootPath("/data/tmp");
-        dataDisplays[0]->mTrajRender.setRootPath("/data/tmp");
-        dataDisplays[0]->atomrender.setRootPath("/data/tmp");
-        dataDisplays[0]->mTriRender.setRootPath("/data/tmp");
+        dataDisplays[0]->mHistoryRender.setRootPath("/alloshare/tmp");
+        dataDisplays[0]->mTrajRender.setRootPath("/alloshare/tmp");
+        dataDisplays[0]->atomrender.setRootPath("/alloshare/tmp");
+        dataDisplays[0]->mTriRender.setRootPath("/alloshare/tmp");
       }
     }
 
@@ -1383,16 +1383,16 @@ public:
       } else {
         tincServer.start();
       }
-      tincServer.setRootMapEntry("/Volumes/Data/tmp", "/data/tmp");
+      //      tincServer.setRootMapEntry("/Volumes/Data/tmp", "/data/tmp");
     } else {
       tincClient.setVerbose(true);
       if (sphere::isRendererMachine()) {
         std::cout << "Client on renderer" << std::endl;
-        tincClient.start(34450, primaryHost.c_str());
+        tincClient.start(34450, "ar01.1g");
       } else {
         tincClient.start();
       }
-      tincClient.setRootMapEntry("/Volumes/Data/tmp", "/data/tmp");
+      //      tincClient.setRootMapEntry("/Volumes/Data/tmp", "/data/tmp");
     }
     //    percoTools.init();
   }

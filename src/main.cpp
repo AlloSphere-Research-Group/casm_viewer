@@ -1366,11 +1366,21 @@ public:
         dataDisplays[0]->mTrajRender.setRootPath("/alloshare/tmp");
         dataDisplays[0]->atomrender.setRootPath("/alloshare/tmp");
         dataDisplays[0]->mTriRender.setRootPath("/alloshare/tmp");
+
+        dataDisplays[0]->imageDiskBuffer.setRootPath("/alloshare/tmp");
+        for (const auto &b : dataDisplays[0]->imageDiskBuffers) {
+          b->setRootPath("/alloshare/tmp");
+        }
       } else {
         dataDisplays[0]->mHistoryRender.setRootPath("/alloshare/tmp");
         dataDisplays[0]->mTrajRender.setRootPath("/alloshare/tmp");
         dataDisplays[0]->atomrender.setRootPath("/alloshare/tmp");
         dataDisplays[0]->mTriRender.setRootPath("/alloshare/tmp");
+
+        dataDisplays[0]->imageDiskBuffer.setRootPath("/alloshare/tmp");
+        for (const auto &b : dataDisplays[0]->imageDiskBuffers) {
+          b->setRootPath("/alloshare/tmp");
+        }
       }
     }
 

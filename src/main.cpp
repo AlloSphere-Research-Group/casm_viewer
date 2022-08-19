@@ -368,6 +368,9 @@ public:
     mControllerMesh.scale(0.1f, 0.1f, 1);
     mControllerMesh.update();
 #endif
+
+    // Information on TINC component
+    tinc->print();
   }
 
   virtual void onAnimate(double /*dt*/) override {
@@ -1357,6 +1360,20 @@ public:
     dataDisplays[0]->atomrender.registerWithTinc(*tinc);
     dataDisplays[0]->mTriRender.registerWithTinc(*tinc);
 
+    if (sphere::isSphereMachine()) {
+      if (isPrimary()) {
+        dataDisplays[0]->mHistoryRender.setRootPath("/Volumes/Data/tmp");
+        dataDisplays[0]->mTrajRender.setRootPath("/Volumes/Data/tmp");
+        dataDisplays[0]->atomrender.setRootPath("/Volumes/Data/tmp");
+        dataDisplays[0]->mTriRender.setRootPath("/Volumes/Data/tmp");
+      } else {
+        dataDisplays[0]->mHistoryRender.setRootPath("/data/tmp");
+        dataDisplays[0]->mTrajRender.setRootPath("/data/tmp");
+        dataDisplays[0]->atomrender.setRootPath("/data/tmp");
+        dataDisplays[0]->mTriRender.setRootPath("/data/tmp");
+      }
+    }
+
     auto primaryHost = getPrimaryHost();
     if (isPrimary()) {
       // Configure TINC server
@@ -1366,6 +1383,7 @@ public:
       } else {
         tincServer.start();
       }
+      tincServer.setRootMapEntry("/Volumes/Data/tmp", "/data/tmp");
     } else {
       tincClient.setVerbose(true);
       if (sphere::isRendererMachine()) {
@@ -1374,6 +1392,7 @@ public:
       } else {
         tincClient.start();
       }
+      tincClient.setRootMapEntry("/Volumes/Data/tmp", "/data/tmp");
     }
     //    percoTools.init();
   }
